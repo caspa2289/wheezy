@@ -1,12 +1,11 @@
 export enum EntityTypes {
     gameObject = 'gameObject',
     component = 'component',
-    mesh = 'mesh',
 }
 
 export type EntityType = keyof typeof EntityTypes
 
-export interface IEntity<T extends EntityType> {
+export interface IEntity<T extends Partial<EntityType>> {
     id: string
     type: T
 }
