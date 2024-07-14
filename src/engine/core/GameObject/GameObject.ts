@@ -1,4 +1,4 @@
-import { EntityTypes, IGameObject } from '../../types'
+import { EntityTypes, IGameObject, SceneTreePosition } from '../../types'
 import { Entity } from '../Entity'
 
 export class GameObject
@@ -8,9 +8,14 @@ export class GameObject
     _children = [] as IGameObject[]
     _parent = null as IGameObject['parent']
     _components = [] as IGameObject['components']
+    _sceneTreePosition = [] as SceneTreePosition
 
     constructor() {
         super(EntityTypes.gameObject)
+    }
+
+    get sceneTreePosition() {
+        return this._sceneTreePosition
     }
 
     get children() {

@@ -1,3 +1,5 @@
 export * from './core/Entity'
 export * from './core/GameObject'
 export * from './core/Component'
+export * from './core/SceneTree'
+export * from './core/ObjectManager'

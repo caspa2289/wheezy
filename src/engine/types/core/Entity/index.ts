@@ -5,7 +5,9 @@ export enum EntityTypes {
 
 export type EntityType = keyof typeof EntityTypes
 
+export type EntityID = string
+
 export interface IEntity<T extends Partial<EntityType>> {
-    id: string
+    id: EntityID
     type: T
 }
