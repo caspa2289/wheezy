@@ -1,20 +1,62 @@
-import { EntityID, IGameObject, IObjectManager } from '../../types'
+import {
+    EntityID,
+    IGameObject,
+    IObjectManager,
+    ISceneTree,
+    SceneTreePosition,
+} from '../../types'
+import { SceneTree } from '../SceneTree'
+
+type ObjectPositions = Map<EntityID, SceneTreePosition | null>
 
 export class ObjectManager implements IObjectManager {
-    _objects: Map<EntityID, IGameObject> = new Map()
+    private _objectPositions: ObjectPositions = new Map()
+    private _sceneTree: ISceneTree = new SceneTree()
 
-    get objects() {
-        return this._objects
+    private getObjectPosition(gameObject?: IGameObject | null) {
+        return gameObject
+            ? this._objectPositions.get(gameObject.id) ?? null
+            : null
     }
 
-    //FIXME: should always be a child of smth
-    public add(object: IGameObject) {
-        this._objects.set(object.id, object)
+    public addObject(child: IGameObject, target?: IGameObject) {
+        const position = this._sceneTree.addNodeAt(
+            this.getObjectPosition(target),
+            {
+                gameObject: child,
+                children: null,
+            }
+        )
+
+        this._objectPositions.set(child.id, position)
     }
 
-    public remove(id: EntityID) {
-        //FIXME: clear up scene tree
-        //FIXME: remove children as well
-        this._objects.delete(id)
+    public reparentObject(child: IGameObject, target?: IGameObject) {
+        const childPosition = this._objectPositions.get(child.id)
+
+        if (!childPosition) {
+            throw new Error(`Position record not found for ${child.id}`)
+        }
+
+        const newPosition = this._sceneTree.reparentNode(
+            this.getObjectPosition(target),
+            childPosition
+        )
+
+        this._objectPositions.set(child.id, newPosition)
+    }
+
+    public destroyObject(gameObject: IGameObject) {
+        const childPosition = this._objectPositions.get(gameObject.id)
+
+        if (!childPosition) {
+            throw new Error(`Position record not found for ${gameObject.id}`)
+        }
+
+        const idsToRemove = this._sceneTree.removeNode(childPosition)
+
+        idsToRemove.forEach((id) => {
+            this._objectPositions.delete(id)
+        })
     }
 }

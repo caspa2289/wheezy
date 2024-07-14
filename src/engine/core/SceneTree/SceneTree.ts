@@ -1,48 +1,86 @@
 import {
-    IGameObject,
+    EntityID,
     ISceneTree,
     SceneNode,
+    SceneNodeContent,
     SceneTreePosition,
 } from '../../types'
 
 export class SceneTree implements ISceneTree {
-    _nodes: SceneNode[] = []
+    _nodes: SceneNode = new Map()
 
-    addNodeAt(
-        position: SceneTreePosition | null,
-        node: SceneNode
-    ): SceneTreePosition {
-        if (!position) {
-            this._nodes = [...this._nodes, node]
-
-            return [] as SceneTreePosition
-        }
-
-        let currentTreeNode = this._nodes[position[0]]
+    public getNodeContentAt(position: SceneTreePosition) {
+        let currentTreeNode = this._nodes.get(position[0])
 
         for (let i = 1; i < position.length; i++) {
-            currentTreeNode = currentTreeNode[1][position[i]]
+            currentTreeNode = currentTreeNode?.children?.get(position[i])
         }
 
-        currentTreeNode[1] = [...currentTreeNode[1], node]
-
-        return [...position, currentTreeNode.length]
+        return currentTreeNode ?? null
     }
 
-    public addNodeAsChild(parent: IGameObject, child: IGameObject) {
-        const parentPosition = parent.sceneTreePosition
-        const childNode = [child.id, []] as SceneNode
+    public addNodeAt(
+        position: SceneTreePosition | null,
+        nodeContent: SceneNodeContent
+    ): SceneTreePosition {
+        if (!position) {
+            this._nodes.set(nodeContent.gameObject.id, nodeContent)
 
-        this.addNodeAt(parentPosition, childNode)
+            return [nodeContent.gameObject.id]
+        }
+
+        let currentTreeNode = this.getNodeContentAt(position)
+
+        currentTreeNode?.children?.set(nodeContent.gameObject.id, nodeContent)
+
+        return [...position, nodeContent.gameObject.id]
     }
 
-    //FIXME: child should be a node probable
-    public reparentNode(target: IGameObject, child: IGameObject) {
-        //FIXME: take into account that child node could have children already
+    public reparentNode(
+        target: SceneTreePosition | null,
+        child: SceneTreePosition
+    ): SceneTreePosition {
+        const nodeContent = this.getNodeContentAt(child)
+
+        if (!nodeContent) {
+            throw new Error(`No node found at position ${child.join()}`)
+        }
+
+        const newPosition = this.addNodeAt(target, nodeContent)
+        this.removeNode(child)
+
+        return newPosition
     }
 
-    //FIXME: maybe return an array of ids to remove for object manager here
-    public removeNode(object: IGameObject) {}
+    public removeNode(targetPosition: SceneTreePosition): EntityID[] {
+        const parentPosition = targetPosition.slice(-1)
+        const parentNode = this.getNodeContentAt(parentPosition)
+
+        const childrenIds: EntityID[] = []
+        this.traverseNode(parentNode?.children, (nodeId) => {
+            childrenIds.push(nodeId)
+        })
+
+        parentNode?.children?.delete(targetPosition[targetPosition.length - 1])
+
+        return childrenIds
+    }
+
+    public traverseNode(
+        node: SceneNode | null | undefined,
+        callback: (nodeId: EntityID, nodeContent: SceneNodeContent) => void
+    ) {
+        const iterate = (sceneNode?: SceneNode | null) => {
+            if (!sceneNode) return
+
+            sceneNode.forEach((value, key) => {
+                callback(key, value)
+                iterate(value.children)
+            })
+        }
+
+        iterate(node)
+    }
 
     get nodes() {
         return this._nodes

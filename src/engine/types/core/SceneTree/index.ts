@@ -1,16 +1,26 @@
 import { EntityID } from '../Entity'
 import { IGameObject } from '../GameObject'
 
-export type SceneNode = [EntityID, SceneNode[]]
-export type SceneTreePosition = number[]
+export type SceneNode = Map<EntityID, SceneNodeContent>
+
+export type SceneNodeContent = {
+    gameObject: IGameObject
+    children: SceneNode | null
+}
+
+export type SceneTreePosition = EntityID[]
 
 export interface ISceneTree {
-    nodes: SceneNode[]
+    nodes: SceneNode
     addNodeAt: (
         position: SceneTreePosition | null,
-        node: SceneNode
+        node: SceneNodeContent
     ) => SceneTreePosition
-    addNodeAsChild: (parent: IGameObject, child: IGameObject) => void
-    reparentNode: (target: IGameObject, child: IGameObject) => void
-    removeNode: (object: IGameObject) => void
+    reparentNode: (
+        target: SceneTreePosition | null,
+        child: SceneTreePosition
+    ) => SceneTreePosition
+    //returns an array of gameObject ids to be cleared from ObjectManager
+    removeNode: (targetPosition: SceneTreePosition) => EntityID[]
+    getNodeContentAt: (position: SceneTreePosition) => SceneNodeContent | null
 }
