@@ -3,5 +3,6 @@ import { EntityTypes, IEntity } from '../Entity'
 
 export interface IGameObject extends IEntity<EntityTypes.gameObject> {
     onUpdate?: (dt: number) => void
-    components: IComponent[]
+    //FIXME: type includes gameObject
+    components: IComponent<EntityTypes>[]
 }

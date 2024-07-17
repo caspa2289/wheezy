@@ -1,14 +1,6 @@
-import { EntityTypes, IEntity } from '../Entity'
+import { EntityType, IEntity } from '../Entity'
 import { IGameObject } from '../GameObject'
 
-export enum ComponentTypes {
-    mesh = 'mesh',
-    transform = 'transform',
-}
-
-export type ComponentType = keyof typeof ComponentTypes
-
-export interface IComponent extends IEntity<EntityTypes.component> {
+export interface IComponent<T extends EntityType> extends IEntity<T> {
     parent: IGameObject
-    componentType: ComponentType
 }

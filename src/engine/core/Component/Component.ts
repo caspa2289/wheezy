@@ -1,24 +1,15 @@
 import { EntityTypes, IComponent } from '../../types'
 import { Entity } from '../Entity'
 
-export class Component
-    extends Entity<EntityTypes.component>
-    implements IComponent
+export class Component<T extends EntityTypes>
+    extends Entity<T>
+    implements IComponent<T>
 {
-    _componentType: IComponent['componentType']
-    _parent: IComponent['parent']
+    _parent: IComponent<T>['parent']
 
-    constructor(
-        parent: IComponent['parent'],
-        componentType: IComponent['componentType']
-    ) {
-        super(EntityTypes.component)
+    constructor(parent: IComponent<T>['parent'], componentType: T) {
+        super(componentType)
         this._parent = parent
-        this._componentType = componentType
-    }
-
-    get componentType() {
-        return this._componentType
     }
 
     get parent() {

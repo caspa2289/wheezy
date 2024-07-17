@@ -1,6 +1,8 @@
 export enum EntityTypes {
     gameObject = 'gameObject',
-    component = 'component',
+    mesh = 'mesh',
+    material = 'material',
+    transform = 'transform',
 }
 
 export type EntityType = keyof typeof EntityTypes
