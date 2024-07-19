@@ -1,9 +1,11 @@
 import { IComponent } from '../Component'
-import { EntityTypes, IEntity } from '../Entity'
+import { EntityID, EntityTypes, IEntity } from '../Entity'
 
 export interface IGameObject extends IEntity<EntityTypes.gameObject> {
     name: string
     onUpdate?: (dt: number) => void
     //FIXME: type includes gameObject
-    components: IComponent<EntityTypes>[]
+    components: Map<EntityID, IComponent<EntityTypes>>
+    addComponent: (component: IComponent<EntityTypes>) => void
+    removeComponent: (id: EntityID) => void
 }

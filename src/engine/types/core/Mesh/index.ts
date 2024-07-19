@@ -1,9 +1,10 @@
 import { IComponent } from '../Component'
 import { EntityTypes } from '../Entity'
+import { Vec3, Vec4 } from 'wgpu-matrix'
 
 export type MaterialPBR = {
     //FIXME: type this
-    baseColorFactor?: [0.5, 0.5, 0.5, 1.0] //vec4
+    baseColorFactor?: Vec4 //vec4
     baseColorTexture?: {
         index: 1
         texCoord: 1
@@ -27,7 +28,27 @@ export interface IMaterial {
     }
     occlusionTexture?: []
     emissiveTexture?: []
-    emissiveFactor?: [0.2, 0.1, 0.0]
+    emissiveFactor?: Vec3
+}
+
+export interface GLTFBufferView {
+    byteLength: number
+    byteStride: number
+    view: Uint8Array
+    buffer: GPUBuffer
+    usage: GPUBufferUsageFlags
+}
+
+export interface GLTFAccessor {
+    byteStride: number
+    count: number
+    componentType: number
+    type: string
+    bufferView: GLTFBufferView
+    byteOffset: number
+    elementType: GPUVertexFormat
+    min?: number[]
+    max?: number[]
 }
 
 export interface IMesh extends IComponent<EntityTypes.mesh> {
@@ -38,16 +59,15 @@ export interface IMesh extends IComponent<EntityTypes.mesh> {
     //     TEXCOORD_0: 25
     // }
     //https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-mesh-primitive
-    normal?: [] //buffer slice
-    position?: [] //buffer slice
-    tangent?: [] //buffer slice
+    normal?: GLTFAccessor
+    tangent?: GLTFAccessor
     //FIXME: why could there be multiple?
-    textureCoordinates?: [] //buffer slice
-    indices?: [] //buffer slice
+    textureCoordinates?: GLTFAccessor[]
+    indices?: GLTFAccessor
     //FIXME: implement default material according to defaults https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-material
     //FIXME: implement materials
     // material: IMaterial //if not present in the file, a default material should be used
-    //FIXME: type this
+    positions: GLTFAccessor
     mode: number //gpu topology - default is 4
     /**
         0 POINTS

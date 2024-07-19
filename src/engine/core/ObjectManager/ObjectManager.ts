@@ -24,7 +24,7 @@ export class ObjectManager implements IObjectManager {
             this.getObjectPosition(target),
             {
                 gameObject: child,
-                children: null,
+                children: new Map(),
             }
         )
 

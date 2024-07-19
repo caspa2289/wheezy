@@ -10,6 +10,7 @@ export class Component<T extends EntityTypes>
     constructor(parent: IComponent<T>['parent'], componentType: T) {
         super(componentType)
         this._parent = parent
+        this._parent.addComponent(this)
     }
 
     get parent() {

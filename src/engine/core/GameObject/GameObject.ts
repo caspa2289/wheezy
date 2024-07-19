@@ -1,4 +1,4 @@
-import { EntityTypes, IGameObject } from '../../types'
+import { EntityID, EntityTypes, IComponent, IGameObject } from '../../types'
 import { Entity } from '../Entity'
 
 export class GameObject
@@ -6,7 +6,7 @@ export class GameObject
     implements IGameObject
 {
     _name: string
-    _components = [] as IGameObject['components']
+    _components = new Map() as Map<EntityID, IComponent<EntityTypes>>
 
     constructor() {
         super(EntityTypes.gameObject)
@@ -25,7 +25,11 @@ export class GameObject
         return this._components
     }
 
-    set components(value) {
-        this._components = value
+    public addComponent(component: IComponent<EntityTypes>) {
+        this._components.set(component.id, component)
+    }
+
+    public removeComponent(id: EntityID) {
+        this._components.delete(id)
     }
 }
