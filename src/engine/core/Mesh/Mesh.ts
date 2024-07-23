@@ -4,12 +4,18 @@ import { Component } from '../Component'
 export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
     mode = 4 // GPU topology mode
     positions: GLTFAccessor //buffer view or accessor?
+    indices?: GLTFAccessor
     renderPipeline?: GPURenderPipeline
 
-    constructor(parent: IGameObject, positions: GLTFAccessor) {
+    constructor(
+        parent: IGameObject,
+        positions: GLTFAccessor,
+        indices?: GLTFAccessor
+    ) {
         super(parent, EntityTypes.mesh)
 
         this.positions = positions
+        this.indices = indices
     }
 
     public buildRenderPipeline(
@@ -26,10 +32,6 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
                 {
                     arrayStride: this.positions.byteStride,
                     attributes: [
-                        // Note: We do not pass the positions.byteOffset here, as its
-                        // meaning can vary in different glB files, i.e., if it's
-                        // being used for interleaved element offset or an absolute
-                        // offset.
                         {
                             format: this.positions.elementType,
                             offset: 0,
@@ -46,17 +48,15 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
             targets: [{ format: colorFormat }],
         }
 
-        // Our loader only supports triangle lists and strips, so by default we set
-        // the primitive topology to triangle list, and check if it's
-        // instead a triangle strip
         const primitive: GPUPrimitiveState = {
             topology: 'triangle-list',
             stripIndexFormat: undefined,
         }
-        // if (this.mode === 5) {
-        //     primitive.topology = 'triangle-strip'
-        //     primitive.stripIndexFormat = this.indices.vertexType
-        // }
+        if (this.mode === 5) {
+            primitive.topology = 'triangle-strip'
+            primitive.stripIndexFormat = this?.indices
+                ?.elementType as GPUIndexFormat
+        }
 
         const layout = device.createPipelineLayout({
             bindGroupLayouts: [uniformsBGLayout],
@@ -73,5 +73,28 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
                 depthCompare: 'less',
             },
         })
+    }
+
+    render(renderPassEncoder: GPURenderPassEncoder) {
+        renderPassEncoder.setPipeline(this.renderPipeline as GPURenderPipeline)
+
+        renderPassEncoder.setVertexBuffer(
+            0,
+            this.positions.bufferView.buffer,
+            this.positions.byteOffset,
+            this.positions.byteLength
+        )
+
+        if (this.indices) {
+            renderPassEncoder.setIndexBuffer(
+                this.indices.bufferView.buffer,
+                this.indices.elementType as GPUIndexFormat,
+                this.indices.byteOffset,
+                this.indices.byteLength
+            )
+            renderPassEncoder.drawIndexed(this.indices.count)
+        } else {
+            renderPassEncoder.draw(this.positions.count)
+        }
     }
 }

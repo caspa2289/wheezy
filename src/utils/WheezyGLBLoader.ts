@@ -13,7 +13,7 @@ export class WheezyGLBLoader {
         //FIXME: buffers uploading to gpu on load
         const modelData = await load(url, GLBLoader)
 
-        // console.log(modelData)
+        console.log(modelData)
 
         const sceneObject = new GameObject()
 
@@ -31,7 +31,79 @@ export class WheezyGLBLoader {
             })
         })
 
-        console.log(objectManager)
+        // console.log(objectManager)
+    }
+
+    private static parseAccessor = (
+        modelData: Record<string, any>,
+        accessorId: number,
+        usage: GPUBufferUsageFlags,
+        device: GPUDevice
+    ): GLTFAccessor | undefined => {
+        if (accessorId !== 0 && !accessorId) {
+            return undefined
+        }
+
+        const rawAccessor = modelData.json.accessors[accessorId]
+
+        console.log(rawAccessor)
+
+        const rawBufferView = modelData.json.bufferViews[rawAccessor.bufferView]
+
+        console.log(rawBufferView)
+
+        const buffer = modelData.binChunks[rawBufferView.buffer]
+
+        console.log(buffer)
+
+        const view = new Uint8Array(
+            buffer.arrayBuffer,
+            //FIXME: why does this work for avocado and not the duck?
+            rawBufferView.byteOffset + buffer.byteOffset,
+            rawBufferView.byteLength
+        )
+        const buf = device.createBuffer({
+            size: alignTo(rawBufferView.byteLength, 4),
+            usage,
+            mappedAtCreation: true,
+        })
+
+        new Uint8Array(buf.getMappedRange()).set(view)
+        buf.unmap()
+
+        const elementSize = getTypeSize(
+            rawAccessor.componentType,
+            rawAccessor.type
+        )
+        const byteStride = Math.max(elementSize, rawBufferView.byteStride ?? 0)
+
+        // console.log(rawAccessor)
+        const a = {
+            byteStride: byteStride,
+            byteLength: rawAccessor.count * (byteStride ?? 1),
+            count: rawAccessor.count,
+            componentType: rawAccessor.componentType,
+            type: rawAccessor.type,
+            byteOffset: rawAccessor.byteOffset ?? 0,
+            elementType: getVertexType(
+                rawAccessor.componentType,
+                rawAccessor.type
+            ),
+            min: rawAccessor.min,
+            max: rawAccessor.max,
+            bufferView: {
+                byteLength: rawBufferView.byteLength,
+                byteStride: rawBufferView.byteStride ?? 0,
+                //FIXME: buf and view are essentially identical
+                view: view,
+                buffer: buf,
+                usage: usage,
+            },
+        }
+
+        console.log(a)
+
+        return a
     }
 
     private static loadNode(
@@ -56,8 +128,6 @@ export class WheezyGLBLoader {
         )
 
         if (nodeJsonData.mesh !== undefined) {
-            //FIXME: get mesh buffers accessors and set them here
-            // const positionAccessor: GLTFAccessor = {}
             const meshJsonData = modelData.json.meshes[nodeJsonData.mesh]
             nodeGameObject.name = meshJsonData.name
 
@@ -83,65 +153,30 @@ export class WheezyGLBLoader {
                     mode: number
                     material: number
                 }) => {
-                    //TODO!
-                    //FIXME: Parse textures, materials, etc. here
-                    const positionRawAccessor =
-                        modelData.json.accessors[primitive.attributes.POSITION]
-
-                    const positionRawBufferView =
-                        modelData.json.bufferViews[
-                            positionRawAccessor.bufferView
-                        ]
-
-                    // console.log(positionRawBufferView)
-
-                    const positionBuffer =
-                        modelData.binChunks[positionRawBufferView.buffer]
-
-                    // console.log(positionBuffer)
-
                     const meshGameObject = new GameObject()
                     objectManager.addObject(meshGameObject, nodeGameObject)
+                    //TODO!
+                    //FIXME: Parse textures, materials, etc. here
+                    const positionsAccessor = WheezyGLBLoader.parseAccessor(
+                        modelData,
+                        primitive.attributes.POSITION,
+                        GPUBufferUsage.VERTEX,
+                        device
+                    ) as GLTFAccessor
 
-                    const view = new Uint8Array(
-                        positionBuffer.arrayBuffer
-                    ).subarray(
-                        positionRawBufferView.byteOffset,
-                        positionRawBufferView.byteOffset +
-                            positionRawBufferView.byteLength
+                    const indicesAccessor = WheezyGLBLoader.parseAccessor(
+                        modelData,
+                        primitive.indices,
+                        GPUBufferUsage.INDEX,
+                        device
                     )
-                    const buf = device.createBuffer({
-                        size: positionRawBufferView.byteLength,
-                        usage: positionRawBufferView.target,
-                        mappedAtCreation: true,
-                    })
-                    new Uint8Array(buf.getMappedRange()).set(view)
-                    buf.unmap()
 
-                    const positionAccessor: GLTFAccessor = {
-                        byteStride: positionRawAccessor.byteStride ?? 0,
-                        count: positionRawAccessor.count,
-                        componentType: positionRawAccessor.componentType,
-                        type: positionRawAccessor.type,
-                        byteOffset: positionRawAccessor.byteOffset ?? 0,
-                        elementType: getVertexType(
-                            positionRawAccessor.componentType,
-                            positionRawAccessor.type
-                        ),
-                        min: positionRawAccessor.min,
-                        max: positionRawAccessor.max,
-                        bufferView: {
-                            byteLength: positionRawBufferView.byteLength,
-                            byteStride: positionRawBufferView.byteStride,
-                            view,
-                            buffer: buf,
-                            usage: positionRawBufferView.target,
-                        },
-                    }
-
-                    const mesh = new Mesh(meshGameObject, positionAccessor)
-
-                    // console.log(mesh)
+                    const mesh = new Mesh(
+                        meshGameObject,
+                        positionsAccessor,
+                        indicesAccessor
+                    )
+                    mesh.mode = primitive.mode ?? 4
                 }
             )
         }
@@ -178,6 +213,7 @@ const getTypeComponentsAmount = (type: string) => {
         case 'VEC3':
             return 3
         case 'VEC4':
+            return 4
         case 'MAT2':
             return 4
         case 'MAT3':
@@ -223,6 +259,8 @@ const getVertexType = (
     }
 
     switch (getTypeComponentsAmount(type)) {
+        case 1:
+            break
         case 2:
             typeStr += 'x2'
             break
@@ -237,4 +275,41 @@ const getVertexType = (
     }
 
     return typeStr as GPUVertexFormat
+}
+
+const getTypeSize = (componentType: GLTFComponentType, type: string) => {
+    let componentSize = 0
+    switch (componentType) {
+        case GLTFComponentType.BYTE:
+            componentSize = 1
+            break
+        case GLTFComponentType.UNSIGNED_BYTE:
+            componentSize = 1
+            break
+        case GLTFComponentType.SHORT:
+            componentSize = 2
+            break
+        case GLTFComponentType.UNSIGNED_SHORT:
+            componentSize = 2
+            break
+        case GLTFComponentType.INT:
+            componentSize = 4
+            break
+        case GLTFComponentType.UNSIGNED_INT:
+            componentSize = 4
+            break
+        case GLTFComponentType.FLOAT:
+            componentSize = 4
+            break
+        case GLTFComponentType.DOUBLE:
+            componentSize = 8
+            break
+        default:
+            throw Error('Unrecognized GLTF Component Type?')
+    }
+    return getTypeComponentsAmount(type) * componentSize
+}
+
+const alignTo = (val: number, align: number) => {
+    return Math.floor((val + align - 1) / align) * align
 }

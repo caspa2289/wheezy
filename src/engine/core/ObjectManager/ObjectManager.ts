@@ -13,6 +13,10 @@ export class ObjectManager implements IObjectManager {
     private _objectPositions: ObjectPositions = new Map()
     private _sceneTree: ISceneTree = new SceneTree()
 
+    public get sceneTree() {
+        return this._sceneTree
+    }
+
     private getObjectPosition(gameObject?: IGameObject | null) {
         return gameObject
             ? this._objectPositions.get(gameObject.id) ?? null

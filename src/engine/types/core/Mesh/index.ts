@@ -46,6 +46,8 @@ export interface GLTFAccessor {
     type: string
     bufferView: GLTFBufferView
     byteOffset: number
+    byteLength: number
+    //FIXME: could be GPUIndexFormat
     elementType: GPUVertexFormat
     min?: number[]
     max?: number[]
