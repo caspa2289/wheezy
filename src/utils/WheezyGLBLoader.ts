@@ -13,7 +13,7 @@ export class WheezyGLBLoader {
         //FIXME: buffers uploading to gpu on load
         const modelData = await load(url, GLBLoader)
 
-        console.log(modelData)
+        // console.log(modelData)
 
         const sceneObject = new GameObject()
 
@@ -45,20 +45,11 @@ export class WheezyGLBLoader {
         }
 
         const rawAccessor = modelData.json.accessors[accessorId]
-
-        console.log(rawAccessor)
-
         const rawBufferView = modelData.json.bufferViews[rawAccessor.bufferView]
-
-        console.log(rawBufferView)
-
         const buffer = modelData.binChunks[rawBufferView.buffer]
-
-        console.log(buffer)
 
         const view = new Uint8Array(
             buffer.arrayBuffer,
-            //FIXME: why does this work for avocado and not the duck?
             rawBufferView.byteOffset + buffer.byteOffset,
             rawBufferView.byteLength
         )
@@ -77,8 +68,7 @@ export class WheezyGLBLoader {
         )
         const byteStride = Math.max(elementSize, rawBufferView.byteStride ?? 0)
 
-        // console.log(rawAccessor)
-        const a = {
+        return {
             byteStride: byteStride,
             byteLength: rawAccessor.count * (byteStride ?? 1),
             count: rawAccessor.count,
@@ -100,10 +90,6 @@ export class WheezyGLBLoader {
                 usage: usage,
             },
         }
-
-        console.log(a)
-
-        return a
     }
 
     private static loadNode(

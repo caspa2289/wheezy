@@ -3,6 +3,7 @@ export enum EntityTypes {
     mesh = 'mesh',
     material = 'material',
     transform = 'transform',
+    camera = 'camera',
 }
 
 export type EntityType = keyof typeof EntityTypes
