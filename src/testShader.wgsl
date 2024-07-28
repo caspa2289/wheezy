@@ -27,6 +27,7 @@ var<uniform> view_params: ViewParams;
 @vertex
 fn vertex_main(vert: VertexInput) -> VertexOutput {
     var out: VertexOutput;
+    //FIXME: maybe view projection is required actually
     // out.position = view_params.view_proj * node_params.transform * float4(vert.position, 1.0);
     out.position = view_params.view_proj * float4(vert.position, 1);
     out.world_pos = vert.position.xyz;

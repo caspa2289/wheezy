@@ -1,3 +1,4 @@
+import { mat4 } from 'wgpu-matrix'
 import { EntityTypes, GLTFAccessor, IGameObject, IMesh } from '../../types'
 import { Component } from '../Component'
 

@@ -2,6 +2,7 @@ import { load } from '@loaders.gl/core'
 import { GLBLoader } from '@loaders.gl/gltf'
 import { GLTFAccessor, IGameObject, IObjectManager } from '../engine/types'
 import { GameObject, Mesh, Transform } from '../engine/core'
+import { mat4 } from 'wgpu-matrix'
 
 export class WheezyGLBLoader {
     public static async loadFromUrl(
@@ -30,8 +31,6 @@ export class WheezyGLBLoader {
                 )
             })
         })
-
-        // console.log(objectManager)
     }
 
     private static parseAccessor = (
@@ -107,26 +106,14 @@ export class WheezyGLBLoader {
         objectManager.addObject(nodeGameObject, parentObject)
 
         //FIXME: figure out what format is used for trs values in the parser
-        const nodeTransfrom = new Transform(
-            nodeGameObject,
-            undefined,
-            nodeJsonData.matrix
-        )
+        // console.log(nodeJsonData)
+        //FIXME: transform trs values to trs matrix here, for now expect matrix to always be present
+        //add transform to newly created gameobject
+        const nodeTransform = new Transform(nodeGameObject, nodeJsonData.matrix)
 
         if (nodeJsonData.mesh !== undefined) {
             const meshJsonData = modelData.json.meshes[nodeJsonData.mesh]
             nodeGameObject.name = meshJsonData.name
-
-            // {
-            //     "attributes": {
-            //         "NORMAL": 1,
-            //         "POSITION": 2,
-            //         "TEXCOORD_0": 3
-            //     },
-            //     "indices": 0,
-            //     "mode": 4,
-            //     "material": 0
-            // }
 
             meshJsonData.primitives.forEach(
                 (primitive: {

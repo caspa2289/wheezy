@@ -97,10 +97,10 @@ export class PerspectiveCamera extends Entity<EntityTypes.camera> {
         vec3.copy(vec, this._back)
     }
 
-    private _recalculateAngles(direction: Vec3) {
-        this.yaw = Math.atan2(direction[0], direction[2])
-        this.pitch = -Math.asin(direction[1])
-    }
+    // private _recalculateAngles(direction: Vec3) {
+    //     this.yaw = Math.atan2(direction[0], direction[2])
+    //     this.pitch = -Math.asin(direction[1])
+    // }
 
     get pitch() {
         return this._pitch
@@ -116,6 +116,10 @@ export class PerspectiveCamera extends Entity<EntityTypes.camera> {
 
     set yaw(value) {
         this._yaw = value
+    }
+
+    get matrix() {
+        return this._matrix
     }
 
     update(): Mat4 {
