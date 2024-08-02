@@ -14,7 +14,7 @@ export interface PerspectiveCameraProps {
 export class PerspectiveCamera extends Entity<EntityTypes.camera> {
     private readonly _view = mat4.create()
 
-    private _matrix = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0])
+    private _matrix = mat4.identity()
     private _right = new Float32Array(this._matrix.buffer, 4 * 0, 4)
     private _up = new Float32Array(this._matrix.buffer, 4 * 4, 4)
     private _back = new Float32Array(this._matrix.buffer, 4 * 8, 4)
@@ -47,6 +47,7 @@ export class PerspectiveCamera extends Entity<EntityTypes.camera> {
         // const target = vec3.create(0, 0, 0)
         // const forward = vec3.normalize(vec3.sub(target, vec3.create(0, 0, 0)))
         // this._recalculateAngles(forward)
+        mat4.translate(this._matrix, position, this._matrix)
     }
 
     get aspectRatio() {
@@ -126,7 +127,10 @@ export class PerspectiveCamera extends Entity<EntityTypes.camera> {
         this.yaw = Stuff.mod(this.yaw, Math.PI * 2)
         this.pitch = Stuff.clamp(this.pitch, -Math.PI / 2, Math.PI / 2)
 
-        this._matrix = mat4.rotateX(mat4.rotationY(this.yaw), this.pitch)
+        this._matrix = mat4.mul(
+            this._matrix,
+            mat4.rotateX(mat4.rotationY(this.yaw), this.pitch)
+        )
         this.view = mat4.invert(this._matrix)
 
         return this.view

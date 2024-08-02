@@ -1,10 +1,9 @@
 import { Mesh, ObjectManager } from './engine/core'
 import { WheezyGLBLoader } from './utils'
 import shaderCode from './testShader.wgsl'
-import { EntityTypes, IMesh } from './engine/types'
-import { mat4, quat, vec3 } from 'wgpu-matrix'
+import { EntityTypes, ITransform, SceneNodeContent } from './engine/types'
+import { Mat4, mat4, vec3 } from 'wgpu-matrix'
 import { PerspectiveCamera } from './engine/core/cameras'
-import { Stuff } from './utils/Stuff'
 ;(async () => {
     const objectManager = new ObjectManager()
 
@@ -36,7 +35,17 @@ import { Stuff } from './utils/Stuff'
         usage: GPUTextureUsage.RENDER_ATTACHMENT,
     })
 
-    const bindGroupLayout = device.createBindGroupLayout({
+    const viewParamsBindGroupLayout = device.createBindGroupLayout({
+        entries: [
+            {
+                binding: 0,
+                visibility: GPUShaderStage.VERTEX,
+                buffer: { type: 'uniform' },
+            },
+        ],
+    })
+
+    const nodeParamsBindGroupLayout = device.createBindGroupLayout({
         entries: [
             {
                 binding: 0,
@@ -52,17 +61,17 @@ import { Stuff } from './utils/Stuff'
     })
 
     const viewParamBG = device.createBindGroup({
-        layout: bindGroupLayout,
+        layout: viewParamsBindGroupLayout,
         entries: [{ binding: 0, resource: { buffer: viewParamsBuffer } }],
     })
 
     const ass = await WheezyGLBLoader.loadFromUrl(
-        'static/models/Duck.glb',
+        'static/models/AntiqueCamera.glb',
         objectManager,
         device
     )
 
-    const iterateNode = (node: any) => {
+    const iterateNode = (node: SceneNodeContent) => {
         node?.gameObject?.components?.forEach((component: any) => {
             if (component.type === EntityTypes.mesh) {
                 ;(component as Mesh).buildRenderPipeline(
@@ -70,10 +79,9 @@ import { Stuff } from './utils/Stuff'
                     shaderModule,
                     swapChainFormat,
                     depthFormat,
-                    bindGroupLayout
+                    viewParamsBindGroupLayout,
+                    nodeParamsBindGroupLayout
                 )
-
-                console.log(component)
             }
         })
         node?.children?.forEach((child: any) => {
@@ -110,80 +118,81 @@ import { Stuff } from './utils/Stuff'
         zNear: 0.0001,
         canvasWidth: canvas.width,
         canvasHeight: canvas.height,
-        position: vec3.create(),
+        // position: vec3.create(-160, 85, 200),
+        position: vec3.create(0, 7, 9),
     })
 
     //camera controller setup
-    let moveLeft = false
-    let moveRight = false
-    let moveForward = false
-    let moveBack = false
-    let moveUp = false
-    let moveDown = false
-    let rotateLeft = false
-    let rotateRight = false
+    // let moveLeft = false
+    // let moveRight = false
+    // let moveForward = false
+    // let moveBack = false
+    // let moveUp = false
+    // let moveDown = false
+    // let rotateLeft = false
+    // let rotateRight = false
 
-    window.addEventListener('keydown', (evt: any) => {
-        switch (evt.code) {
-            case 'KeyA':
-                moveLeft = true
-                break
-            case 'KeyD':
-                moveRight = true
-                break
-            case 'KeyS':
-                moveBack = true
-                break
-            case 'KeyW':
-                moveForward = true
-                break
-            case 'KeyQ':
-                rotateLeft = true
-                break
-            case 'KeyE':
-                rotateRight = true
-                break
-            case 'Space':
-                moveUp = true
-                break
-            case 'ControlLeft':
-                moveDown = true
-                break
-            default:
-                break
-        }
-    })
+    // window.addEventListener('keydown', (evt: any) => {
+    //     switch (evt.code) {
+    //         case 'KeyA':
+    //             moveLeft = true
+    //             break
+    //         case 'KeyD':
+    //             moveRight = true
+    //             break
+    //         case 'KeyS':
+    //             moveBack = true
+    //             break
+    //         case 'KeyW':
+    //             moveForward = true
+    //             break
+    //         case 'KeyQ':
+    //             rotateLeft = true
+    //             break
+    //         case 'KeyE':
+    //             rotateRight = true
+    //             break
+    //         case 'Space':
+    //             moveUp = true
+    //             break
+    //         case 'ControlLeft':
+    //             moveDown = true
+    //             break
+    //         default:
+    //             break
+    //     }
+    // })
 
-    window.addEventListener('keyup', (evt: any) => {
-        switch (evt.code) {
-            case 'KeyA':
-                moveLeft = false
-                break
-            case 'KeyD':
-                moveRight = false
-                break
-            case 'KeyS':
-                moveBack = false
-                break
-            case 'KeyW':
-                moveForward = false
-                break
-            case 'KeyQ':
-                rotateLeft = false
-                break
-            case 'KeyE':
-                rotateRight = false
-                break
-            case 'Space':
-                moveUp = false
-                break
-            case 'ControlLeft':
-                moveDown = false
-                break
-            default:
-                break
-        }
-    })
+    // window.addEventListener('keyup', (evt: any) => {
+    //     switch (evt.code) {
+    //         case 'KeyA':
+    //             moveLeft = false
+    //             break
+    //         case 'KeyD':
+    //             moveRight = false
+    //             break
+    //         case 'KeyS':
+    //             moveBack = false
+    //             break
+    //         case 'KeyW':
+    //             moveForward = false
+    //             break
+    //         case 'KeyQ':
+    //             rotateLeft = false
+    //             break
+    //         case 'KeyE':
+    //             rotateRight = false
+    //             break
+    //         case 'Space':
+    //             moveUp = false
+    //             break
+    //         case 'ControlLeft':
+    //             moveDown = false
+    //             break
+    //         default:
+    //             break
+    //     }
+    // })
 
     // let velocity = vec3.create()
 
@@ -226,59 +235,32 @@ import { Stuff } from './utils/Stuff'
         /**************/
         camera.update()
 
-        const iterateNode = (node: any) => {
+        const meshesToRender: Mesh[] = []
+
+        const viewParamsUploadBuffer = device.createBuffer({
+            size: 16 * 4,
+            usage: GPUBufferUsage.COPY_SRC,
+            mappedAtCreation: true,
+        })
+
+        const viewMap = new Float32Array(
+            viewParamsUploadBuffer.getMappedRange()
+        )
+        viewMap.set(camera.projectionMatrix)
+        viewParamsUploadBuffer.unmap()
+
+        const iterateNode = (node: SceneNodeContent, worldMatrix: Mat4) => {
+            const nodeTransform = [...node.gameObject.components.values()].find(
+                (component) => component.type === EntityTypes.transform
+            ) as ITransform | undefined
+
+            const meshMatrix = nodeTransform
+                ? //FIXME: why multiplication gives different results for duck and engine?
+                  mat4.mul(worldMatrix, nodeTransform.matrix)
+                : worldMatrix
+
             node?.gameObject?.components?.forEach((component: any) => {
                 if (component.type === EntityTypes.mesh) {
-                    //FYI: placeholder for transform`s matrix
-                    //********* */
-                    const meshMatrix = mat4.create(
-                        1,
-                        0,
-                        0,
-                        0,
-                        0,
-                        1,
-                        0,
-                        0,
-                        0,
-                        0,
-                        1,
-                        0
-                    )
-
-                    mat4.translate(
-                        meshMatrix,
-                        vec3.create(0, -2, -5),
-                        meshMatrix
-                    )
-
-                    mat4.scale(
-                        meshMatrix,
-                        vec3.create(0.02, 0.02, 0.02),
-                        meshMatrix
-                    )
-
-                    mat4.axisRotate(
-                        meshMatrix,
-                        vec3.create(0, 1, 0),
-                        -1.2,
-                        meshMatrix
-                    )
-
-                    //********* */
-
-                    renderPassDesc.colorAttachments[0].view = context
-                        .getCurrentTexture()
-                        .createView()
-
-                    const commandEncoder = device.createCommandEncoder()
-
-                    const uploadBuffer = device.createBuffer({
-                        size: 16 * 4,
-                        usage: GPUBufferUsage.COPY_SRC,
-                        mappedAtCreation: true,
-                    })
-
                     const viewMatrix = mat4.copy(camera.view)
 
                     mat4.translate(
@@ -314,46 +296,68 @@ import { Stuff } from './utils/Stuff'
                         viewMatrix
                     )
 
-                    const modelViewProjection = mat4.multiply(
-                        camera.projectionMatrix,
-                        viewMatrix
-                    ) as Float32Array
-
-                    const map = new Float32Array(uploadBuffer.getMappedRange())
-                    map.set(modelViewProjection)
-                    uploadBuffer.unmap()
-
-                    commandEncoder.copyBufferToBuffer(
-                        uploadBuffer,
-                        0,
-                        viewParamsBuffer,
-                        0,
-                        16 * 4
+                    const nodeParamsUploadBuffer = device.createBuffer({
+                        size: 16 * 4,
+                        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+                        mappedAtCreation: true,
+                    })
+                    const nodeParamsMap = new Float32Array(
+                        nodeParamsUploadBuffer.getMappedRange()
                     )
+                    nodeParamsMap.set(viewMatrix)
+                    nodeParamsUploadBuffer.unmap()
 
-                    const renderPass =
-                        commandEncoder.beginRenderPass(renderPassDesc)
+                    component.nodeParamsBindGroup = device.createBindGroup({
+                        layout: nodeParamsBindGroupLayout,
+                        entries: [
+                            {
+                                binding: 0,
+                                resource: { buffer: nodeParamsUploadBuffer },
+                            },
+                        ],
+                    })
 
-                    renderPass.setBindGroup(0, viewParamBG) // renderPass.setBindGroup(1, this.nodeParamsBG);
-                    ;(component as Mesh).render(renderPass)
-
-                    //FIXME: find a way to do it without creating a render pass for each primitive
-                    renderPass.end()
-                    device.queue.submit([commandEncoder.finish()])
-                    uploadBuffer.destroy()
+                    meshesToRender.push(component)
                 }
             })
+
             node?.children?.forEach((child: any) => {
-                iterateNode(child)
+                iterateNode(child, meshMatrix)
             })
         }
 
         objectManager.sceneTree.nodes.forEach((node) => {
-            iterateNode(node)
+            iterateNode(node, mat4.identity())
         })
+
+        const commandEncoder = device.createCommandEncoder()
+
+        commandEncoder.copyBufferToBuffer(
+            viewParamsUploadBuffer,
+            0,
+            viewParamsBuffer,
+            0,
+            16 * 4
+        )
+
+        renderPassDesc.colorAttachments[0].view = context
+            .getCurrentTexture()
+            .createView()
+        const renderPass = commandEncoder.beginRenderPass(renderPassDesc)
+
+        renderPass.setBindGroup(0, viewParamBG)
+
+        meshesToRender.forEach((mesh) => {
+            renderPass.setBindGroup(1, mesh.nodeParamsBindGroup as GPUBindGroup)
+            mesh.render(renderPass)
+        })
+
+        renderPass.end()
+        device.queue.submit([commandEncoder.finish()])
+        viewParamsUploadBuffer.destroy()
 
         requestAnimationFrame(render)
     }
     requestAnimationFrame(render)
-    // render()
+    // render(1)
 })()

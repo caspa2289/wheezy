@@ -14,7 +14,7 @@ export class WheezyGLBLoader {
         //FIXME: buffers uploading to gpu on load
         const modelData = await load(url, GLBLoader)
 
-        // console.log(modelData)
+        console.log(modelData)
 
         const sceneObject = new GameObject()
 
@@ -47,9 +47,13 @@ export class WheezyGLBLoader {
         const rawBufferView = modelData.json.bufferViews[rawAccessor.bufferView]
         const buffer = modelData.binChunks[rawBufferView.buffer]
 
+        // console.log(rawAccessor)
+        // console.log(rawBufferView)
+        // console.log(buffer)
+
         const view = new Uint8Array(
             buffer.arrayBuffer,
-            rawBufferView.byteOffset + buffer.byteOffset,
+            rawBufferView.byteOffset + (buffer?.byteOffset ?? 0),
             rawBufferView.byteLength
         )
         const buf = device.createBuffer({
@@ -67,7 +71,7 @@ export class WheezyGLBLoader {
         )
         const byteStride = Math.max(elementSize, rawBufferView.byteStride ?? 0)
 
-        return {
+        const a = {
             byteStride: byteStride,
             byteLength: rawAccessor.count * (byteStride ?? 1),
             count: rawAccessor.count,
@@ -89,6 +93,11 @@ export class WheezyGLBLoader {
                 usage: usage,
             },
         }
+
+        // console.log(usage)
+        // console.log(a)
+
+        return a
     }
 
     private static loadNode(
@@ -98,10 +107,12 @@ export class WheezyGLBLoader {
         objectManager: IObjectManager,
         parentObject?: IGameObject
     ) {
+        // console.log(modelData)
         const nodeJsonData = modelData?.json?.nodes[nodeIndex]
         if (!nodeJsonData) {
             return
         }
+        // console.log(nodeJsonData)
         const nodeGameObject = new GameObject()
         objectManager.addObject(nodeGameObject, parentObject)
 
@@ -109,7 +120,10 @@ export class WheezyGLBLoader {
         // console.log(nodeJsonData)
         //FIXME: transform trs values to trs matrix here, for now expect matrix to always be present
         //add transform to newly created gameobject
-        const nodeTransform = new Transform(nodeGameObject, nodeJsonData.matrix)
+        const nodeTransform = new Transform(
+            nodeGameObject,
+            nodeJsonData.matrix ?? mat4.identity()
+        )
 
         if (nodeJsonData.mesh !== undefined) {
             const meshJsonData = modelData.json.meshes[nodeJsonData.mesh]
@@ -149,6 +163,7 @@ export class WheezyGLBLoader {
                         positionsAccessor,
                         indicesAccessor
                     )
+
                     mesh.mode = primitive.mode ?? 4
                 }
             )

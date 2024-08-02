@@ -7,6 +7,7 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
     positions: GLTFAccessor //buffer view or accessor?
     indices?: GLTFAccessor
     renderPipeline?: GPURenderPipeline
+    nodeParamsBindGroup?: GPUBindGroup
 
     constructor(
         parent: IGameObject,
@@ -24,7 +25,8 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
         shaderModule: GPUShaderModule,
         colorFormat: GPUTextureFormat,
         depthFormat: GPUTextureFormat,
-        uniformsBGLayout: GPUBindGroupLayout
+        uniformsBGLayout: GPUBindGroupLayout,
+        nodeParamsBGLayout: GPUBindGroupLayout
     ) {
         const vertexState: GPUVertexState = {
             module: shaderModule,
@@ -60,7 +62,7 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
         }
 
         const layout = device.createPipelineLayout({
-            bindGroupLayouts: [uniformsBGLayout],
+            bindGroupLayouts: [uniformsBGLayout, nodeParamsBGLayout],
         })
 
         this.renderPipeline = device.createRenderPipeline({
