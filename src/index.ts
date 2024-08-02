@@ -66,7 +66,7 @@ import { PerspectiveCamera } from './engine/core/cameras'
     })
 
     const ass = await WheezyGLBLoader.loadFromUrl(
-        'static/models/AntiqueCamera.glb',
+        'static/models/Engine.glb',
         objectManager,
         device
     )
@@ -115,11 +115,12 @@ import { PerspectiveCamera } from './engine/core/cameras'
 
     const camera = new PerspectiveCamera({
         zFar: 1000,
-        zNear: 0.0001,
+        zNear: 0.1,
         canvasWidth: canvas.width,
         canvasHeight: canvas.height,
-        // position: vec3.create(-160, 85, 200),
-        position: vec3.create(0, 7, 9),
+        position: vec3.create(-30, 55, 700),
+        // position: vec3.create(0, 7, 9),
+        // position: vec3.create(0, 0, 0.15),
     })
 
     //camera controller setup
