@@ -1,4 +1,4 @@
-import { Mat4, mat4, vec3, Vec3 } from 'wgpu-matrix'
+import { Mat4, mat4, vec3, Vec3, vec4 } from 'wgpu-matrix'
 import { EntityTypes } from '../../../types'
 import { Entity } from '../../Entity'
 import { Stuff } from '../../../../utils/Stuff'
@@ -14,10 +14,13 @@ export interface PerspectiveCameraProps {
 export class PerspectiveCamera extends Entity<EntityTypes.camera> {
     private readonly _view = mat4.create()
 
-    private _matrix = mat4.identity()
+    private _matrix = new Float32Array([
+        1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
+    ])
     private _right = new Float32Array(this._matrix.buffer, 4 * 0, 4)
     private _up = new Float32Array(this._matrix.buffer, 4 * 4, 4)
     private _back = new Float32Array(this._matrix.buffer, 4 * 8, 4)
+    private _position = new Float32Array(this._matrix.buffer, 4 * 12, 4)
 
     private _zFar: number
     private _zNear: number
@@ -44,10 +47,16 @@ export class PerspectiveCamera extends Entity<EntityTypes.camera> {
             this._zNear,
             this._zFar
         )
-        // const target = vec3.create(0, 0, 0)
-        // const forward = vec3.normalize(vec3.sub(target, vec3.create(0, 0, 0)))
-        // this._recalculateAngles(forward)
-        mat4.translate(this._matrix, position, this._matrix)
+
+        const target = vec3.create(0, 0, 0)
+        const back = vec3.normalize(vec3.sub(position, target))
+        this._recalculateAngles(back)
+        this.position = position
+    }
+
+    private _recalculateAngles(direction: Vec3) {
+        this.yaw = Math.atan2(direction[0], direction[2])
+        this.pitch = -Math.asin(direction[1])
     }
 
     get aspectRatio() {
@@ -98,11 +107,6 @@ export class PerspectiveCamera extends Entity<EntityTypes.camera> {
         vec3.copy(vec, this._back)
     }
 
-    // private _recalculateAngles(direction: Vec3) {
-    //     this.yaw = Math.atan2(direction[0], direction[2])
-    //     this.pitch = -Math.asin(direction[1])
-    // }
-
     get pitch() {
         return this._pitch
     }
@@ -123,15 +127,28 @@ export class PerspectiveCamera extends Entity<EntityTypes.camera> {
         return this._matrix
     }
 
+    set matrix(value: Mat4) {
+        this._matrix = mat4.copy(value, this._matrix)
+        this._recalculateAngles(this.back)
+    }
+
+    get position() {
+        return this._position
+    }
+
+    set position(value: Vec3) {
+        vec3.copy(value, this._position)
+    }
+
     update(): Mat4 {
         this.yaw = Stuff.mod(this.yaw, Math.PI * 2)
         this.pitch = Stuff.clamp(this.pitch, -Math.PI / 2, Math.PI / 2)
 
-        this._matrix = mat4.mul(
-            this._matrix,
-            mat4.rotateX(mat4.rotationY(this.yaw), this.pitch)
-        )
-        this.view = mat4.invert(this._matrix)
+        const position = vec3.copy(this.position)
+        this.matrix = mat4.rotateX(mat4.rotationY(this.yaw), this.pitch)
+        this.position = position
+
+        this.view = mat4.invert(this.matrix)
 
         return this.view
     }
