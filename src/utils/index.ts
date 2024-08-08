@@ -1,1 +1,1 @@
-export * from './WheezyGLBLoader'
+export * from './WheezyGLBLoader/WheezyGLBLoader'

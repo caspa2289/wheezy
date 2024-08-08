@@ -1,13 +1,19 @@
-import { mat4 } from 'wgpu-matrix'
 import { EntityTypes, GLTFAccessor, IGameObject, IMesh } from '../../types'
 import { Component } from '../Component'
+import { BufferStorage } from '../BufferStorage'
+
+export const alignTo = (val: number, align: number) => {
+    return Math.floor((val + align - 1) / align) * align
+}
 
 export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
     mode = 4 // GPU topology mode
-    positions: GLTFAccessor //buffer view or accessor?
+    positions: GLTFAccessor
     indices?: GLTFAccessor
     renderPipeline?: GPURenderPipeline
     nodeParamsBindGroup?: GPUBindGroup
+    private positionsBuffer?: GPUBuffer
+    private indicesBuffer?: GPUBuffer
 
     constructor(
         parent: IGameObject,
@@ -26,7 +32,8 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
         colorFormat: GPUTextureFormat,
         depthFormat: GPUTextureFormat,
         uniformsBGLayout: GPUBindGroupLayout,
-        nodeParamsBGLayout: GPUBindGroupLayout
+        nodeParamsBGLayout: GPUBindGroupLayout,
+        bufferStorage: BufferStorage
     ) {
         const vertexState: GPUVertexState = {
             module: shaderModule,
@@ -76,6 +83,38 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
                 depthCompare: 'less',
             },
         })
+
+        const positionsView = new Uint8Array(
+            bufferStorage.buffers.get(this.positions.bufferId) as ArrayBuffer,
+            this.positions.byteOffset,
+            this.positions.byteLength
+        )
+        this.positionsBuffer = device.createBuffer({
+            size: alignTo(this.positions.byteLength, 4),
+            usage: this.positions.usage,
+            mappedAtCreation: true,
+        })
+        new Uint8Array(this.positionsBuffer.getMappedRange()).set(positionsView)
+        this.positionsBuffer.unmap()
+
+        if (this.indices) {
+            const indicesBuffer = bufferStorage.buffers.get(
+                this?.indices.bufferId
+            )
+
+            const indicesView = new Uint8Array(
+                indicesBuffer as ArrayBuffer,
+                this.indices.byteOffset,
+                this.indices.byteLength
+            )
+            this.indicesBuffer = device.createBuffer({
+                size: alignTo(this.indices.byteLength, 4),
+                usage: this.indices.usage,
+                mappedAtCreation: true,
+            })
+            new Uint8Array(this.indicesBuffer.getMappedRange()).set(indicesView)
+            this.indicesBuffer.unmap()
+        }
     }
 
     render(renderPassEncoder: GPURenderPassEncoder) {
@@ -83,16 +122,16 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
 
         renderPassEncoder.setVertexBuffer(
             0,
-            this.positions.bufferView.buffer,
-            this.positions.byteOffset,
+            this.positionsBuffer as GPUBuffer,
+            0,
             this.positions.byteLength
         )
 
         if (this.indices) {
             renderPassEncoder.setIndexBuffer(
-                this.indices.bufferView.buffer,
+                this.indicesBuffer as GPUBuffer,
                 this.indices.elementType as GPUIndexFormat,
-                this.indices.byteOffset,
+                0,
                 this.indices.byteLength
             )
             renderPassEncoder.drawIndexed(this.indices.count)

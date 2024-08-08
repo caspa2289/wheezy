@@ -1,13 +1,150 @@
-import { Mesh, ObjectManager } from './engine/core'
+import { GameObject, Mesh, ObjectManager, Transform } from './engine/core'
 import { WheezyGLBLoader } from './utils'
 import shaderCode from './testShader.wgsl'
-import { EntityTypes, ITransform, SceneNodeContent } from './engine/types'
-import { Mat4, mat4, quat, vec3, vec4 } from 'wgpu-matrix'
+import {
+    EntityTypes,
+    GLTFAccessor,
+    IGameObject,
+    IModelPreloadData,
+    IObjectManager,
+    IPreloadEntity,
+    ITransform,
+    SceneNodeContent,
+} from './engine/types'
+import { Mat4, mat4, vec3 } from 'wgpu-matrix'
 import { PerspectiveCamera } from './engine/core/cameras'
 import { Stuff } from './utils/Stuff'
-;(async () => {
-    const objectManager = new ObjectManager()
+import { BufferStorage } from './engine/core/BufferStorage'
+import { IBufferStorage } from './engine/types/core/BufferStorage'
 
+const objectManager = new ObjectManager()
+const bufferStorage = new BufferStorage()
+
+const traversePreloadNode = (
+    node: IPreloadEntity,
+    parentGameObject: IGameObject,
+    objectManager: IObjectManager,
+    pipelineParams: {
+        device: GPUDevice
+        shaderModule: GPUShaderModule
+        colorFormat: GPUTextureFormat
+        depthFormat: GPUTextureFormat
+        uniformsBGLayout: GPUBindGroupLayout
+        nodeParamsBGLayout: GPUBindGroupLayout
+    },
+    bufferStorage: IBufferStorage
+) => {
+    const { trsMatrix, meshes, children } = node
+    const gameObject = new GameObject()
+
+    objectManager.addObject(gameObject, parentGameObject)
+
+    new Transform(gameObject, trsMatrix)
+
+    const {
+        device,
+        shaderModule,
+        colorFormat: swapChainFormat,
+        depthFormat,
+        uniformsBGLayout: viewParamsBindGroupLayout,
+        nodeParamsBGLayout: nodeParamsBindGroupLayout,
+    } = pipelineParams
+
+    meshes.forEach((meshData) => {
+        const mesh = new Mesh(
+            gameObject,
+            meshData.positions as GLTFAccessor,
+            meshData.indices
+        )
+
+        mesh.buildRenderPipeline(
+            device,
+            shaderModule,
+            swapChainFormat,
+            depthFormat,
+            viewParamsBindGroupLayout,
+            nodeParamsBindGroupLayout,
+            bufferStorage
+        )
+    })
+
+    children.forEach((child) => {
+        traversePreloadNode(
+            child,
+            gameObject,
+            objectManager,
+            pipelineParams,
+            bufferStorage
+        )
+    })
+}
+
+const uploadModel = (
+    modelData: IModelPreloadData,
+    objectManager: IObjectManager,
+    pipelineParams: {
+        device: GPUDevice
+        shaderModule: GPUShaderModule
+        colorFormat: GPUTextureFormat
+        depthFormat: GPUTextureFormat
+        uniformsBGLayout: GPUBindGroupLayout
+        nodeParamsBGLayout: GPUBindGroupLayout
+    },
+    bufferStorage: IBufferStorage
+) => {
+    modelData.buffers.forEach((value, key) => {
+        bufferStorage.buffers.set(key, value)
+    })
+
+    const { trsMatrix, meshes, children } = modelData.model
+
+    const sceneObject = new GameObject()
+
+    objectManager.addObject(sceneObject)
+
+    new Transform(sceneObject, trsMatrix)
+
+    const {
+        device,
+        shaderModule,
+        colorFormat: swapChainFormat,
+        depthFormat,
+        uniformsBGLayout: viewParamsBindGroupLayout,
+        nodeParamsBGLayout: nodeParamsBindGroupLayout,
+    } = pipelineParams
+
+    meshes.forEach((meshData) => {
+        const mesh = new Mesh(
+            sceneObject,
+            meshData.positions as GLTFAccessor,
+            meshData.indices
+        )
+
+        mesh.buildRenderPipeline(
+            device,
+            shaderModule,
+            swapChainFormat,
+            depthFormat,
+            viewParamsBindGroupLayout,
+            nodeParamsBindGroupLayout,
+            bufferStorage
+        )
+    })
+
+    children.forEach((child) => {
+        traversePreloadNode(
+            child,
+            sceneObject,
+            objectManager,
+            pipelineParams,
+            bufferStorage
+        )
+    })
+
+    return sceneObject
+}
+
+;(async () => {
     const adapter = (await navigator.gpu.requestAdapter()) as GPUAdapter
     const device = await adapter.requestDevice()
 
@@ -66,33 +203,25 @@ import { Stuff } from './utils/Stuff'
         entries: [{ binding: 0, resource: { buffer: viewParamsBuffer } }],
     })
 
-    const ass = await WheezyGLBLoader.loadFromUrl(
-        'static/models/DamagedHelmet.glb',
-        objectManager,
-        device
+    const modelData = await WheezyGLBLoader.loadFromUrl(
+        'static/models/Engine.glb'
     )
 
-    const iterateNode = (node: SceneNodeContent) => {
-        node?.gameObject?.components?.forEach((component: any) => {
-            if (component.type === EntityTypes.mesh) {
-                ;(component as Mesh).buildRenderPipeline(
-                    device,
-                    shaderModule,
-                    swapChainFormat,
-                    depthFormat,
-                    viewParamsBindGroupLayout,
-                    nodeParamsBindGroupLayout
-                )
-            }
-        })
-        node?.children?.forEach((child: any) => {
-            iterateNode(child)
-        })
-    }
+    const model = uploadModel(
+        modelData,
+        objectManager,
+        {
+            device,
+            shaderModule,
+            colorFormat: swapChainFormat,
+            depthFormat,
+            uniformsBGLayout: viewParamsBindGroupLayout,
+            nodeParamsBGLayout: nodeParamsBindGroupLayout,
+        },
+        bufferStorage
+    )
 
-    objectManager.sceneTree.nodes.forEach((node) => {
-        iterateNode(node)
-    })
+    console.log(objectManager)
 
     const renderPassDesc = {
         colorAttachments: [
@@ -119,9 +248,9 @@ import { Stuff } from './utils/Stuff'
         zNear: 0.1,
         canvasWidth: canvas.width,
         canvasHeight: canvas.height,
-        // position: vec3.create(-30, 55, 700),
+        position: vec3.create(-30, 55, 700),
         // position: vec3.create(0, 7, 9),
-        position: vec3.create(0, 0, 8),
+        // position: vec3.create(0, 0, 8),
     })
 
     //camera controller setup
@@ -220,8 +349,6 @@ import { Stuff } from './utils/Stuff'
     let prevTime = 0
 
     const render = (time: number) => {
-        // camera.update()
-
         const deltaTime = (time - prevTime) / 1000
         prevTime = time
         /****Placeholder camera controller */
@@ -247,7 +374,6 @@ import { Stuff } from './utils/Stuff'
 
         camera.position = vec3.addScaled(camera.position, velocity, deltaTime)
 
-        // console.log(camera.position)
         /**************/
         camera.update()
 
