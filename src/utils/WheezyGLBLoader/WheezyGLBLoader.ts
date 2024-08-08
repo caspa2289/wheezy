@@ -20,6 +20,8 @@ export class WheezyGLBLoader {
     public static async loadFromUrl(url: string): Promise<IModelPreloadData> {
         const modelData = await load(url, GLBLoader)
 
+        console.log(modelData)
+
         const bufferIndexMap: BufferIndexMap = new Map()
         const bufferMap: BufferMap = new Map()
 
@@ -78,8 +80,9 @@ export class WheezyGLBLoader {
             byteStride: byteStride,
             byteLength: rawAccessor.count * (byteStride ?? 1),
             byteOffset:
-                rawAccessor.byteOffset ??
-                0 + rawBufferView.byteOffset + (buffer?.byteOffset ?? 0),
+                (rawAccessor.byteOffset ?? 0) +
+                rawBufferView.byteOffset +
+                (buffer?.byteOffset ?? 0),
             count: rawAccessor.count,
             componentType: rawAccessor.componentType,
             elementType: getVertexType(
@@ -107,7 +110,6 @@ export class WheezyGLBLoader {
 
         if (nodeJsonData.mesh !== undefined) {
             const meshJsonData = modelData.json.meshes[nodeJsonData.mesh]
-            const meshes: IPreloadMesh[] = []
 
             meshJsonData.primitives.forEach(
                 (primitive: {
@@ -121,7 +123,7 @@ export class WheezyGLBLoader {
                     material: number
                 }) => {
                     //TODO! Parse textures, materials, etc. here
-                    meshes.push({
+                    dataStructEntry.meshes.push({
                         positions: WheezyGLBLoader.parseAccessor(
                             modelData,
                             primitive.attributes.POSITION,
@@ -139,8 +141,6 @@ export class WheezyGLBLoader {
                     })
                 }
             )
-
-            dataStructEntry.meshes = [...dataStructEntry.meshes, ...meshes]
         }
 
         nodeJsonData?.children?.forEach((childIndex: number) => {

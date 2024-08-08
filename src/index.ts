@@ -221,8 +221,6 @@ const uploadModel = (
         bufferStorage
     )
 
-    console.log(objectManager)
-
     const renderPassDesc = {
         colorAttachments: [
             {
@@ -250,7 +248,7 @@ const uploadModel = (
         canvasHeight: canvas.height,
         position: vec3.create(-30, 55, 700),
         // position: vec3.create(0, 7, 9),
-        // position: vec3.create(0, 0, 8),
+        // position: vec3.create(50, -20, 120),
     })
 
     //camera controller setup
@@ -396,13 +394,16 @@ const uploadModel = (
                 (component) => component.type === EntityTypes.transform
             ) as ITransform | undefined
 
+            // console.log(nodeTransform?.matrix)
             const meshMatrix = nodeTransform
-                ? //FIXME: why multiplication gives different results for duck and engine?
-                  mat4.mul(worldMatrix, nodeTransform.matrix)
+                ? mat4.mul(worldMatrix, nodeTransform.matrix)
                 : worldMatrix
+
+            // console.log(meshMatrix)
 
             node?.gameObject?.components?.forEach((component: any) => {
                 if (component.type === EntityTypes.mesh) {
+                    //FIXME: this can be done once per node, and only if node contains meshes
                     const viewMatrix = mat4.copy(camera.view)
 
                     mat4.translate(
