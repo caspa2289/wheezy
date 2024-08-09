@@ -1,12 +1,151 @@
-import { Mesh, ObjectManager } from './engine/core'
+import { GameObject, Mesh, ObjectManager, Transform } from './engine/core'
 import { WheezyGLBLoader } from './utils'
 import shaderCode from './testShader.wgsl'
-import { EntityTypes, ITransform, SceneNodeContent } from './engine/types'
+import {
+    EntityTypes,
+    GLTFAccessor,
+    IGameObject,
+    IModelPreloadData,
+    IObjectManager,
+    IPreloadEntity,
+    ITransform,
+    SceneNodeContent,
+} from './engine/types'
 import { Mat4, mat4, vec3 } from 'wgpu-matrix'
 import { PerspectiveCamera } from './engine/core/cameras'
-;(async () => {
-    const objectManager = new ObjectManager()
+import { Stuff } from './utils/Stuff'
+import { BufferStorage } from './engine/core/BufferStorage'
+import { IBufferStorage } from './engine/types/core/BufferStorage'
 
+const objectManager = new ObjectManager()
+const bufferStorage = new BufferStorage()
+
+const traversePreloadNode = (
+    node: IPreloadEntity,
+    parentGameObject: IGameObject,
+    objectManager: IObjectManager,
+    pipelineParams: {
+        device: GPUDevice
+        shaderModule: GPUShaderModule
+        colorFormat: GPUTextureFormat
+        depthFormat: GPUTextureFormat
+        uniformsBGLayout: GPUBindGroupLayout
+        nodeParamsBGLayout: GPUBindGroupLayout
+    },
+    bufferStorage: IBufferStorage
+) => {
+    const { trsMatrix, meshes, children } = node
+
+    const gameObject = new GameObject()
+
+    objectManager.addObject(gameObject, parentGameObject)
+
+    new Transform(gameObject, trsMatrix)
+
+    const {
+        device,
+        shaderModule,
+        colorFormat: swapChainFormat,
+        depthFormat,
+        uniformsBGLayout: viewParamsBindGroupLayout,
+        nodeParamsBGLayout: nodeParamsBindGroupLayout,
+    } = pipelineParams
+
+    meshes.forEach((meshData) => {
+        const mesh = new Mesh(
+            gameObject,
+            meshData.positions as GLTFAccessor,
+            meshData.indices
+        )
+
+        mesh.buildRenderPipeline(
+            device,
+            shaderModule,
+            swapChainFormat,
+            depthFormat,
+            viewParamsBindGroupLayout,
+            nodeParamsBindGroupLayout,
+            bufferStorage
+        )
+    })
+
+    children.forEach((child) => {
+        traversePreloadNode(
+            child,
+            gameObject,
+            objectManager,
+            pipelineParams,
+            bufferStorage
+        )
+    })
+}
+
+const uploadModel = (
+    modelData: IModelPreloadData,
+    objectManager: IObjectManager,
+    pipelineParams: {
+        device: GPUDevice
+        shaderModule: GPUShaderModule
+        colorFormat: GPUTextureFormat
+        depthFormat: GPUTextureFormat
+        uniformsBGLayout: GPUBindGroupLayout
+        nodeParamsBGLayout: GPUBindGroupLayout
+    },
+    bufferStorage: IBufferStorage
+) => {
+    modelData.buffers.forEach((value, key) => {
+        bufferStorage.buffers.set(key, value)
+    })
+
+    const { trsMatrix, meshes, children } = modelData.model
+
+    const sceneObject = new GameObject()
+
+    objectManager.addObject(sceneObject)
+
+    new Transform(sceneObject, trsMatrix)
+
+    const {
+        device,
+        shaderModule,
+        colorFormat: swapChainFormat,
+        depthFormat,
+        uniformsBGLayout: viewParamsBindGroupLayout,
+        nodeParamsBGLayout: nodeParamsBindGroupLayout,
+    } = pipelineParams
+
+    meshes.forEach((meshData) => {
+        const mesh = new Mesh(
+            sceneObject,
+            meshData.positions as GLTFAccessor,
+            meshData.indices
+        )
+
+        mesh.buildRenderPipeline(
+            device,
+            shaderModule,
+            swapChainFormat,
+            depthFormat,
+            viewParamsBindGroupLayout,
+            nodeParamsBindGroupLayout,
+            bufferStorage
+        )
+    })
+
+    children.forEach((child) => {
+        traversePreloadNode(
+            child,
+            sceneObject,
+            objectManager,
+            pipelineParams,
+            bufferStorage
+        )
+    })
+
+    return sceneObject
+}
+
+;(async () => {
     const adapter = (await navigator.gpu.requestAdapter()) as GPUAdapter
     const device = await adapter.requestDevice()
 
@@ -65,33 +204,23 @@ import { PerspectiveCamera } from './engine/core/cameras'
         entries: [{ binding: 0, resource: { buffer: viewParamsBuffer } }],
     })
 
-    const ass = await WheezyGLBLoader.loadFromUrl(
-        'static/models/Engine.glb',
-        objectManager,
-        device
+    const modelData = await WheezyGLBLoader.loadFromUrl(
+        'static/models/Duck.glb'
     )
 
-    const iterateNode = (node: SceneNodeContent) => {
-        node?.gameObject?.components?.forEach((component: any) => {
-            if (component.type === EntityTypes.mesh) {
-                ;(component as Mesh).buildRenderPipeline(
-                    device,
-                    shaderModule,
-                    swapChainFormat,
-                    depthFormat,
-                    viewParamsBindGroupLayout,
-                    nodeParamsBindGroupLayout
-                )
-            }
-        })
-        node?.children?.forEach((child: any) => {
-            iterateNode(child)
-        })
-    }
-
-    objectManager.sceneTree.nodes.forEach((node) => {
-        iterateNode(node)
-    })
+    const model = uploadModel(
+        modelData,
+        objectManager,
+        {
+            device,
+            shaderModule,
+            colorFormat: swapChainFormat,
+            depthFormat,
+            uniformsBGLayout: viewParamsBindGroupLayout,
+            nodeParamsBGLayout: nodeParamsBindGroupLayout,
+        },
+        bufferStorage
+    )
 
     const renderPassDesc = {
         colorAttachments: [
@@ -118,91 +247,103 @@ import { PerspectiveCamera } from './engine/core/cameras'
         zNear: 0.1,
         canvasWidth: canvas.width,
         canvasHeight: canvas.height,
-        position: vec3.create(-30, 55, 700),
-        // position: vec3.create(0, 7, 9),
-        // position: vec3.create(0, 0, 0.15),
+        // position: vec3.create(-30, 55, 700),
+        position: vec3.create(0, 0.8, 3),
+        // position: vec3.create(50, -20, 120),
     })
 
     //camera controller setup
-    // let moveLeft = false
-    // let moveRight = false
-    // let moveForward = false
-    // let moveBack = false
-    // let moveUp = false
-    // let moveDown = false
-    // let rotateLeft = false
-    // let rotateRight = false
+    let moveLeft = false
+    let moveRight = false
+    let moveForward = false
+    let moveBack = false
+    let moveUp = false
+    let moveDown = false
+    let rotateLeft = false
+    let rotateRight = false
 
-    // window.addEventListener('keydown', (evt: any) => {
-    //     switch (evt.code) {
-    //         case 'KeyA':
-    //             moveLeft = true
-    //             break
-    //         case 'KeyD':
-    //             moveRight = true
-    //             break
-    //         case 'KeyS':
-    //             moveBack = true
-    //             break
-    //         case 'KeyW':
-    //             moveForward = true
-    //             break
-    //         case 'KeyQ':
-    //             rotateLeft = true
-    //             break
-    //         case 'KeyE':
-    //             rotateRight = true
-    //             break
-    //         case 'Space':
-    //             moveUp = true
-    //             break
-    //         case 'ControlLeft':
-    //             moveDown = true
-    //             break
-    //         default:
-    //             break
-    //     }
-    // })
+    window.addEventListener('keydown', (evt: any) => {
+        switch (evt.code) {
+            case 'KeyA':
+                moveLeft = true
+                break
+            case 'KeyD':
+                moveRight = true
+                break
+            case 'KeyS':
+                moveBack = true
+                break
+            case 'KeyW':
+                moveForward = true
+                break
+            case 'KeyQ':
+                rotateLeft = true
+                break
+            case 'KeyE':
+                rotateRight = true
+                break
+            case 'Space':
+                moveUp = true
+                break
+            case 'ControlLeft':
+                moveDown = true
+                break
+            default:
+                break
+        }
+    })
 
-    // window.addEventListener('keyup', (evt: any) => {
-    //     switch (evt.code) {
-    //         case 'KeyA':
-    //             moveLeft = false
-    //             break
-    //         case 'KeyD':
-    //             moveRight = false
-    //             break
-    //         case 'KeyS':
-    //             moveBack = false
-    //             break
-    //         case 'KeyW':
-    //             moveForward = false
-    //             break
-    //         case 'KeyQ':
-    //             rotateLeft = false
-    //             break
-    //         case 'KeyE':
-    //             rotateRight = false
-    //             break
-    //         case 'Space':
-    //             moveUp = false
-    //             break
-    //         case 'ControlLeft':
-    //             moveDown = false
-    //             break
-    //         default:
-    //             break
-    //     }
-    // })
+    window.addEventListener('keyup', (evt: any) => {
+        switch (evt.code) {
+            case 'KeyA':
+                moveLeft = false
+                break
+            case 'KeyD':
+                moveRight = false
+                break
+            case 'KeyS':
+                moveBack = false
+                break
+            case 'KeyW':
+                moveForward = false
+                break
+            case 'KeyQ':
+                rotateLeft = false
+                break
+            case 'KeyE':
+                rotateRight = false
+                break
+            case 'Space':
+                moveUp = false
+                break
+            case 'ControlLeft':
+                moveDown = false
+                break
+            default:
+                break
+        }
+    })
 
-    // let velocity = vec3.create()
+    let analogX = 0
+    let analogY = 0
+    canvas.addEventListener('pointermove', (evt) => {
+        const mouseDown =
+            evt.pointerType == 'mouse' ? (evt.buttons & 1) !== 0 : true
 
-    // const sign = (positive: boolean, negative: boolean) =>
-    //     (positive ? 1 : 0) - (negative ? 1 : 0)
+        if (mouseDown) {
+            analogX += evt.movementX
+            analogY += evt.movementY
+        }
+    })
 
-    // const movementSpeed = 5
-    // const frictionCoefficient = 0.99
-    // const rotationSpeed = 0.05
+    let velocity = vec3.create()
+
+    const sign = (positive: boolean, negative: boolean) =>
+        (positive ? 1 : 0) - (negative ? 1 : 0)
+
+    const movementSpeed = 8
+    const frictionCoefficient = 0.99
+    const rotationSpeed = 0.05
 
     let prevTime = 0
 
@@ -210,28 +351,27 @@ import { PerspectiveCamera } from './engine/core/cameras'
         const deltaTime = (time - prevTime) / 1000
         prevTime = time
         /****Placeholder camera controller */
-        // const targetVelocity = vec3.create()
-        // const deltaRight = sign(moveLeft, moveRight)
-        // const deltaBack = sign(moveForward, moveBack)
-        // const deltaUp = sign(moveDown, moveUp)
-        // camera.yaw += sign(rotateLeft, rotateRight) * rotationSpeed
-        // vec3.addScaled(targetVelocity, camera.right, deltaRight, targetVelocity)
-        // vec3.addScaled(targetVelocity, camera.back, deltaBack, targetVelocity)
-        // vec3.addScaled(targetVelocity, camera.up, deltaUp, targetVelocity)
-        // vec3.normalize(targetVelocity, targetVelocity)
-        // vec3.mulScalar(targetVelocity, movementSpeed, targetVelocity)
+        const targetVelocity = vec3.create()
+        const deltaRight = sign(moveRight, moveLeft)
+        const deltaBack = sign(moveBack, moveForward)
+        const deltaUp = sign(moveUp, moveDown)
+        camera.yaw -= rotationSpeed * analogX * deltaTime
+        camera.pitch -= rotationSpeed * analogY * deltaTime
+        analogX = 0
+        analogY = 0
+        vec3.addScaled(targetVelocity, camera.right, deltaRight, targetVelocity)
+        vec3.addScaled(targetVelocity, camera.back, deltaBack, targetVelocity)
+        vec3.addScaled(targetVelocity, camera.up, deltaUp, targetVelocity)
+        vec3.normalize(targetVelocity, targetVelocity)
+        vec3.mulScalar(targetVelocity, movementSpeed, targetVelocity)
 
-        // velocity = Stuff.lerp(
-        //     targetVelocity,
-        //     velocity,
-        //     Math.pow(1 - frictionCoefficient, deltaTime)
-        // )
+        velocity = Stuff.lerp(
+            targetVelocity,
+            velocity,
+            Math.pow(1 - frictionCoefficient, deltaTime)
+        )
 
-        // gameObjectPosition = vec3.addScaled(
-        //     gameObjectPosition,
-        //     velocity,
-        //     deltaTime
-        // )
+        camera.position = vec3.addScaled(camera.position, velocity, deltaTime)
 
         /**************/
         camera.update()
@@ -256,12 +396,12 @@ import { PerspectiveCamera } from './engine/core/cameras'
             ) as ITransform | undefined
 
             const meshMatrix = nodeTransform
-                ? //FIXME: why multiplication gives different results for duck and engine?
-                  mat4.mul(worldMatrix, nodeTransform.matrix)
+                ? mat4.mul(worldMatrix, nodeTransform.matrix)
                 : worldMatrix
 
             node?.gameObject?.components?.forEach((component: any) => {
                 if (component.type === EntityTypes.mesh) {
+                    //FIXME: this can be done once per node, and only if node contains meshes
                     const viewMatrix = mat4.copy(camera.view)
 
                     mat4.translate(
@@ -276,26 +416,12 @@ import { PerspectiveCamera } from './engine/core/cameras'
                         viewMatrix
                     )
 
-                    mat4.setAxis(
-                        viewMatrix,
-                        mat4.getAxis(meshMatrix, 0),
-                        0,
-                        viewMatrix
-                    )
+                    //FIXME: Do this once on load
+                    const meshRotation = Stuff.extractEulerRotation(meshMatrix)
 
-                    mat4.setAxis(
-                        viewMatrix,
-                        mat4.getAxis(meshMatrix, 1),
-                        1,
-                        viewMatrix
-                    )
-
-                    mat4.setAxis(
-                        viewMatrix,
-                        mat4.getAxis(meshMatrix, 2),
-                        2,
-                        viewMatrix
-                    )
+                    mat4.rotateX(viewMatrix, meshRotation[0], viewMatrix)
+                    mat4.rotateY(viewMatrix, meshRotation[1], viewMatrix)
+                    mat4.rotateZ(viewMatrix, meshRotation[2], viewMatrix)
 
                     const nodeParamsUploadBuffer = device.createBuffer({
                         size: 16 * 4,
@@ -330,6 +456,8 @@ import { PerspectiveCamera } from './engine/core/cameras'
         objectManager.sceneTree.nodes.forEach((node) => {
             iterateNode(node, mat4.identity())
         })
+
+        // console.log(objectManager)
 
         const commandEncoder = device.createCommandEncoder()
 

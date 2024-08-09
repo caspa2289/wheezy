@@ -17,6 +17,11 @@ export type MaterialPBR = {
     }
 }
 
+export interface GLTFBufferData {
+    id: string
+    buffer: GPUBuffer
+}
+
 export interface IMaterial {
     name?: string
     pbr?: MaterialPBR
@@ -31,53 +36,27 @@ export interface IMaterial {
     emissiveFactor?: Vec3
 }
 
-export interface GLTFBufferView {
-    byteLength: number
-    byteStride: number
-    view: Uint8Array
-    buffer: GPUBuffer
-    usage: GPUBufferUsageFlags
-}
-
 export interface GLTFAccessor {
     byteStride: number
     count: number
     componentType: number
-    type: string
-    bufferView: GLTFBufferView
+    elementType: GPUVertexFormat //FIXME: could be GPUIndexFormat
     byteOffset: number
     byteLength: number
-    //FIXME: could be GPUIndexFormat
-    elementType: GPUVertexFormat
+    bufferId: GLTFBufferData['id']
     min?: number[]
     max?: number[]
+    usage: GPUBufferUsageFlags
 }
 
 export interface IMesh extends IComponent<EntityTypes.mesh> {
-    // attributes: {
-    //     NORMAL: 23
-    //     POSITION: 22
-    //     TANGENT: 24
-    //     TEXCOORD_0: 25
-    // }
     //https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-mesh-primitive
     normal?: GLTFAccessor
     tangent?: GLTFAccessor
-    //FIXME: why could there be multiple?
-    textureCoordinates?: GLTFAccessor[]
     indices?: GLTFAccessor
     //FIXME: implement default material according to defaults https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-material
     //FIXME: implement materials
     // material: IMaterial //if not present in the file, a default material should be used
     positions: GLTFAccessor
-    mode: number //gpu topology - default is 4
-    /**
-        0 POINTS
-        1 LINES
-        2 LINE_LOOP
-        3 LINE_STRIP
-        4 TRIANGLES
-        5 TRIANGLE_STRIP
-        6 TRIANGLE_FAN
-     */
+    mode: number //gpu topology - default is 4 (triangles)
 }
