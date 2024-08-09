@@ -1,27 +1,66 @@
 import { load } from '@loaders.gl/core'
-import { GLBLoader } from '@loaders.gl/gltf'
+import { GLB, GLBLoader } from '@loaders.gl/gltf'
 import {
     BufferMap,
     GLTFAccessor,
+    ImageMap,
     IModelPreloadData,
     IPreloadEntity,
+    MaterialMap,
+    SamplerMap,
+    TextureMap,
 } from '../../engine/types'
 import { getTypeSize, getVertexType } from './helpers'
 import { mat4 } from 'wgpu-matrix'
 
-type BufferIndexMap = Map<number, string>
+type IndexMap = Map<number, string>
 
 const generateId = () => {
     return String(Math.random())
 }
 
 export class WheezyGLBLoader {
+    private static async loadImages(
+        modelData: GLB,
+        bufferIndexMap: IndexMap
+    ): Promise<{
+        imagesIndexMap: IndexMap
+        imagesMap: ImageMap
+    }> {
+        const imagesIndexMap: IndexMap = new Map()
+        const imagesMap: ImageMap = new Map()
+
+        modelData.json?.images?.forEach(
+            (
+                {
+                    bufferView,
+                    mimeType,
+                }: {
+                    bufferView: number
+                    mimeType: string
+                },
+                index: number
+            ) => {
+                const bufferViewData = modelData.json.bufferViews[bufferView]
+                bufferViewData.buffer = bufferIndexMap.get(
+                    bufferViewData.buffer
+                )
+
+                const id = generateId()
+                imagesIndexMap.set(index, id)
+                imagesMap.set(id, { bufferView: bufferViewData, mimeType })
+            }
+        )
+
+        return { imagesIndexMap, imagesMap }
+    }
+
     public static async loadFromUrl(url: string): Promise<IModelPreloadData> {
         const modelData = await load(url, GLBLoader)
 
         console.log(modelData)
 
-        const bufferIndexMap: BufferIndexMap = new Map()
+        const bufferIndexMap: IndexMap = new Map()
         const bufferMap: BufferMap = new Map()
 
         modelData.binChunks.forEach((chunk, index) => {
@@ -31,6 +70,20 @@ export class WheezyGLBLoader {
                 bufferMap.set(id, chunk.arrayBuffer)
             }
         })
+
+        const { imagesIndexMap, imagesMap } = await this.loadImages(
+            modelData,
+            bufferIndexMap
+        )
+
+        const samplersIndexMap: IndexMap = new Map()
+        const samplers: SamplerMap = new Map()
+
+        const texturesIndexMap: IndexMap = new Map()
+        const textures: TextureMap = new Map()
+
+        const materialsIndexMap: IndexMap = new Map()
+        const materials: MaterialMap = new Map()
 
         const modelPreload: IPreloadEntity = {
             trsMatrix: mat4.identity(),

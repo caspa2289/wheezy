@@ -16,9 +16,11 @@ import { PerspectiveCamera } from './engine/core/cameras'
 import { Stuff } from './utils/Stuff'
 import { BufferStorage } from './engine/core/BufferStorage'
 import { IBufferStorage } from './engine/types/core/BufferStorage'
+import { ImageStorage } from './engine/core/ImageStorage'
 
 const objectManager = new ObjectManager()
 const bufferStorage = new BufferStorage()
+const imageStorage = new ImageStorage()
 
 const traversePreloadNode = (
     node: IPreloadEntity,

@@ -1,6 +1,6 @@
 import { EntityTypes, GLTFAccessor, IGameObject, IMesh } from '../../types'
+import { IBufferStorage } from '../../types/core/BufferStorage'
 import { Component } from '../Component'
-import { BufferStorage } from '../BufferStorage'
 
 export const alignTo = (val: number, align: number) => {
     return Math.floor((val + align - 1) / align) * align
@@ -33,7 +33,7 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
         depthFormat: GPUTextureFormat,
         uniformsBGLayout: GPUBindGroupLayout,
         nodeParamsBGLayout: GPUBindGroupLayout,
-        bufferStorage: BufferStorage
+        bufferStorage: IBufferStorage
     ) {
         const vertexState: GPUVertexState = {
             module: shaderModule,
