@@ -5,7 +5,6 @@ import {
     GLTFAccessor,
     IModelPreloadData,
     IPreloadEntity,
-    IPreloadMesh,
 } from '../../engine/types'
 import { getTypeSize, getVertexType } from './helpers'
 import { mat4 } from 'wgpu-matrix'
@@ -129,7 +128,7 @@ export class WheezyGLBLoader {
                             primitive.attributes.POSITION,
                             GPUBufferUsage.VERTEX,
                             bufferIndexMap
-                        ) as GLTFAccessor,
+                        ),
 
                         indices: WheezyGLBLoader.parseAccessor(
                             modelData,
@@ -144,7 +143,7 @@ export class WheezyGLBLoader {
         }
 
         nodeJsonData?.children?.forEach((childIndex: number) => {
-            dataStruct.children.push(
+            dataStructEntry.children.push(
                 this.loadNode(
                     childIndex,
                     modelData,

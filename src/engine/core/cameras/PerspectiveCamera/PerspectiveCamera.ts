@@ -6,7 +6,8 @@ import { Stuff } from '../../../../utils/Stuff'
 export interface PerspectiveCameraProps {
     zFar: number
     zNear: number
-    position: Vec3
+    position?: Vec3
+    target?: Vec3
     canvasWidth: number
     canvasHeight: number
 }
@@ -36,6 +37,7 @@ export class PerspectiveCamera extends Entity<EntityTypes.camera> {
         position,
         canvasWidth,
         canvasHeight,
+        target,
     }: PerspectiveCameraProps) {
         super(EntityTypes.camera)
         this._zFar = zFar ?? 1000
@@ -48,10 +50,11 @@ export class PerspectiveCamera extends Entity<EntityTypes.camera> {
             this._zFar
         )
 
-        const target = vec3.create(0, 0, 0)
-        const back = vec3.normalize(vec3.sub(position, target))
+        const positionVec = position ?? vec3.create(0, 0, 0)
+        const targetVec = target ?? vec3.copy(positionVec)
+        const back = vec3.normalize(vec3.sub(positionVec, targetVec))
         this._recalculateAngles(back)
-        this.position = position
+        this.position = positionVec
     }
 
     private _recalculateAngles(direction: Vec3) {

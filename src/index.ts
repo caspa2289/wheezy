@@ -35,6 +35,7 @@ const traversePreloadNode = (
     bufferStorage: IBufferStorage
 ) => {
     const { trsMatrix, meshes, children } = node
+
     const gameObject = new GameObject()
 
     objectManager.addObject(gameObject, parentGameObject)
@@ -204,7 +205,7 @@ const uploadModel = (
     })
 
     const modelData = await WheezyGLBLoader.loadFromUrl(
-        'static/models/Engine.glb'
+        'static/models/Duck.glb'
     )
 
     const model = uploadModel(
@@ -246,8 +247,8 @@ const uploadModel = (
         zNear: 0.1,
         canvasWidth: canvas.width,
         canvasHeight: canvas.height,
-        position: vec3.create(-30, 55, 700),
-        // position: vec3.create(0, 7, 9),
+        // position: vec3.create(-30, 55, 700),
+        position: vec3.create(0, 0.8, 3),
         // position: vec3.create(50, -20, 120),
     })
 
@@ -394,12 +395,9 @@ const uploadModel = (
                 (component) => component.type === EntityTypes.transform
             ) as ITransform | undefined
 
-            // console.log(nodeTransform?.matrix)
             const meshMatrix = nodeTransform
                 ? mat4.mul(worldMatrix, nodeTransform.matrix)
                 : worldMatrix
-
-            // console.log(meshMatrix)
 
             node?.gameObject?.components?.forEach((component: any) => {
                 if (component.type === EntityTypes.mesh) {
@@ -458,6 +456,8 @@ const uploadModel = (
         objectManager.sceneTree.nodes.forEach((node) => {
             iterateNode(node, mat4.identity())
         })
+
+        // console.log(objectManager)
 
         const commandEncoder = device.createCommandEncoder()
 
