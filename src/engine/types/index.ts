@@ -1,4 +1,4 @@
-import { Mat4, Vec4 } from 'wgpu-matrix'
+import { Mat4, Vec3, Vec4 } from 'wgpu-matrix'
 import { GLTFAccessor } from './core/Mesh'
 
 export * from './core/Entity'
@@ -9,10 +9,12 @@ export * from './core/ObjectManager'
 export * from './core/Mesh'
 export * from './core/Transform'
 
+//FIXME: move this somewhere else
 export interface IPreloadMesh {
     positions?: GLTFAccessor
     indices?: GLTFAccessor
-    materialId: string
+    textureCoordinates?: GLTFAccessor
+    materialId?: string
     mode: number
 }
 
@@ -33,24 +35,25 @@ export interface IModelPreloadData {
 }
 
 export interface IMaterialPreloadData {
-    baseColorFactor: Vec4 //[1, 1, 1, 1]
-    baseColorTextureId: string
-    metallicFactor: number // 1
-    roughnessFactor: number // 1
-    metallicRoughnessTextureId: string
+    baseColorFactor?: Vec4 //[1, 1, 1, 1]
+    emissiveFactor?: Vec3
+    metallicFactor?: number // 1
+    roughnessFactor?: number // 1
+    baseColorTextureId?: string
+    metallicRoughnessTextureId?: string
 }
 
 export interface ITexturePreloadData {
     samplerId: string
     imageId: string
-    usage: GPUTextureUsageFlags
+    // usage: GPUTextureUsageFlags
 }
 
 export interface ISamplerPreloadData {
-    magFilter: GPUFilterMode
-    minFilter: GPUFilterMode
-    wrapU: GPUAddressMode
-    wrapV: GPUAddressMode
+    magFilter?: GPUFilterMode
+    minFilter?: GPUFilterMode
+    wrapU?: GPUAddressMode
+    wrapV?: GPUAddressMode
 }
 
 export interface IImagePreloadData {

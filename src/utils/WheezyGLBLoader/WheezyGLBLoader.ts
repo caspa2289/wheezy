@@ -4,14 +4,17 @@ import {
     BufferMap,
     GLTFAccessor,
     ImageMap,
+    IMaterialPreloadData,
     IModelPreloadData,
     IPreloadEntity,
+    ISamplerPreloadData,
+    ITexturePreloadData,
     MaterialMap,
     SamplerMap,
     TextureMap,
 } from '../../engine/types'
 import { getTypeSize, getVertexType } from './helpers'
-import { mat4 } from 'wgpu-matrix'
+import { mat4, Vec3, Vec4 } from 'wgpu-matrix'
 
 type IndexMap = Map<number, string>
 
@@ -20,13 +23,13 @@ const generateId = () => {
 }
 
 export class WheezyGLBLoader {
-    private static async loadImages(
+    private static loadImages(
         modelData: GLB,
         bufferIndexMap: IndexMap
-    ): Promise<{
+    ): {
         imagesIndexMap: IndexMap
         imagesMap: ImageMap
-    }> {
+    } {
         const imagesIndexMap: IndexMap = new Map()
         const imagesMap: ImageMap = new Map()
 
@@ -55,11 +58,124 @@ export class WheezyGLBLoader {
         return { imagesIndexMap, imagesMap }
     }
 
-    public static async loadFromUrl(url: string): Promise<IModelPreloadData> {
-        const modelData = await load(url, GLBLoader)
+    private static loadSamplers = (
+        modelData: GLB
+    ): {
+        samplersIndexMap: IndexMap
+        samplersMap: SamplerMap
+    } => {
+        const samplersIndexMap: IndexMap = new Map()
+        const samplersMap: SamplerMap = new Map()
 
-        console.log(modelData)
+        modelData.json?.samplers?.forEach(
+            (sampler: ISamplerPreloadData, index: number) => {
+                const id = generateId()
+                samplersIndexMap.set(index, id)
+                samplersMap.set(id, sampler)
+            }
+        )
 
+        return { samplersIndexMap, samplersMap }
+    }
+
+    private static loadTextures = (
+        modelData: GLB,
+        samplersIndexMap: IndexMap,
+        imagesIndexMap: IndexMap
+    ): {
+        texturesIndexMap: IndexMap
+        texturesMap: TextureMap
+    } => {
+        const texturesIndexMap: IndexMap = new Map()
+        const texturesMap: TextureMap = new Map()
+
+        modelData.json?.textures?.forEach(
+            (
+                textureData: { source: number; sampler: number },
+                index: number
+            ) => {
+                const id = generateId()
+                const texture: ITexturePreloadData = {
+                    samplerId: samplersIndexMap.get(
+                        textureData.sampler
+                    ) as string,
+                    imageId: imagesIndexMap.get(textureData.source) as string,
+                }
+
+                texturesIndexMap.set(index, id)
+                texturesMap.set(id, texture)
+            }
+        )
+
+        return { texturesIndexMap, texturesMap }
+    }
+
+    private static loadMaterials = (
+        modelData: GLB,
+        texturesIndexMap: IndexMap
+    ): {
+        materialsIndexMap: IndexMap
+        materialsMap: MaterialMap
+    } => {
+        const materialsIndexMap: IndexMap = new Map()
+        const materialsMap: MaterialMap = new Map()
+
+        modelData.json?.materials?.forEach(
+            (
+                //FIXME: check types
+                materialData: {
+                    pbrMetallicRoughness?: {
+                        baseColorTexture?: {
+                            index: number
+                        }
+                        metallicRoughnessTexture?: {
+                            index: number
+                        }
+                        baseColorFactor?: Vec4
+                        metallicFactor?: number
+                        roughnessFactor?: number
+                    }
+                    emissiveFactor?: Vec3
+                    name?: string
+                },
+                index: number
+            ) => {
+                const material: IMaterialPreloadData = {
+                    baseColorFactor:
+                        materialData?.pbrMetallicRoughness?.baseColorFactor,
+                    emissiveFactor: materialData.emissiveFactor,
+                    metallicFactor:
+                        materialData?.pbrMetallicRoughness?.metallicFactor,
+                    roughnessFactor:
+                        materialData?.pbrMetallicRoughness?.roughnessFactor,
+                    baseColorTextureId:
+                        materialData?.pbrMetallicRoughness?.baseColorTexture
+                            ?.index !== undefined
+                            ? texturesIndexMap.get(
+                                  materialData?.pbrMetallicRoughness
+                                      ?.baseColorTexture?.index
+                              )
+                            : undefined,
+                    metallicRoughnessTextureId:
+                        materialData?.pbrMetallicRoughness
+                            ?.metallicRoughnessTexture?.index !== undefined
+                            ? texturesIndexMap.get(
+                                  materialData?.pbrMetallicRoughness
+                                      ?.metallicRoughnessTexture?.index
+                              )
+                            : undefined,
+                }
+
+                const id = generateId()
+                materialsIndexMap.set(index, id)
+                materialsMap.set(id, material)
+            }
+        )
+
+        return { materialsIndexMap, materialsMap }
+    }
+
+    private static loadBuffers = (modelData: GLB) => {
         const bufferIndexMap: IndexMap = new Map()
         const bufferMap: BufferMap = new Map()
 
@@ -71,19 +187,33 @@ export class WheezyGLBLoader {
             }
         })
 
-        const { imagesIndexMap, imagesMap } = await this.loadImages(
+        return { bufferIndexMap, bufferMap }
+    }
+
+    public static async loadFromUrl(url: string): Promise<IModelPreloadData> {
+        const modelData = await load(url, GLBLoader)
+
+        console.log(modelData)
+
+        const { bufferIndexMap, bufferMap } = this.loadBuffers(modelData)
+
+        const { imagesIndexMap, imagesMap } = this.loadImages(
             modelData,
             bufferIndexMap
         )
 
-        const samplersIndexMap: IndexMap = new Map()
-        const samplers: SamplerMap = new Map()
+        const { samplersIndexMap, samplersMap } = this.loadSamplers(modelData)
 
-        const texturesIndexMap: IndexMap = new Map()
-        const textures: TextureMap = new Map()
+        const { texturesIndexMap, texturesMap } = this.loadTextures(
+            modelData,
+            samplersIndexMap,
+            imagesIndexMap
+        )
 
-        const materialsIndexMap: IndexMap = new Map()
-        const materials: MaterialMap = new Map()
+        const { materialsIndexMap, materialsMap } = this.loadMaterials(
+            modelData,
+            texturesIndexMap
+        )
 
         const modelPreload: IPreloadEntity = {
             trsMatrix: mat4.identity(),
@@ -94,19 +224,31 @@ export class WheezyGLBLoader {
         modelData?.json?.scenes?.forEach((scene: { nodes?: number[] }) => {
             scene?.nodes?.forEach((nodeIndex) => {
                 modelPreload.children.push(
-                    this.loadNode(nodeIndex, modelData, bufferIndexMap)
+                    this.loadNode(
+                        nodeIndex,
+                        modelData,
+                        bufferIndexMap,
+                        materialsIndexMap
+                    )
                 )
             })
         })
 
-        return { model: modelPreload, buffers: bufferMap }
+        return {
+            model: modelPreload,
+            buffers: bufferMap,
+            images: imagesMap,
+            samplers: samplersMap,
+            textures: texturesMap,
+            materials: materialsMap,
+        }
     }
 
     private static parseAccessor = (
         modelData: Record<string, any>,
         accessorId: number,
         usage: GPUBufferUsageFlags,
-        bufferIndexMap: BufferIndexMap
+        bufferIndexMap: IndexMap
     ): GLTFAccessor | undefined => {
         if (accessorId !== 0 && !accessorId) {
             return undefined
@@ -145,7 +287,8 @@ export class WheezyGLBLoader {
     private static loadNode(
         nodeIndex: number,
         modelData: Record<string, any>,
-        bufferIndexMap: BufferIndexMap
+        bufferIndexMap: IndexMap,
+        materialsIndexMap: IndexMap
     ) {
         const nodeJsonData = modelData?.json?.nodes[nodeIndex]
         const dataStructEntry: IPreloadEntity = {
@@ -166,9 +309,8 @@ export class WheezyGLBLoader {
                     }
                     indices: number
                     mode: number
-                    material: number
+                    material?: number
                 }) => {
-                    //TODO! Parse textures, materials, etc. here
                     dataStructEntry.meshes.push({
                         positions: WheezyGLBLoader.parseAccessor(
                             modelData,
@@ -176,13 +318,22 @@ export class WheezyGLBLoader {
                             GPUBufferUsage.VERTEX,
                             bufferIndexMap
                         ),
-
                         indices: WheezyGLBLoader.parseAccessor(
                             modelData,
                             primitive.indices,
                             GPUBufferUsage.INDEX,
                             bufferIndexMap
                         ),
+                        textureCoordinates: WheezyGLBLoader.parseAccessor(
+                            modelData,
+                            primitive.attributes.TEXCOORD_0,
+                            GPUBufferUsage.VERTEX,
+                            bufferIndexMap
+                        ),
+                        materialId:
+                            primitive.material !== undefined
+                                ? materialsIndexMap.get(primitive.material)
+                                : undefined,
                         mode: primitive.mode ?? 4,
                     })
                 }
@@ -191,7 +342,12 @@ export class WheezyGLBLoader {
 
         nodeJsonData?.children?.forEach((childIndex: number) => {
             dataStructEntry.children.push(
-                this.loadNode(childIndex, modelData, bufferIndexMap)
+                this.loadNode(
+                    childIndex,
+                    modelData,
+                    bufferIndexMap,
+                    materialsIndexMap
+                )
             )
         })
 

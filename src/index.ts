@@ -95,6 +95,8 @@ const uploadModel = (
     },
     bufferStorage: IBufferStorage
 ) => {
+    //TODO: upload textures, create samplers, etc. here.
+
     modelData.buffers.forEach((value, key) => {
         bufferStorage.buffers.set(key, value)
     })
@@ -209,6 +211,8 @@ const uploadModel = (
     const modelData = await WheezyGLBLoader.loadFromUrl(
         'static/models/Duck.glb'
     )
+
+    console.log(modelData)
 
     const model = uploadModel(
         modelData,
