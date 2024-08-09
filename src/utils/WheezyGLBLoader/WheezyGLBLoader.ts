@@ -41,12 +41,7 @@ export class WheezyGLBLoader {
         modelData?.json?.scenes?.forEach((scene: { nodes?: number[] }) => {
             scene?.nodes?.forEach((nodeIndex) => {
                 modelPreload.children.push(
-                    this.loadNode(
-                        nodeIndex,
-                        modelData,
-                        modelPreload,
-                        bufferIndexMap
-                    )
+                    this.loadNode(nodeIndex, modelData, bufferIndexMap)
                 )
             })
         })
@@ -97,7 +92,6 @@ export class WheezyGLBLoader {
     private static loadNode(
         nodeIndex: number,
         modelData: Record<string, any>,
-        dataStruct: IPreloadEntity,
         bufferIndexMap: BufferIndexMap
     ) {
         const nodeJsonData = modelData?.json?.nodes[nodeIndex]
@@ -144,12 +138,7 @@ export class WheezyGLBLoader {
 
         nodeJsonData?.children?.forEach((childIndex: number) => {
             dataStructEntry.children.push(
-                this.loadNode(
-                    childIndex,
-                    modelData,
-                    dataStructEntry,
-                    bufferIndexMap
-                )
+                this.loadNode(childIndex, modelData, bufferIndexMap)
             )
         })
 
