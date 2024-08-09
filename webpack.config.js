@@ -1,5 +1,6 @@
 const path = require('path')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
+const CopyPlugin = require('copy-webpack-plugin')
 
 module.exports = {
     mode: 'development',
@@ -21,6 +22,14 @@ module.exports = {
             inject: true,
             filename: 'index.html',
         }),
+        new CopyPlugin({
+            patterns: [
+                {
+                    from: path.resolve(__dirname, 'src/assets'),
+                    to: path.resolve(__dirname, 'dist/static'),
+                },
+            ],
+        }),
     ],
     output: {
         filename: '[name].[contenthash].js',
@@ -38,6 +47,10 @@ module.exports = {
             {
                 test: /\.(png|svg|jpg|jpeg|gif)$/i,
                 type: 'asset/resource',
+            },
+            {
+                test: /\.wgsl$/i,
+                type: 'asset/source',
             },
         ],
     },
