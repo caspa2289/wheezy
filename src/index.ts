@@ -3,6 +3,7 @@ import {
     Mesh,
     ObjectManager,
     SamplerStorage,
+    TextureStorage,
     Transform,
 } from './engine/core'
 import { WheezyGLBLoader } from './utils'
@@ -15,6 +16,7 @@ import {
     IObjectManager,
     IPreloadEntity,
     ISamplerStorage,
+    ITextureStorage,
     ITransform,
     SceneNodeContent,
 } from './engine/types'
@@ -25,12 +27,12 @@ import { BufferStorage } from './engine/core/BufferStorage'
 import { IBufferStorage } from './engine/types/core/BufferStorage'
 import { ImageStorage } from './engine/core/ImageStorage'
 import { IImageStorage } from './engine/types/core/ImageStorage'
-import { GLB } from '@loaders.gl/gltf'
 
 const objectManager = new ObjectManager()
 const bufferStorage = new BufferStorage()
 const imageStorage = new ImageStorage()
 const samplerStorage = new SamplerStorage()
+const textureStorage = new TextureStorage()
 
 export enum GLTFTextureFilter {
     NEAREST = 9728,
@@ -177,7 +179,7 @@ const uploadImages = async (
     })
 }
 
-const uploadBuffers = async (
+const uploadBuffers = (
     modelData: IModelPreloadData,
     bufferStorage: IBufferStorage
 ) => {
@@ -186,7 +188,7 @@ const uploadBuffers = async (
     })
 }
 
-const uploadSamplers = async (
+const uploadSamplers = (
     modelData: IModelPreloadData,
     samplerStorage: ISamplerStorage,
     device: GPUDevice
@@ -201,6 +203,15 @@ const uploadSamplers = async (
             mipmapFilter: 'nearest',
         })
         samplerStorage.samplers.set(key, gpuSampler)
+    })
+}
+
+const uploadTextures = (
+    modelData: IModelPreloadData,
+    textureStorage: ITextureStorage
+) => {
+    modelData.textures.forEach((value, key) => {
+        textureStorage.textures.set(key, value)
     })
 }
 
@@ -220,9 +231,10 @@ const uploadModel = async (
     samplerStorage: ISamplerStorage
 ) => {
     //TODO: upload textures, create samplers, etc. here.
-    await uploadBuffers(modelData, bufferStorage)
+    uploadBuffers(modelData, bufferStorage)
     await uploadImages(modelData, bufferStorage, imageStorage)
-    await uploadSamplers(modelData, samplerStorage, pipelineParams.device)
+    uploadSamplers(modelData, samplerStorage, pipelineParams.device)
+    uploadTextures(modelData, textureStorage)
 
     const { trsMatrix, meshes, children } = modelData.model
 
@@ -355,6 +367,7 @@ const uploadModel = async (
 
     console.log(imageStorage)
     console.log(samplerStorage)
+    console.log(textureStorage)
 
     const renderPassDesc = {
         colorAttachments: [
