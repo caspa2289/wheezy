@@ -88,6 +88,7 @@ const uploadImages = async (
     bufferStorage: IBufferStorage,
     imageStorage: IImageStorage
 ) => {
+    //FIXME: use Promise.all
     modelData.images.forEach(async (value, key) => {
         const {
             bufferView: {
