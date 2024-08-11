@@ -1,4 +1,4 @@
-import { IImageStorage } from '../../types/ImageStorage'
+import { IImageStorage } from '../../types/core/ImageStorage'
 
 export class ImageStorage implements IImageStorage {
     private _images: Map<string, ImageBitmap> = new Map()

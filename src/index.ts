@@ -1,4 +1,10 @@
-import { GameObject, Mesh, ObjectManager, Transform } from './engine/core'
+import {
+    GameObject,
+    Mesh,
+    ObjectManager,
+    SamplerStorage,
+    Transform,
+} from './engine/core'
 import { WheezyGLBLoader } from './utils'
 import shaderCode from './testShader.wgsl'
 import {
@@ -8,6 +14,7 @@ import {
     IModelPreloadData,
     IObjectManager,
     IPreloadEntity,
+    ISamplerStorage,
     ITransform,
     SceneNodeContent,
 } from './engine/types'
@@ -17,11 +24,69 @@ import { Stuff } from './utils/Stuff'
 import { BufferStorage } from './engine/core/BufferStorage'
 import { IBufferStorage } from './engine/types/core/BufferStorage'
 import { ImageStorage } from './engine/core/ImageStorage'
-import { IImageStorage } from './engine/types/ImageStorage'
+import { IImageStorage } from './engine/types/core/ImageStorage'
+import { GLB } from '@loaders.gl/gltf'
 
 const objectManager = new ObjectManager()
 const bufferStorage = new BufferStorage()
 const imageStorage = new ImageStorage()
+const samplerStorage = new SamplerStorage()
+
+export enum GLTFTextureFilter {
+    NEAREST = 9728,
+    LINEAR = 9729,
+    NEAREST_MIPMAP_NEAREST = 9984,
+    LINEAR_MIPMAP_NEAREST = 9985,
+    NEAREST_MIPMAP_LINEAR = 9986,
+    LINEAR_MIPMAP_LINEAR = 9987,
+}
+
+export enum GLTFTextureWrap {
+    REPEAT = 10497,
+    CLAMP_TO_EDGE = 33071,
+    MIRRORED_REPEAT = 33648,
+}
+
+export const getTextureFilterMode = (filter?: GLTFTextureFilter) => {
+    switch (filter) {
+        case GLTFTextureFilter.NEAREST_MIPMAP_NEAREST:
+        case GLTFTextureFilter.NEAREST_MIPMAP_LINEAR:
+        case GLTFTextureFilter.NEAREST:
+            return 'nearest' as GPUFilterMode
+        case GLTFTextureFilter.LINEAR_MIPMAP_NEAREST:
+        case GLTFTextureFilter.LINEAR_MIPMAP_LINEAR:
+        case GLTFTextureFilter.LINEAR:
+            return 'linear' as GPUFilterMode
+        default:
+            return 'linear'
+    }
+}
+
+export const getTextureMipMapMode = (filter: GLTFTextureFilter) => {
+    switch (filter) {
+        case GLTFTextureFilter.NEAREST_MIPMAP_NEAREST:
+        case GLTFTextureFilter.LINEAR_MIPMAP_NEAREST:
+        case GLTFTextureFilter.NEAREST:
+            return 'nearest' as GPUMipmapFilterMode
+        case GLTFTextureFilter.LINEAR_MIPMAP_LINEAR:
+        case GLTFTextureFilter.NEAREST_MIPMAP_LINEAR:
+        case GLTFTextureFilter.LINEAR:
+            return 'linear' as GPUMipmapFilterMode
+    }
+}
+
+export const getTextureAddressMode = (mode?: GLTFTextureWrap) => {
+    switch (mode) {
+        case GLTFTextureWrap.REPEAT:
+            return 'repeat' as GPUAddressMode
+        case GLTFTextureWrap.CLAMP_TO_EDGE:
+            return 'clamp-to-edge' as GPUAddressMode
+        case GLTFTextureWrap.MIRRORED_REPEAT:
+            return 'mirror-repeat' as GPUAddressMode
+        default:
+            return 'repeat'
+    }
+}
 
 const traversePreloadNode = (
     node: IPreloadEntity,
@@ -121,6 +186,24 @@ const uploadBuffers = async (
     })
 }
 
+const uploadSamplers = async (
+    modelData: IModelPreloadData,
+    samplerStorage: ISamplerStorage,
+    device: GPUDevice
+) => {
+    modelData.samplers.forEach((value, key) => {
+        const gpuSampler = device.createSampler({
+            magFilter: getTextureFilterMode(value?.magFilter),
+            minFilter: getTextureFilterMode(value?.minFilter),
+            addressModeU: getTextureAddressMode(value?.wrapS),
+            addressModeV: getTextureAddressMode(value?.wrapT),
+            //FIXME: use mipmap filtration
+            mipmapFilter: 'nearest',
+        })
+        samplerStorage.samplers.set(key, gpuSampler)
+    })
+}
+
 const uploadModel = async (
     modelData: IModelPreloadData,
     objectManager: IObjectManager,
@@ -133,11 +216,13 @@ const uploadModel = async (
         nodeParamsBGLayout: GPUBindGroupLayout
     },
     bufferStorage: IBufferStorage,
-    imageStorage: IImageStorage
+    imageStorage: IImageStorage,
+    samplerStorage: ISamplerStorage
 ) => {
     //TODO: upload textures, create samplers, etc. here.
     await uploadBuffers(modelData, bufferStorage)
     await uploadImages(modelData, bufferStorage, imageStorage)
+    await uploadSamplers(modelData, samplerStorage, pipelineParams.device)
 
     const { trsMatrix, meshes, children } = modelData.model
 
@@ -264,10 +349,12 @@ const uploadModel = async (
             nodeParamsBGLayout: nodeParamsBindGroupLayout,
         },
         bufferStorage,
-        imageStorage
+        imageStorage,
+        samplerStorage
     )
 
     console.log(imageStorage)
+    console.log(samplerStorage)
 
     const renderPassDesc = {
         colorAttachments: [
