@@ -45,9 +45,12 @@ export class WheezyGLBLoader {
                 index: number
             ) => {
                 const bufferViewData = modelData.json.bufferViews[bufferView]
-                bufferViewData.buffer = bufferIndexMap.get(
-                    bufferViewData.buffer
-                )
+                const bufferId = bufferIndexMap.get(bufferViewData.buffer)
+
+                const bufferOffset =
+                    modelData.binChunks[bufferViewData.buffer].byteOffset ?? 0
+                bufferViewData.buffer = bufferId
+                bufferViewData.byteOffset += bufferOffset
 
                 const id = generateId()
                 imagesIndexMap.set(index, id)

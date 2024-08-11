@@ -17,6 +17,7 @@ import { Stuff } from './utils/Stuff'
 import { BufferStorage } from './engine/core/BufferStorage'
 import { IBufferStorage } from './engine/types/core/BufferStorage'
 import { ImageStorage } from './engine/core/ImageStorage'
+import { IImageStorage } from './engine/types/ImageStorage'
 
 const objectManager = new ObjectManager()
 const bufferStorage = new BufferStorage()
@@ -82,7 +83,44 @@ const traversePreloadNode = (
     })
 }
 
-const uploadModel = (
+const uploadImages = async (
+    modelData: IModelPreloadData,
+    bufferStorage: IBufferStorage,
+    imageStorage: IImageStorage
+) => {
+    modelData.images.forEach(async (value, key) => {
+        const {
+            bufferView: {
+                buffer,
+                byteLength,
+                byteOffset,
+                //   byteStride
+            },
+            mimeType,
+        } = value
+
+        const imageView = new Uint8Array(
+            bufferStorage.buffers.get(buffer) as ArrayBuffer,
+            byteOffset,
+            byteLength
+        )
+
+        const blob = new Blob([imageView], { type: mimeType })
+        const bitmap = await createImageBitmap(blob)
+        imageStorage.images.set(key, bitmap)
+    })
+}
+
+const uploadBuffers = async (
+    modelData: IModelPreloadData,
+    bufferStorage: IBufferStorage
+) => {
+    modelData.buffers.forEach((value, key) => {
+        bufferStorage.buffers.set(key, value)
+    })
+}
+
+const uploadModel = async (
     modelData: IModelPreloadData,
     objectManager: IObjectManager,
     pipelineParams: {
@@ -93,13 +131,12 @@ const uploadModel = (
         uniformsBGLayout: GPUBindGroupLayout
         nodeParamsBGLayout: GPUBindGroupLayout
     },
-    bufferStorage: IBufferStorage
+    bufferStorage: IBufferStorage,
+    imageStorage: IImageStorage
 ) => {
     //TODO: upload textures, create samplers, etc. here.
-
-    modelData.buffers.forEach((value, key) => {
-        bufferStorage.buffers.set(key, value)
-    })
+    await uploadBuffers(modelData, bufferStorage)
+    await uploadImages(modelData, bufferStorage, imageStorage)
 
     const { trsMatrix, meshes, children } = modelData.model
 
@@ -214,7 +251,7 @@ const uploadModel = (
 
     console.log(modelData)
 
-    const model = uploadModel(
+    const model = await uploadModel(
         modelData,
         objectManager,
         {
@@ -225,8 +262,11 @@ const uploadModel = (
             uniformsBGLayout: viewParamsBindGroupLayout,
             nodeParamsBGLayout: nodeParamsBindGroupLayout,
         },
-        bufferStorage
+        bufferStorage,
+        imageStorage
     )
+
+    console.log(imageStorage)
 
     const renderPassDesc = {
         colorAttachments: [

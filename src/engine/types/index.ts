@@ -58,7 +58,7 @@ export interface ISamplerPreloadData {
 
 export interface IImagePreloadData {
     bufferView: {
-        buffer: number
+        buffer: string
         byteLength: number
         byteOffset: number
         byteStride: number

@@ -1,3 +1,3 @@
 export interface IImageStorage {
-    images: Map<string, ArrayBuffer>
+    images: Map<string, ImageBitmap>
 }
