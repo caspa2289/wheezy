@@ -24,16 +24,15 @@ export interface GLTFBufferData {
 
 export interface IMaterial {
     name?: string
-    pbr?: MaterialPBR
-    //FIXME: type this
-    normalTexture?: {
-        scale: 2
-        index: 3
-        texCoord: 1
-    }
-    occlusionTexture?: []
-    emissiveTexture?: []
+
+    baseColorTexture?: { view: GPUTextureView; sampler: GPUSampler }
+    metallicRoughnessTexture?: { view: GPUTextureView; sampler: GPUSampler }
+
+    metallicFactor: number
+    roughnessFactor: number
+
     emissiveFactor?: Vec3
+    baseColorFactor: Vec4
 }
 
 export interface GLTFAccessor {
@@ -55,8 +54,7 @@ export interface IMesh extends IComponent<EntityTypes.mesh> {
     tangent?: GLTFAccessor
     indices?: GLTFAccessor
     //FIXME: implement default material according to defaults https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-material
-    //FIXME: implement materials
-    // material: IMaterial //if not present in the file, a default material should be used
+    material?: IMaterial //if not present in the file, a default material should be used
     positions: GLTFAccessor
     mode: number //gpu topology - default is 4 (triangles)
 }

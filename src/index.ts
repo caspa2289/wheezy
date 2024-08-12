@@ -1,5 +1,6 @@
 import {
     GameObject,
+    MaterialStorage,
     Mesh,
     ObjectManager,
     SamplerStorage,
@@ -16,23 +17,26 @@ import {
     IObjectManager,
     IPreloadEntity,
     ISamplerStorage,
+    ITexture,
     ITextureStorage,
     ITransform,
     SceneNodeContent,
 } from './engine/types'
-import { Mat4, mat4, vec3 } from 'wgpu-matrix'
+import { Mat4, mat4, vec3, vec4 } from 'wgpu-matrix'
 import { PerspectiveCamera } from './engine/core/cameras'
 import { Stuff } from './utils/Stuff'
 import { BufferStorage } from './engine/core/BufferStorage'
 import { IBufferStorage } from './engine/types/core/BufferStorage'
 import { ImageStorage } from './engine/core/ImageStorage'
 import { IImageStorage } from './engine/types/core/ImageStorage'
+import { IMaterialStorage } from './engine/types/core/MaterialStorage'
 
 const objectManager = new ObjectManager()
 const bufferStorage = new BufferStorage()
 const imageStorage = new ImageStorage()
 const samplerStorage = new SamplerStorage()
 const textureStorage = new TextureStorage()
+const materialStorage = new MaterialStorage()
 
 export enum GLTFTextureFilter {
     NEAREST = 9728,
@@ -102,7 +106,8 @@ const traversePreloadNode = (
         uniformsBGLayout: GPUBindGroupLayout
         nodeParamsBGLayout: GPUBindGroupLayout
     },
-    bufferStorage: IBufferStorage
+    bufferStorage: IBufferStorage,
+    materialStorage: IMaterialStorage
 ) => {
     const { trsMatrix, meshes, children } = node
 
@@ -125,7 +130,11 @@ const traversePreloadNode = (
         const mesh = new Mesh(
             gameObject,
             meshData.positions as GLTFAccessor,
-            meshData.indices
+            meshData.indices,
+            meshData.textureCoordinates,
+            meshData.materialId
+                ? materialStorage.materials.get(meshData.materialId)
+                : undefined
         )
 
         mesh.buildRenderPipeline(
@@ -145,7 +154,8 @@ const traversePreloadNode = (
             gameObject,
             objectManager,
             pipelineParams,
-            bufferStorage
+            bufferStorage,
+            materialStorage
         )
     })
 }
@@ -155,15 +165,9 @@ const uploadImages = async (
     bufferStorage: IBufferStorage,
     imageStorage: IImageStorage
 ) => {
-    //FIXME: use Promise.all
-    modelData.images.forEach(async (value, key) => {
+    for (let [key, value] of modelData.images.entries()) {
         const {
-            bufferView: {
-                buffer,
-                byteLength,
-                byteOffset,
-                //   byteStride
-            },
+            bufferView: { buffer, byteLength, byteOffset },
             mimeType,
         } = value
 
@@ -176,7 +180,7 @@ const uploadImages = async (
         const blob = new Blob([imageView], { type: mimeType })
         const bitmap = await createImageBitmap(blob)
         imageStorage.images.set(key, bitmap)
-    })
+    }
 }
 
 const uploadBuffers = (
@@ -215,6 +219,73 @@ const uploadTextures = (
     })
 }
 
+const uploadMaterials = (
+    modelData: IModelPreloadData,
+    textureStorage: ITextureStorage,
+    samplerStorage: ISamplerStorage,
+    imageStorage: IImageStorage,
+    device: GPUDevice
+) => {
+    modelData.materials.forEach((value, key) => {
+        let baseColorTextureView: GPUTextureView | undefined
+        let baseColorTextureSampler: GPUSampler | undefined
+        if (value.baseColorTextureId) {
+            const baseColorTextureData = textureStorage.textures.get(
+                value.baseColorTextureId
+            ) as ITexture
+
+            if (!baseColorTextureData.samplerId) {
+                throw new Error('No sampler for this texture')
+            }
+
+            baseColorTextureSampler = samplerStorage.samplers.get(
+                baseColorTextureData.samplerId
+            ) as GPUSampler
+
+            const imageBitmap = imageStorage.images.get(
+                baseColorTextureData.imageId
+            ) as ImageBitmap
+
+            const format: GPUTextureFormat = 'rgba8unorm-srgb'
+
+            const imageSize = [imageBitmap.width, imageBitmap.height, 1]
+
+            const imageTexture = device.createTexture({
+                size: imageSize,
+                format: format,
+                usage:
+                    GPUTextureUsage.TEXTURE_BINDING |
+                    GPUTextureUsage.COPY_DST |
+                    GPUTextureUsage.RENDER_ATTACHMENT,
+            })
+
+            device.queue.copyExternalImageToTexture(
+                { source: imageBitmap },
+                { texture: imageTexture },
+                imageSize
+            )
+
+            baseColorTextureView = imageTexture.createView()
+        }
+
+        const material = {
+            //TODO
+            // name?: string
+            // emissiveFactor: value?.emissiveFactor
+            // metallicRoughnessTexture?: { view: GPUTextureView; sampler: GPUSampler }
+            baseColorTexture: {
+                view: baseColorTextureView as GPUTextureView,
+                sampler: baseColorTextureSampler as GPUSampler,
+            },
+            metallicFactor: value?.metallicFactor ?? 1,
+            roughnessFactor: value.roughnessFactor ?? 1,
+            baseColorFactor: value?.baseColorFactor ?? vec4.create(1, 1, 1, 1),
+        }
+
+        materialStorage.materials.set(key, material)
+    })
+}
+
 const uploadModel = async (
     modelData: IModelPreloadData,
     objectManager: IObjectManager,
@@ -228,13 +299,20 @@ const uploadModel = async (
     },
     bufferStorage: IBufferStorage,
     imageStorage: IImageStorage,
-    samplerStorage: ISamplerStorage
+    samplerStorage: ISamplerStorage,
+    materialStorage: IMaterialStorage
 ) => {
-    //TODO: upload textures, create samplers, etc. here.
     uploadBuffers(modelData, bufferStorage)
     await uploadImages(modelData, bufferStorage, imageStorage)
     uploadSamplers(modelData, samplerStorage, pipelineParams.device)
     uploadTextures(modelData, textureStorage)
+    uploadMaterials(
+        modelData,
+        textureStorage,
+        samplerStorage,
+        imageStorage,
+        pipelineParams.device
+    )
 
     const { trsMatrix, meshes, children } = modelData.model
 
@@ -257,7 +335,11 @@ const uploadModel = async (
         const mesh = new Mesh(
             sceneObject,
             meshData.positions as GLTFAccessor,
-            meshData.indices
+            meshData.indices,
+            meshData.textureCoordinates,
+            meshData.materialId
+                ? materialStorage.materials.get(meshData.materialId)
+                : undefined
         )
 
         mesh.buildRenderPipeline(
@@ -277,7 +359,8 @@ const uploadModel = async (
             sceneObject,
             objectManager,
             pipelineParams,
-            bufferStorage
+            bufferStorage,
+            materialStorage
         )
     })
 
@@ -347,8 +430,6 @@ const uploadModel = async (
         'static/models/Duck.glb'
     )
 
-    console.log(modelData)
-
     const model = await uploadModel(
         modelData,
         objectManager,
@@ -362,12 +443,9 @@ const uploadModel = async (
         },
         bufferStorage,
         imageStorage,
-        samplerStorage
+        samplerStorage,
+        materialStorage
     )
-
-    console.log(imageStorage)
-    console.log(samplerStorage)
-    console.log(textureStorage)
 
     const renderPassDesc = {
         colorAttachments: [
