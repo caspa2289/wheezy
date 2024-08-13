@@ -42,6 +42,12 @@ var base_color_sampler: sampler;
 @group(2) @binding(2)
 var base_color_texture: texture_2d<f32>;
 
+@group(2) @binding(3)
+var metallic_roughness_sampler: sampler;
+
+@group(2) @binding(4)
+var metallic_roughness_texture: texture_2d<f32>;
+
 fn linear_to_srgb(x: f32) -> f32 {
     if (x <= 0.0031308) {
         return 12.92 * x;
@@ -55,20 +61,33 @@ fn vertex_main(vert: VertexInput) -> VertexOutput {
     out.position = view_params.view_proj * node_params.transform * float4(vert.position, 1.0);
     out.world_pos = vert.position.xyz;
     out.texcoords = vert.texcoords;
+
     return out;
 };
 
 @fragment
 fn fragment_main(in: VertexOutput) -> @location(0) float4 {
-    let dx = dpdx(in.world_pos);
-    let dy = dpdy(in.world_pos);
-    let n = normalize(cross(dx, dy));
-    let base_color = textureSample(base_color_texture, base_color_sampler, in.texcoords);
-    var color = material_params.base_color_factor * base_color;
+    var color = textureSample(base_color_texture, base_color_sampler, in.texcoords) * material_params.base_color_factor;
 
     color.x = linear_to_srgb(color.x);
     color.y = linear_to_srgb(color.y);
     color.z = linear_to_srgb(color.z);
     color.w = 1.0;
-    return color;
-}
+
+    // Hardcoded lighting
+    const lightDir = vec3f(9, 0, 0);
+    const lightColor = vec3f(1);
+    const ambientColor = vec3f(0.2);
+
+    //FIXME: upload normals
+    let dx = dpdx(in.world_pos);
+    let dy = dpdy(in.world_pos);
+    let normal = normalize(cross(dx, dy));
+
+    let N = normalize(normal);
+    let L = normalize(lightDir);
+    let NDotL = max(dot(N, L), 0.0);
+    let surfaceColor = (color.rgb * ambientColor) + (color.rgb * NDotL);
+
+    return vec4f(surfaceColor, color.a);
+};

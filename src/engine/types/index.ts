@@ -40,6 +40,7 @@ export interface IModelPreloadData {
 }
 
 export interface IMaterialPreloadData {
+    name?: string
     baseColorFactor?: Vec4 //[1, 1, 1, 1]
     emissiveFactor?: Vec3
     metallicFactor?: number // 1

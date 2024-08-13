@@ -112,28 +112,27 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
             })
         }
 
-        // if (this.metallicRoughnessTexture) {
-        //     bgLayoutEntries.push({
-        //         binding: 3,
-        //         visibility: GPUShaderStage.FRAGMENT,
-        //         sampler: {},
-        //     })
-        //     bgLayoutEntries.push({
-        //         binding: 4,
-        //         visibility: GPUShaderStage.FRAGMENT,
-        //         texture: {},
-        //     })
+        if (this.material?.metallicRoughnessTexture) {
+            materialBindGroupLayoutEntries.push({
+                binding: 3,
+                visibility: GPUShaderStage.FRAGMENT,
+                sampler: {},
+            })
+            materialBindGroupLayoutEntries.push({
+                binding: 4,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: {},
+            })
 
-        //     bgEntries.push({
-        //         binding: 3,
-        //         resource: this.metallicRoughnessTexture.sampler.sampler,
-        //     })
-        //     bgEntries.push({
-        //         binding: 4,
-        //         resource: this.metallicRoughnessTexture.image.view,
-        //     })
-        // }
-        /*** */
+            materialBindGroupEntries.push({
+                binding: 3,
+                resource: this.material?.metallicRoughnessTexture.sampler,
+            })
+            materialBindGroupEntries.push({
+                binding: 4,
+                resource: this.material?.metallicRoughnessTexture.view,
+            })
+        }
 
         const vertexState: GPUVertexState = {
             module: shaderModule,

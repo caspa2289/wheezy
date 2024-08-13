@@ -13,6 +13,7 @@ import {
     EntityTypes,
     GLTFAccessor,
     IGameObject,
+    IMaterial,
     IModelPreloadData,
     IObjectManager,
     IPreloadEntity,
@@ -219,6 +220,60 @@ const uploadTextures = (
     })
 }
 
+const createGPUTexture = (
+    device: GPUDevice,
+    format: GPUTextureFormat,
+    samplerStorage: ISamplerStorage,
+    imageStorage: IImageStorage,
+    texturePreloadData?: ITexture
+) => {
+    let textureView: GPUTextureView | undefined
+    let textureSampler: GPUSampler | undefined
+
+    if (!texturePreloadData) {
+        console.warn('No texture data')
+
+        return
+    }
+
+    if (!texturePreloadData.imageId) {
+        throw new Error('No image view for this texture')
+    }
+
+    if (!texturePreloadData.samplerId) {
+        throw new Error('No sampler for this texture')
+    }
+
+    textureSampler = samplerStorage.samplers.get(
+        texturePreloadData.samplerId
+    ) as GPUSampler
+
+    const imageBitmap = imageStorage.images.get(
+        texturePreloadData.imageId
+    ) as ImageBitmap
+
+    const imageSize = [imageBitmap.width, imageBitmap.height, 1]
+
+    const imageTexture = device.createTexture({
+        size: imageSize,
+        format: format,
+        usage:
+            GPUTextureUsage.TEXTURE_BINDING |
+            GPUTextureUsage.COPY_DST |
+            GPUTextureUsage.RENDER_ATTACHMENT,
+    })
+
+    device.queue.copyExternalImageToTexture(
+        { source: imageBitmap },
+        { texture: imageTexture },
+        imageSize
+    )
+
+    textureView = imageTexture.createView()
+
+    return { view: textureView, sampler: textureSampler }
+}
+
 const uploadMaterials = (
     modelData: IModelPreloadData,
     textureStorage: ITextureStorage,
@@ -227,59 +282,33 @@ const uploadMaterials = (
     device: GPUDevice
 ) => {
     modelData.materials.forEach((value, key) => {
-        let baseColorTextureView: GPUTextureView | undefined
-        let baseColorTextureSampler: GPUSampler | undefined
-        if (value.baseColorTextureId) {
-            const baseColorTextureData = textureStorage.textures.get(
-                value.baseColorTextureId
-            ) as ITexture
-
-            if (!baseColorTextureData.samplerId) {
-                throw new Error('No sampler for this texture')
-            }
-
-            baseColorTextureSampler = samplerStorage.samplers.get(
-                baseColorTextureData.samplerId
-            ) as GPUSampler
-
-            const imageBitmap = imageStorage.images.get(
-                baseColorTextureData.imageId
-            ) as ImageBitmap
-
-            const format: GPUTextureFormat = 'rgba8unorm-srgb'
-
-            const imageSize = [imageBitmap.width, imageBitmap.height, 1]
-
-            const imageTexture = device.createTexture({
-                size: imageSize,
-                format: format,
-                usage:
-                    GPUTextureUsage.TEXTURE_BINDING |
-                    GPUTextureUsage.COPY_DST |
-                    GPUTextureUsage.RENDER_ATTACHMENT,
-            })
-
-            device.queue.copyExternalImageToTexture(
-                { source: imageBitmap },
-                { texture: imageTexture },
-                imageSize
-            )
-
-            baseColorTextureView = imageTexture.createView()
-        }
-
-        const material = {
+        const material: IMaterial = {
             //TODO
-            // name?: string
-            // emissiveFactor: value?.emissiveFactor
-            // metallicRoughnessTexture?: { view: GPUTextureView; sampler: GPUSampler }
-            baseColorTexture: {
-                view: baseColorTextureView as GPUTextureView,
-                sampler: baseColorTextureSampler as GPUSampler,
-            },
+            name: value.name,
+            emissiveFactor: value?.emissiveFactor ?? vec3.create(1, 1, 1),
             metallicFactor: value?.metallicFactor ?? 1,
             roughnessFactor: value.roughnessFactor ?? 1,
             baseColorFactor: value?.baseColorFactor ?? vec4.create(1, 1, 1, 1),
+        }
+
+        if (value.baseColorTextureId) {
+            material.baseColorTexture = createGPUTexture(
+                device,
+                'rgba8unorm-srgb',
+                samplerStorage,
+                imageStorage,
+                textureStorage.textures.get(value.baseColorTextureId)
+            )
+        }
+
+        if (value.metallicRoughnessTextureId) {
+            material.metallicRoughnessTexture = createGPUTexture(
+                device,
+                'rgba8unorm',
+                samplerStorage,
+                imageStorage,
+                textureStorage.textures.get(value.metallicRoughnessTextureId)
+            )
         }
 
         materialStorage.materials.set(key, material)
@@ -427,7 +456,7 @@ const uploadModel = async (
     })
 
     const modelData = await WheezyGLBLoader.loadFromUrl(
-        'static/models/Duck.glb'
+        'static/models/DamagedHelmet.glb'
     )
 
     const model = await uploadModel(

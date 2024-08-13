@@ -144,6 +144,7 @@ export class WheezyGLBLoader {
                 index: number
             ) => {
                 const material: IMaterialPreloadData = {
+                    name: materialData.name,
                     baseColorFactor:
                         materialData?.pbrMetallicRoughness?.baseColorFactor,
                     emissiveFactor: materialData.emissiveFactor,
