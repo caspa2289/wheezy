@@ -502,7 +502,7 @@ const uploadModel = async (
         canvasWidth: canvas.width,
         canvasHeight: canvas.height,
         // position: vec3.create(-30, 55, 700),
-        position: vec3.create(0, 0.8, 3),
+        position: vec3.create(0, 0, 3),
         // position: vec3.create(50, -20, 120),
     })
 
@@ -513,8 +513,6 @@ const uploadModel = async (
     let moveBack = false
     let moveUp = false
     let moveDown = false
-    let rotateLeft = false
-    let rotateRight = false
 
     window.addEventListener('keydown', (evt: any) => {
         switch (evt.code) {
@@ -529,12 +527,6 @@ const uploadModel = async (
                 break
             case 'KeyW':
                 moveForward = true
-                break
-            case 'KeyQ':
-                rotateLeft = true
-                break
-            case 'KeyE':
-                rotateRight = true
                 break
             case 'Space':
                 moveUp = true
@@ -560,12 +552,6 @@ const uploadModel = async (
                 break
             case 'KeyW':
                 moveForward = false
-                break
-            case 'KeyQ':
-                rotateLeft = false
-                break
-            case 'KeyE':
-                rotateRight = false
                 break
             case 'Space':
                 moveUp = false

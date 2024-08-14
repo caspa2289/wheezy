@@ -79,7 +79,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     const lightColor = vec3f(1);
     const ambientColor = vec3f(0.2);
 
-    //FIXME: upload normals
+    //FIXME: upload normals and that would probably really help with lighting and metalness)
     let dx = dpdx(in.world_pos);
     let dy = dpdy(in.world_pos);
     let normal = normalize(cross(dx, dy));
