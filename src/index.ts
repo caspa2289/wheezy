@@ -31,7 +31,7 @@ import { IBufferStorage } from './engine/types/core/BufferStorage'
 import { ImageStorage } from './engine/core/ImageStorage'
 import { IImageStorage } from './engine/types/core/ImageStorage'
 import { IMaterialStorage } from './engine/types/core/MaterialStorage'
-import { FPSController } from './utils/FPSController'
+// import { FPSController } from './utils/FPSController'
 import { ArcBallCamera } from './engine/core/cameras/ArcBallCamera'
 import { ArcBallController } from './utils/ArcBallController'
 
@@ -404,6 +404,9 @@ const uploadModel = async (
     const device = await adapter.requestDevice()
 
     const canvas = document.getElementById('webgpu-canvas') as HTMLCanvasElement
+    canvas.width = document.body.clientWidth * window.devicePixelRatio
+    canvas.height = document.body.clientHeight * window.devicePixelRatio
+
     const context = canvas.getContext('webgpu') as GPUCanvasContext
 
     const shaderModule = device.createShaderModule({ code: shaderCode })

@@ -17,6 +17,9 @@ export class ArcBallController {
     analogX = 0
     analogY = 0
 
+    touchX = 0
+    touchY = 0
+
     camera: IArcBallCamera
     canvas: HTMLCanvasElement
 
@@ -30,6 +33,8 @@ export class ArcBallController {
 
         this.canvas.addEventListener('pointerup', () => {
             this._isTouching = false
+            // this.touchX = 0
+            // this.touchY = 0
         })
 
         this.canvas.addEventListener('pointermove', (evt) => {
@@ -40,6 +45,18 @@ export class ArcBallController {
                 this.analogX += evt.movementX
                 this.analogY += evt.movementY
             }
+        })
+
+        this.canvas.addEventListener('touchstart', (evt) => {
+            this.touchX = evt.changedTouches[0].clientX
+            this.touchY = evt.changedTouches[0].clientY
+        })
+
+        this.canvas.addEventListener('touchmove', (evt) => {
+            this.analogX += evt.changedTouches[0].clientX - this.touchX
+            this.analogY += evt.changedTouches[0].clientY - this.touchY
+            this.touchX = evt.changedTouches[0].clientX
+            this.touchY = evt.changedTouches[0].clientY
         })
     }
 
