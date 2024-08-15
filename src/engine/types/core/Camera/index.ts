@@ -1,4 +1,4 @@
-import { Mat3, Mat4, Vec4 } from 'wgpu-matrix'
+import { Mat3, Mat4, Vec3, Vec4 } from 'wgpu-matrix'
 import { EntityTypes, IEntity } from '../Entity'
 
 export interface ICamera extends IEntity<EntityTypes.camera> {
@@ -17,4 +17,11 @@ export interface ICamera extends IEntity<EntityTypes.camera> {
 export interface IPerspectiveCamera extends ICamera {
     pitch: number
     yaw: number
+}
+
+export interface IArcBallCamera extends ICamera {
+    axis: Vec3
+    distance: number
+    recalculateRight: VoidFunction
+    recalculateUp: VoidFunction
 }

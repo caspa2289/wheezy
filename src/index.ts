@@ -32,6 +32,8 @@ import { ImageStorage } from './engine/core/ImageStorage'
 import { IImageStorage } from './engine/types/core/ImageStorage'
 import { IMaterialStorage } from './engine/types/core/MaterialStorage'
 import { FPSController } from './utils/FPSController'
+import { ArcBallCamera } from './engine/core/cameras/ArcBallCamera'
+import { ArcBallController } from './utils/ArcBallController'
 
 const objectManager = new ObjectManager()
 const bufferStorage = new BufferStorage()
@@ -497,17 +499,27 @@ const uploadModel = async (
         },
     }
 
-    const camera = new PerspectiveCamera({
+    // const camera = new PerspectiveCamera({
+    //     zFar: 1000,
+    //     zNear: 0.1,
+    //     canvasWidth: canvas.width,
+    //     canvasHeight: canvas.height,
+    //     // position: vec3.create(-30, 55, 700),
+    //     position: vec3.create(0, 0, 3),
+    //     // position: vec3.create(50, -20, 120),
+    // })
+
+    // const controller = new FPSController({ camera, canvas })
+
+    const camera = new ArcBallCamera({
         zFar: 1000,
         zNear: 0.1,
         canvasWidth: canvas.width,
         canvasHeight: canvas.height,
-        // position: vec3.create(-30, 55, 700),
         position: vec3.create(0, 0, 3),
-        // position: vec3.create(50, -20, 120),
     })
 
-    const fpsController = new FPSController({ camera, canvas })
+    const controller = new ArcBallController({ camera, canvas })
 
     let prevTime = 0
 
@@ -515,7 +527,7 @@ const uploadModel = async (
         const deltaTime = (time - prevTime) / 1000
         prevTime = time
 
-        fpsController.update(deltaTime)
+        controller.update(deltaTime)
         camera.update()
 
         const meshesToRender: Mesh[] = []
