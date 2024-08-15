@@ -1,10 +1,11 @@
 import { Mat4, mat4, vec3, Vec3, vec4 } from 'wgpu-matrix'
 import { Stuff } from '../../../../utils/Stuff'
 import { Camera, ICameraProps } from '../Camera/Camera'
+import { IPerspectiveCamera } from '../../../types/core/Camera'
 
 export interface PerspectiveCameraProps extends ICameraProps {}
 
-export class PerspectiveCamera extends Camera {
+export class PerspectiveCamera extends Camera implements IPerspectiveCamera {
     public pitch = 0
     public yaw = 0
 

@@ -31,6 +31,7 @@ import { IBufferStorage } from './engine/types/core/BufferStorage'
 import { ImageStorage } from './engine/core/ImageStorage'
 import { IImageStorage } from './engine/types/core/ImageStorage'
 import { IMaterialStorage } from './engine/types/core/MaterialStorage'
+import { FPSController } from './utils/FPSController'
 
 const objectManager = new ObjectManager()
 const bufferStorage = new BufferStorage()
@@ -506,114 +507,15 @@ const uploadModel = async (
         // position: vec3.create(50, -20, 120),
     })
 
-    //camera controller setup
-    let moveLeft = false
-    let moveRight = false
-    let moveForward = false
-    let moveBack = false
-    let moveUp = false
-    let moveDown = false
-
-    window.addEventListener('keydown', (evt: any) => {
-        switch (evt.code) {
-            case 'KeyA':
-                moveLeft = true
-                break
-            case 'KeyD':
-                moveRight = true
-                break
-            case 'KeyS':
-                moveBack = true
-                break
-            case 'KeyW':
-                moveForward = true
-                break
-            case 'Space':
-                moveUp = true
-                break
-            case 'ControlLeft':
-                moveDown = true
-                break
-            default:
-                break
-        }
-    })
-
-    window.addEventListener('keyup', (evt: any) => {
-        switch (evt.code) {
-            case 'KeyA':
-                moveLeft = false
-                break
-            case 'KeyD':
-                moveRight = false
-                break
-            case 'KeyS':
-                moveBack = false
-                break
-            case 'KeyW':
-                moveForward = false
-                break
-            case 'Space':
-                moveUp = false
-                break
-            case 'ControlLeft':
-                moveDown = false
-                break
-            default:
-                break
-        }
-    })
-
-    let analogX = 0
-    let analogY = 0
-    canvas.addEventListener('pointermove', (evt) => {
-        const mouseDown =
-            evt.pointerType == 'mouse' ? (evt.buttons & 1) !== 0 : true
-
-        if (mouseDown) {
-            analogX += evt.movementX
-            analogY += evt.movementY
-        }
-    })
-
-    let velocity = vec3.create()
-
-    const sign = (positive: boolean, negative: boolean) =>
-        (positive ? 1 : 0) - (negative ? 1 : 0)
-
-    const movementSpeed = 8
-    const frictionCoefficient = 0.99
-    const rotationSpeed = 0.05
+    const fpsController = new FPSController({ camera, canvas })
 
     let prevTime = 0
 
     const render = (time: number) => {
         const deltaTime = (time - prevTime) / 1000
         prevTime = time
-        /****Placeholder camera controller */
-        const targetVelocity = vec3.create()
-        const deltaRight = sign(moveRight, moveLeft)
-        const deltaBack = sign(moveBack, moveForward)
-        const deltaUp = sign(moveUp, moveDown)
-        camera.yaw -= rotationSpeed * analogX * deltaTime
-        camera.pitch -= rotationSpeed * analogY * deltaTime
-        analogX = 0
-        analogY = 0
-        vec3.addScaled(targetVelocity, camera.right, deltaRight, targetVelocity)
-        vec3.addScaled(targetVelocity, camera.back, deltaBack, targetVelocity)
-        vec3.addScaled(targetVelocity, camera.up, deltaUp, targetVelocity)
-        vec3.normalize(targetVelocity, targetVelocity)
-        vec3.mulScalar(targetVelocity, movementSpeed, targetVelocity)
 
-        velocity = Stuff.lerp(
-            targetVelocity,
-            velocity,
-            Math.pow(1 - frictionCoefficient, deltaTime)
-        )
-
-        camera.position = vec3.addScaled(camera.position, velocity, deltaTime)
-
-        /**************/
+        fpsController.update(deltaTime)
         camera.update()
 
         const meshesToRender: Mesh[] = []
@@ -697,8 +599,6 @@ const uploadModel = async (
             iterateNode(node, mat4.identity())
         })
 
-        // console.log(objectManager)
-
         const commandEncoder = device.createCommandEncoder()
 
         commandEncoder.copyBufferToBuffer(
@@ -728,5 +628,4 @@ const uploadModel = async (
         requestAnimationFrame(render)
     }
     requestAnimationFrame(render)
-    // render(1)
 })()

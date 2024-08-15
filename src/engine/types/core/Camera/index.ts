@@ -4,6 +4,7 @@ import { EntityTypes, IEntity } from '../Entity'
 export interface ICamera extends IEntity<EntityTypes.camera> {
     matrix: Mat3 // This is the inverse of the view matrix.
     view: Mat4
+    position: Vec4
     right: Vec4
     up: Vec4
     back: Vec4
@@ -11,4 +12,9 @@ export interface ICamera extends IEntity<EntityTypes.camera> {
     zFar: number
     zNear: number
     projectionMatrix: Mat4
+}
+
+export interface IPerspectiveCamera extends ICamera {
+    pitch: number
+    yaw: number
 }
