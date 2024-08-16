@@ -82,11 +82,8 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     const lightColor = vec3f(1);
     const ambientColor = vec3f(0.2);
 
-    //FIXME: upload normals and that would probably really help with lighting and metalness)
-
-    let N = in.normal;
     let L = normalize(lightDir);
-    let NDotL = max(dot(N, L), 0.0);
+    let NDotL = max(dot(in.normal, L), 0.0);
     let surfaceColor = (color.rgb * ambientColor) + (color.rgb * NDotL);
 
     return vec4f(surfaceColor, color.a);

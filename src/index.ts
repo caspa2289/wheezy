@@ -287,7 +287,6 @@ const uploadMaterials = (
 ) => {
     modelData.materials.forEach((value, key) => {
         const material: IMaterial = {
-            //TODO
             name: value.name,
             emissiveFactor: value?.emissiveFactor ?? vec3.create(1, 1, 1),
             metallicFactor: value?.metallicFactor ?? 1,
@@ -466,8 +465,6 @@ const uploadModel = async (
     const modelData = await WheezyGLBLoader.loadFromUrl(
         'static/models/DamagedHelmet.glb'
     )
-
-    console.log(modelData)
 
     const model = await uploadModel(
         modelData,
