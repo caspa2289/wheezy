@@ -17,12 +17,14 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
     positions: GLTFAccessor
     indices?: GLTFAccessor
     textureCoordinates?: GLTFAccessor
+    normals?: GLTFAccessor
     renderPipeline?: GPURenderPipeline
     nodeParamsBindGroup?: GPUBindGroup
     material?: IMaterial
     private positionsBuffer?: GPUBuffer
     private indicesBuffer?: GPUBuffer
     private textureCoordinatesBuffer?: GPUBuffer
+    private normalsBuffer?: GPUBuffer
     private materialParamsBuffer?: GPUBuffer
     private materialBindGroup?: GPUBindGroup
 
@@ -30,6 +32,7 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
         parent: IGameObject,
         positions: GLTFAccessor,
         indices?: GLTFAccessor,
+        normals?: GLTFAccessor,
         textureCoordinates?: GLTFAccessor,
         material?: IMaterial
     ) {
@@ -39,6 +42,7 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
         this.indices = indices
         this.textureCoordinates = textureCoordinates
         this.material = material
+        this.normals = normals
     }
 
     public buildRenderPipeline(
@@ -50,7 +54,7 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
         nodeParamsBGLayout: GPUBindGroupLayout,
         bufferStorage: IBufferStorage
     ) {
-        /*** */
+        //FIXME: REFACTOR THIS SHIT
         this.materialParamsBuffer = device.createBuffer({
             size: 8 * 4,
             usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
@@ -163,6 +167,19 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
             })
         }
 
+        if (this.normals) {
+            ;(vertexState.buffers as GPUVertexBufferLayout[]).push({
+                arrayStride: this.normals.byteStride,
+                attributes: [
+                    {
+                        format: this.normals.elementType,
+                        offset: 0,
+                        shaderLocation: 2,
+                    },
+                ],
+            })
+        }
+
         const fragmentState: GPUFragmentState = {
             module: shaderModule,
             entryPoint: 'fragment_main',
@@ -245,6 +262,26 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
             this.textureCoordinatesBuffer.unmap()
         }
 
+        if (this.normals) {
+            const normalsBuffer = bufferStorage.buffers.get(
+                this?.normals.bufferId
+            )
+
+            const normalsView = new Uint8Array(
+                normalsBuffer as ArrayBuffer,
+                this.normals.byteOffset,
+                this.normals.byteLength
+            )
+
+            this.normalsBuffer = device.createBuffer({
+                size: alignTo(this.normals.byteLength, 4),
+                usage: this.normals.usage,
+                mappedAtCreation: true,
+            })
+            new Uint8Array(this.normalsBuffer.getMappedRange()).set(normalsView)
+            this.normalsBuffer.unmap()
+        }
+
         if (this.indices) {
             const indicesBuffer = bufferStorage.buffers.get(
                 this?.indices.bufferId
@@ -285,6 +322,15 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
                 this.textureCoordinatesBuffer as GPUBuffer,
                 0,
                 this.textureCoordinates.byteLength
+            )
+        }
+
+        if (this.normals) {
+            renderPassEncoder.setVertexBuffer(
+                2,
+                this.normalsBuffer as GPUBuffer,
+                0,
+                this.normals.byteLength
             )
         }
 

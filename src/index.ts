@@ -135,6 +135,7 @@ const traversePreloadNode = (
             gameObject,
             meshData.positions as GLTFAccessor,
             meshData.indices,
+            meshData.normals,
             meshData.textureCoordinates,
             meshData.materialId
                 ? materialStorage.materials.get(meshData.materialId)
@@ -368,6 +369,7 @@ const uploadModel = async (
             sceneObject,
             meshData.positions as GLTFAccessor,
             meshData.indices,
+            meshData.normals,
             meshData.textureCoordinates,
             meshData.materialId
                 ? materialStorage.materials.get(meshData.materialId)
@@ -464,6 +466,8 @@ const uploadModel = async (
     const modelData = await WheezyGLBLoader.loadFromUrl(
         'static/models/DamagedHelmet.glb'
     )
+
+    console.log(modelData)
 
     const model = await uploadModel(
         modelData,

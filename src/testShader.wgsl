@@ -5,12 +5,14 @@ alias float2 = vec2<f32>;
 struct VertexInput {
     @location(0) position: float3,
     @location(1) texcoords: float2,
+    @location(2) normal: float3
 };
 
 struct VertexOutput {
     @builtin(position) position: float4,
     @location(0) world_pos: float3,
     @location(1) texcoords: float2,
+    @location(2) normal: float3
 };
 
 struct ViewParams {
@@ -61,6 +63,7 @@ fn vertex_main(vert: VertexInput) -> VertexOutput {
     out.position = view_params.view_proj * node_params.transform * float4(vert.position, 1.0);
     out.world_pos = vert.position.xyz;
     out.texcoords = vert.texcoords;
+    out.normal = vert.normal;
 
     return out;
 };
@@ -75,16 +78,13 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     color.w = 1.0;
 
     // Hardcoded lighting
-    const lightDir = vec3f(9, 0, 0);
+    const lightDir = vec3f(-9, 0, 0);
     const lightColor = vec3f(1);
     const ambientColor = vec3f(0.2);
 
     //FIXME: upload normals and that would probably really help with lighting and metalness)
-    let dx = dpdx(in.world_pos);
-    let dy = dpdy(in.world_pos);
-    let normal = normalize(cross(dx, dy));
 
-    let N = normalize(normal);
+    let N = in.normal;
     let L = normalize(lightDir);
     let NDotL = max(dot(N, L), 0.0);
     let surfaceColor = (color.rgb * ambientColor) + (color.rgb * NDotL);

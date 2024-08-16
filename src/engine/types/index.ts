@@ -18,6 +18,7 @@ export * from './core/TextureStorage'
 export interface IPreloadMesh {
     positions?: GLTFAccessor
     indices?: GLTFAccessor
+    normals?: GLTFAccessor
     textureCoordinates?: GLTFAccessor
     materialId?: string
     mode: number

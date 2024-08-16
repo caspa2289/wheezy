@@ -328,6 +328,12 @@ export class WheezyGLBLoader {
                             GPUBufferUsage.INDEX,
                             bufferIndexMap
                         ),
+                        normals: WheezyGLBLoader.parseAccessor(
+                            modelData,
+                            primitive.attributes.NORMAL,
+                            GPUBufferUsage.VERTEX,
+                            bufferIndexMap
+                        ),
                         textureCoordinates: WheezyGLBLoader.parseAccessor(
                             modelData,
                             primitive.attributes.TEXCOORD_0,
