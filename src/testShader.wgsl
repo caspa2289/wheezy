@@ -57,6 +57,10 @@ fn linear_to_srgb(x: f32) -> f32 {
     return 1.055 * pow(x, 1.0 / 2.4) - 0.055;
 }
 
+fn decode_color(color: vec4f) -> vec4f {
+    return vec4f(linear_to_srgb(color.x), linear_to_srgb(color.y), linear_to_srgb(color.z), 1.0);
+}
+
 @vertex
 fn vertex_main(vert: VertexInput) -> VertexOutput {
     var out: VertexOutput;
@@ -68,23 +72,92 @@ fn vertex_main(vert: VertexInput) -> VertexOutput {
     return out;
 };
 
+// Hardcoded lighting
+const LightPosition = vec3f(8, 18, 9);
+const LightColor = vec3f(1);
+const AmbientColorStrength = vec3f(0.1);
+
+const CameraPosition = vec3f(0, 8, 0);
+
+const SpecularColor = vec3f(1);  
+
+fn lerp(a: vec3f, b: vec3f, s: f32) -> vec3f {
+    let diff = b - a;
+    var result = a;
+    result.r += diff.r * s;
+    result.g += diff.g * s;
+    result.b += diff.b * s;
+
+    return result;
+}
+
+fn GGXNormalDistribution(roughness: f32, NdotH: f32) ->f32 {
+    let roughnessSqr = roughness * roughness;
+    let NdotHSqr = NdotH * NdotH;
+    let TanNdotHSqr = (1 - NdotHSqr) / NdotHSqr;
+    //should there be pow or sqrt?
+    return (1.0 / 3.1415926535) * pow(roughness / (NdotHSqr * (roughnessSqr + TanNdotHSqr)), 2.0);
+}
+
+fn ImplicitGeometricShadowing(NdotL: f32, NdotV: f32) -> f32 {
+	return NdotL * NdotV;
+}
+
+fn SphericalGaussianFresnel(LdotH: f32, SpecularColor: vec3f) -> vec3f {	
+  let power = ((-5.55473 * LdotH) - 6.98316) * LdotH;
+  return SpecularColor + (1 - SpecularColor) * pow(2, power);
+}
+
 @fragment
 fn fragment_main(in: VertexOutput) -> @location(0) float4 {
-    var color = textureSample(base_color_texture, base_color_sampler, in.texcoords) * material_params.base_color_factor;
+    let color = decode_color(
+        textureSample(base_color_texture, base_color_sampler, in.texcoords) 
+            * material_params.base_color_factor
+    );
 
-    color.x = linear_to_srgb(color.x);
-    color.y = linear_to_srgb(color.y);
-    color.z = linear_to_srgb(color.z);
-    color.w = 1.0;
+    let DiffuseColor = color.rgb;
 
-    // Hardcoded lighting
-    const lightDir = vec3f(-9, 0, 0);
-    const lightColor = vec3f(1);
-    const ambientColor = vec3f(0.2);
+    let metallic_roughness = textureSample(metallic_roughness_texture, metallic_roughness_sampler, in.texcoords);
 
-    let L = normalize(lightDir);
-    let NDotL = max(dot(in.normal, L), 0.0);
-    let surfaceColor = (color.rgb * ambientColor) + (color.rgb * NDotL);
+    let normalDirection = normalize(in.normal);
 
-    return vec4f(surfaceColor, color.a);
+    let lightDirection = normalize(lerp(LightPosition, LightPosition - in.world_pos, 1.0));
+
+    let lightReflectDirection = reflect(-lightDirection, normalDirection);
+
+    let viewDirection = normalize(CameraPosition - in.world_pos);
+
+    let viewReflectDirection = normalize(reflect(-viewDirection, normalDirection));
+
+    let halfDirection = normalize(viewDirection + lightDirection); 
+
+    let NdotL = max(0.0, dot(normalDirection, lightDirection));
+    let NdotH = max(0.0, dot(normalDirection, halfDirection));
+    let NdotV = max(0.0, dot(normalDirection, viewDirection));
+    let VdotH = max(0.0, dot(viewDirection, halfDirection));
+    let LdotH = max(0.0, dot(lightDirection, halfDirection));
+    let LdotV = max(0.0, dot(lightDirection, viewDirection)); 
+    let RdotV = max(0.0, dot(lightReflectDirection, viewDirection));
+
+    let attenuation = 1.5;
+
+    let attenColor = attenuation * LightColor;
+
+    let roughness = metallic_roughness.g;
+    let metallic = metallic_roughness.b;
+
+    let diffuseColor = DiffuseColor * (1 - metallic);
+    let specColor = lerp(SpecularColor, DiffuseColor, metallic * 0.5);
+   
+    let SpecularDistribution = specColor * GGXNormalDistribution(roughness, NdotH);
+    let GeometricShadow = ImplicitGeometricShadowing(NdotL, NdotV);
+    let FresnelFunction = SphericalGaussianFresnel(LdotH, specColor);
+
+    let specularity = (SpecularDistribution * FresnelFunction * GeometricShadow) / (4 * (  NdotL * NdotV));
+
+    let ambientColor = AmbientColorStrength * color.rgb;
+
+    let lightingModel = ((diffuseColor + specularity) * NdotL) * attenColor;
+
+    return vec4f(lightingModel, color.a);
 };
