@@ -453,7 +453,7 @@ const uploadModel = async (
     })
 
     const viewParamsBuffer = device.createBuffer({
-        size: 16 * 4,
+        size: 16 * 4 + 16 * 4,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     })
 
@@ -520,7 +520,7 @@ const uploadModel = async (
         zNear: 0.1,
         canvasWidth: canvas.width,
         canvasHeight: canvas.height,
-        position: vec3.create(0, 0, 3),
+        position: vec3.create(0, 0, 5),
     })
 
     const controller = new ArcBallController({ camera, canvas })
@@ -537,7 +537,7 @@ const uploadModel = async (
         const meshesToRender: Mesh[] = []
 
         const viewParamsUploadBuffer = device.createBuffer({
-            size: 16 * 4,
+            size: 16 * 4 + 16,
             usage: GPUBufferUsage.COPY_SRC,
             mappedAtCreation: true,
         })
@@ -546,6 +546,8 @@ const uploadModel = async (
             viewParamsUploadBuffer.getMappedRange()
         )
         viewMap.set(camera.projectionMatrix)
+        viewMap.set(camera.position, 16)
+
         viewParamsUploadBuffer.unmap()
 
         const iterateNode = (node: SceneNodeContent, worldMatrix: Mat4) => {
@@ -622,7 +624,7 @@ const uploadModel = async (
             0,
             viewParamsBuffer,
             0,
-            16 * 4
+            16 * 4 + 16
         )
 
         renderPassDesc.colorAttachments[0].view = context

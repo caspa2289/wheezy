@@ -12,11 +12,13 @@ struct VertexOutput {
     @builtin(position) position: float4,
     @location(0) world_pos: float3,
     @location(1) texcoords: float2,
-    @location(2) normal: float3
+    @location(2) normal: float3,
+    @location(3) camera_position: float3
 };
 
 struct ViewParams {
     view_proj: mat4x4<f32>,
+    camera_position: vec4f
 };
 
 struct NodeParams {
@@ -68,16 +70,18 @@ fn vertex_main(vert: VertexInput) -> VertexOutput {
     out.world_pos = vert.position.xyz;
     out.texcoords = vert.texcoords;
     out.normal = vert.normal;
+    out.camera_position = view_params.camera_position.xyz;
 
     return out;
 };
 
 // Hardcoded lighting
-const LightPosition = vec3f(8, 18, 9);
+const LightPosition = vec3f(0, 8, 0);
 const LightColor = vec3f(1);
 const AmbientColorStrength = vec3f(0.1);
 
-const CameraPosition = vec3f(0, 8, 0);
+
+const CameraPosition = vec3f(0.17195218801498413, 2.75129771232605, 4.171425819396973);
 
 const SpecularColor = vec3f(1);  
 
@@ -125,7 +129,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
 
     let lightReflectDirection = reflect(-lightDirection, normalDirection);
 
-    let viewDirection = normalize(CameraPosition - in.world_pos);
+    let viewDirection = normalize(in.camera_position - in.world_pos);
 
     let viewReflectDirection = normalize(reflect(-viewDirection, normalDirection));
 
