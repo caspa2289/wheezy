@@ -52,17 +52,6 @@ var metallic_roughness_sampler: sampler;
 @group(2) @binding(4)
 var metallic_roughness_texture: texture_2d<f32>;
 
-fn linear_to_srgb(x: f32) -> f32 {
-    if (x <= 0.0031308) {
-        return 12.92 * x;
-    }
-    return 1.055 * pow(x, 1.0 / 2.4) - 0.055;
-}
-
-fn decode_color(color: vec4f) -> vec4f {
-    return vec4f(linear_to_srgb(color.x), linear_to_srgb(color.y), linear_to_srgb(color.z), 1.0);
-}
-
 @vertex
 fn vertex_main(vert: VertexInput) -> VertexOutput {
     var out: VertexOutput;
@@ -76,14 +65,26 @@ fn vertex_main(vert: VertexInput) -> VertexOutput {
 };
 
 // Hardcoded lighting
-const LightPosition = vec3f(0, 8, 0);
+const LightPosition = vec3f(8, 8, 0);
 const LightColor = vec3f(1);
 const AmbientColorStrength = vec3f(0.1);
+const PI = 3.1415926535;
 
 
 const CameraPosition = vec3f(0.17195218801498413, 2.75129771232605, 4.171425819396973);
 
-const SpecularColor = vec3f(1);  
+const SpecularColor = vec3f(1);
+
+fn linear_to_srgb(x: f32) -> f32 {
+    if (x <= 0.0031308) {
+        return 12.92 * x;
+    }
+    return 1.055 * pow(x, 1.0 / 2.4) - 0.055;
+}
+
+fn decode_color(color: vec4f) -> vec4f {
+    return vec4f(linear_to_srgb(color.x), linear_to_srgb(color.y), linear_to_srgb(color.z), 1.0);
+}
 
 fn lerp(a: vec3f, b: vec3f, s: f32) -> vec3f {
     let diff = b - a;
@@ -100,7 +101,7 @@ fn GGXNormalDistribution(roughness: f32, NdotH: f32) ->f32 {
     let NdotHSqr = NdotH * NdotH;
     let TanNdotHSqr = (1 - NdotHSqr) / NdotHSqr;
     //should there be pow or sqrt?
-    return (1.0 / 3.1415926535) * pow(roughness / (NdotHSqr * (roughnessSqr + TanNdotHSqr)), 2.0);
+    return (1.0 / PI) * pow(roughness / (NdotHSqr * (roughnessSqr + TanNdotHSqr)), 2.0);
 }
 
 fn ImplicitGeometricShadowing(NdotL: f32, NdotV: f32) -> f32 {
@@ -143,9 +144,9 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     let LdotV = max(0.0, dot(lightDirection, viewDirection)); 
     let RdotV = max(0.0, dot(lightReflectDirection, viewDirection));
 
-    let attenuation = 1.5;
+    let attenuation = 1.0;
 
-    let attenColor = attenuation * LightColor;
+    let attenColor = attenuation * normalize(LightColor);
 
     let roughness = metallic_roughness.g;
     let metallic = metallic_roughness.b;
@@ -157,9 +158,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     let GeometricShadow = ImplicitGeometricShadowing(NdotL, NdotV);
     let FresnelFunction = SphericalGaussianFresnel(LdotH, specColor);
 
-    let specularity = (SpecularDistribution * FresnelFunction * GeometricShadow) / (4 * (  NdotL * NdotV));
-
-    let ambientColor = AmbientColorStrength * color.rgb;
+    let specularity = (SpecularDistribution * FresnelFunction * GeometricShadow) / (PI * (  NdotL * NdotV));
 
     let lightingModel = ((diffuseColor + specularity) * NdotL) * attenColor;
 
