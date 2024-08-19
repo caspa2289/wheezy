@@ -60,6 +60,7 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
             usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
             mappedAtCreation: true,
         })
+
         if (this.material) {
             const params = new Float32Array(
                 this.materialParamsBuffer.getMappedRange()
@@ -138,6 +139,29 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
             })
         }
 
+        if (this.material?.normalTexture) {
+            materialBindGroupLayoutEntries.push({
+                binding: 5,
+                visibility: GPUShaderStage.FRAGMENT,
+                sampler: {},
+            })
+
+            materialBindGroupLayoutEntries.push({
+                binding: 6,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: {},
+            })
+
+            materialBindGroupEntries.push({
+                binding: 5,
+                resource: this.material?.normalTexture.sampler,
+            })
+            materialBindGroupEntries.push({
+                binding: 6,
+                resource: this.material?.normalTexture.view,
+            })
+        }
+
         const vertexState: GPUVertexState = {
             module: shaderModule,
             entryPoint: 'vertex_main',
@@ -154,6 +178,7 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
                 },
             ],
         }
+
         if (this.textureCoordinates) {
             ;(vertexState.buffers as GPUVertexBufferLayout[]).push({
                 arrayStride: this.textureCoordinates.byteStride,

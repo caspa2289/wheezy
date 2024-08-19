@@ -138,6 +138,9 @@ export class WheezyGLBLoader {
                         metallicFactor?: number
                         roughnessFactor?: number
                     }
+                    normalTexture?: { index: number }
+                    emissiveTexture?: { index: number }
+                    occlusionTexture?: { index: number }
                     emissiveFactor?: Vec3
                     name?: string
                 },
@@ -166,6 +169,24 @@ export class WheezyGLBLoader {
                             ? texturesIndexMap.get(
                                   materialData?.pbrMetallicRoughness
                                       ?.metallicRoughnessTexture?.index
+                              )
+                            : undefined,
+                    normalTextureId:
+                        materialData?.normalTexture?.index !== undefined
+                            ? texturesIndexMap.get(
+                                  materialData?.normalTexture?.index
+                              )
+                            : undefined,
+                    occlusionTextureId:
+                        materialData?.occlusionTexture?.index !== undefined
+                            ? texturesIndexMap.get(
+                                  materialData?.occlusionTexture?.index
+                              )
+                            : undefined,
+                    emissiveTextureId:
+                        materialData?.emissiveTexture?.index !== undefined
+                            ? texturesIndexMap.get(
+                                  materialData?.emissiveTexture?.index
                               )
                             : undefined,
                 }

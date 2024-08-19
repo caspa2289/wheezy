@@ -48,6 +48,9 @@ export interface IMaterialPreloadData {
     roughnessFactor?: number // 1
     baseColorTextureId?: string
     metallicRoughnessTextureId?: string
+    normalTextureId?: string
+    occlusionTextureId?: string
+    emissiveTextureId?: string
 }
 
 export interface ITexturePreloadData {

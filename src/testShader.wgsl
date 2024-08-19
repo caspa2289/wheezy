@@ -5,14 +5,14 @@ alias float2 = vec2<f32>;
 struct VertexInput {
     @location(0) position: float3,
     @location(1) texcoords: float2,
-    @location(2) normal: float3
+    @location(2) object_normal: float3
 };
 
 struct VertexOutput {
     @builtin(position) position: float4,
     @location(0) world_pos: float3,
     @location(1) texcoords: float2,
-    @location(2) normal: float3,
+    @location(2) object_normal: float3,
     @location(3) camera_position: float3
 };
 
@@ -52,13 +52,19 @@ var metallic_roughness_sampler: sampler;
 @group(2) @binding(4)
 var metallic_roughness_texture: texture_2d<f32>;
 
+@group(2) @binding(5)
+var tangent_normal_sampler: sampler;
+
+@group(2) @binding(6)
+var tangent_normal_texture: texture_2d<f32>;
+
 @vertex
 fn vertex_main(vert: VertexInput) -> VertexOutput {
     var out: VertexOutput;
     out.position = view_params.view_proj * node_params.transform * float4(vert.position, 1.0);
     out.world_pos = vert.position.xyz;
     out.texcoords = vert.texcoords;
-    out.normal = vert.normal;
+    out.object_normal = vert.object_normal;
     out.camera_position = view_params.camera_position.xyz;
 
     return out;
@@ -120,11 +126,13 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
             * material_params.base_color_factor
     );
 
+    let tangent_normal = textureSample(tangent_normal_texture, tangent_normal_sampler, in.texcoords).rgb;
+
     let DiffuseColor = color.rgb;
 
     let metallic_roughness = textureSample(metallic_roughness_texture, metallic_roughness_sampler, in.texcoords);
 
-    let normalDirection = normalize(in.normal);
+    let normalDirection = normalize(in.object_normal);
 
     let lightDirection = normalize(lerp(LightPosition, LightPosition - in.world_pos, 1.0));
 

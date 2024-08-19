@@ -2,31 +2,24 @@ import { IComponent } from '../Component'
 import { EntityTypes } from '../Entity'
 import { Vec3, Vec4 } from 'wgpu-matrix'
 
-export type MaterialPBR = {
-    //FIXME: type this
-    baseColorFactor?: Vec4 //vec4
-    baseColorTexture?: {
-        index: 1
-        texCoord: 1
-    }
-    metallicFactor?: number //0 to 1
-    roughnessFactor?: number //0 to 1
-    metallicRoughnessTexture?: {
-        index: 2
-        texCoord: 1
-    }
-}
-
 export interface GLTFBufferData {
     id: string
     buffer: GPUBuffer
 }
 
+export interface IMaterialTexture {
+    view: GPUTextureView
+    sampler: GPUSampler
+}
+
 export interface IMaterial {
     name?: string
 
-    baseColorTexture?: { view: GPUTextureView; sampler: GPUSampler }
-    metallicRoughnessTexture?: { view: GPUTextureView; sampler: GPUSampler }
+    baseColorTexture?: IMaterialTexture
+    metallicRoughnessTexture?: IMaterialTexture
+    normalTexture?: IMaterialTexture
+    emissiveTexture?: IMaterialTexture
+    occlusionTexture?: IMaterialTexture
 
     metallicFactor: number
     roughnessFactor: number

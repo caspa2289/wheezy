@@ -314,6 +314,16 @@ const uploadMaterials = (
             )
         }
 
+        if (value.normalTextureId) {
+            material.normalTexture = createGPUTexture(
+                device,
+                'rgba8unorm-srgb',
+                samplerStorage,
+                imageStorage,
+                textureStorage.textures.get(value.normalTextureId)
+            )
+        }
+
         materialStorage.materials.set(key, material)
     })
 }
