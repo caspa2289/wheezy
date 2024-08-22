@@ -1,4 +1,4 @@
-import { Mat4, vec3, Vec3 } from 'wgpu-matrix'
+import { mat4, Mat4, vec3, Vec3 } from 'wgpu-matrix'
 
 export class Stuff {
     static clamp(x: number, min: number, max: number): number {
@@ -11,6 +11,10 @@ export class Stuff {
 
     static lerp(a: Vec3, b: Vec3, s: number): Vec3 {
         return vec3.addScaled(a, vec3.sub(b, a), s)
+    }
+
+    static rotate(vec: Vec3, axis: Vec3, angle: number): Vec3 {
+        return vec3.transformMat4Upper3x3(vec, mat4.rotation(axis, angle))
     }
 
     static extractEulerRotation(mat: Mat4): Vec3 {
