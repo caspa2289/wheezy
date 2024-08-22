@@ -6,7 +6,8 @@
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
         "dev": "webpack serve --open --port 3000",
-        "prepare": "husky install"
+        "prepare": "husky install",
+        "build": "webpack build"
     },
     "keywords": [],
     "author": "caspa2289",

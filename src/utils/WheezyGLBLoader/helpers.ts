@@ -114,3 +114,11 @@ export const getTypeSize = (componentType: GLTFComponentType, type: string) => {
     }
     return getTypeComponentsAmount(type) * componentSize
 }
+
+export enum ImageUsage {
+    BASE_COLOR,
+    METALLIC_ROUGHNESS,
+    NORMAL,
+    OCCLUSION,
+    EMISSION,
+}
