@@ -24,7 +24,6 @@ import {
     SceneNodeContent,
 } from './engine/types'
 import { Mat4, mat4, vec3, vec4 } from 'wgpu-matrix'
-import { PerspectiveCamera } from './engine/core/cameras'
 import { Stuff } from './utils/Stuff'
 import { BufferStorage } from './engine/core/BufferStorage'
 import { IBufferStorage } from './engine/types/core/BufferStorage'
