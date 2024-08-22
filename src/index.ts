@@ -1,38 +1,20 @@
 import {
-    GameObject,
     MaterialStorage,
     Mesh,
     ObjectManager,
     SamplerStorage,
     TextureStorage,
-    Transform,
 } from './engine/core'
 import { WheezyGLBLoader } from './utils'
 import shaderCode from './testShader.wgsl'
-import {
-    EntityTypes,
-    GLTFAccessor,
-    IGameObject,
-    IMaterial,
-    IModelPreloadData,
-    IObjectManager,
-    IPreloadEntity,
-    ISamplerStorage,
-    ITexture,
-    ITextureStorage,
-    ITransform,
-    SceneNodeContent,
-} from './engine/types'
-import { Mat4, mat4, vec3, vec4 } from 'wgpu-matrix'
+import { EntityTypes, ITransform, SceneNodeContent } from './engine/types'
+import { Mat4, mat4, vec3 } from 'wgpu-matrix'
 import { Stuff } from './utils/Stuff'
 import { BufferStorage } from './engine/core/BufferStorage'
-import { IBufferStorage } from './engine/types/core/BufferStorage'
 import { ImageStorage } from './engine/core/ImageStorage'
-import { IImageStorage } from './engine/types/core/ImageStorage'
-import { IMaterialStorage } from './engine/types/core/MaterialStorage'
-// import { FPSController } from './utils/FPSController'
 import { ArcBallCamera } from './engine/core/cameras/ArcBallCamera'
 import { ArcBallController } from './utils/ArcBallController'
+import { ModelUploader } from './engine/core/ModelUploader'
 
 const objectManager = new ObjectManager()
 const bufferStorage = new BufferStorage()
@@ -40,374 +22,6 @@ const imageStorage = new ImageStorage()
 const samplerStorage = new SamplerStorage()
 const textureStorage = new TextureStorage()
 const materialStorage = new MaterialStorage()
-
-export enum GLTFTextureFilter {
-    NEAREST = 9728,
-    LINEAR = 9729,
-    NEAREST_MIPMAP_NEAREST = 9984,
-    LINEAR_MIPMAP_NEAREST = 9985,
-    NEAREST_MIPMAP_LINEAR = 9986,
-    LINEAR_MIPMAP_LINEAR = 9987,
-}
-
-export enum GLTFTextureWrap {
-    REPEAT = 10497,
-    CLAMP_TO_EDGE = 33071,
-    MIRRORED_REPEAT = 33648,
-}
-
-export const getTextureFilterMode = (filter?: GLTFTextureFilter) => {
-    switch (filter) {
-        case GLTFTextureFilter.NEAREST_MIPMAP_NEAREST:
-        case GLTFTextureFilter.NEAREST_MIPMAP_LINEAR:
-        case GLTFTextureFilter.NEAREST:
-            return 'nearest' as GPUFilterMode
-        case GLTFTextureFilter.LINEAR_MIPMAP_NEAREST:
-        case GLTFTextureFilter.LINEAR_MIPMAP_LINEAR:
-        case GLTFTextureFilter.LINEAR:
-            return 'linear' as GPUFilterMode
-        default:
-            return 'linear'
-    }
-}
-
-export const getTextureMipMapMode = (filter: GLTFTextureFilter) => {
-    switch (filter) {
-        case GLTFTextureFilter.NEAREST_MIPMAP_NEAREST:
-        case GLTFTextureFilter.LINEAR_MIPMAP_NEAREST:
-        case GLTFTextureFilter.NEAREST:
-            return 'nearest' as GPUMipmapFilterMode
-        case GLTFTextureFilter.LINEAR_MIPMAP_LINEAR:
-        case GLTFTextureFilter.NEAREST_MIPMAP_LINEAR:
-        case GLTFTextureFilter.LINEAR:
-            return 'linear' as GPUMipmapFilterMode
-    }
-}
-
-export const getTextureAddressMode = (mode?: GLTFTextureWrap) => {
-    switch (mode) {
-        case GLTFTextureWrap.REPEAT:
-            return 'repeat' as GPUAddressMode
-        case GLTFTextureWrap.CLAMP_TO_EDGE:
-            return 'clamp-to-edge' as GPUAddressMode
-        case GLTFTextureWrap.MIRRORED_REPEAT:
-            return 'mirror-repeat' as GPUAddressMode
-        default:
-            return 'repeat'
-    }
-}
-
-const traversePreloadNode = (
-    node: IPreloadEntity,
-    parentGameObject: IGameObject,
-    objectManager: IObjectManager,
-    pipelineParams: {
-        device: GPUDevice
-        shaderModule: GPUShaderModule
-        colorFormat: GPUTextureFormat
-        depthFormat: GPUTextureFormat
-        uniformsBGLayout: GPUBindGroupLayout
-        nodeParamsBGLayout: GPUBindGroupLayout
-    },
-    bufferStorage: IBufferStorage,
-    materialStorage: IMaterialStorage
-) => {
-    const { trsMatrix, meshes, children } = node
-
-    const gameObject = new GameObject()
-
-    objectManager.addObject(gameObject, parentGameObject)
-
-    new Transform(gameObject, trsMatrix)
-
-    const {
-        device,
-        shaderModule,
-        colorFormat: swapChainFormat,
-        depthFormat,
-        uniformsBGLayout: viewParamsBindGroupLayout,
-        nodeParamsBGLayout: nodeParamsBindGroupLayout,
-    } = pipelineParams
-
-    meshes.forEach((meshData) => {
-        const mesh = new Mesh(
-            gameObject,
-            meshData.positions as GLTFAccessor,
-            meshData.indices,
-            meshData.normals,
-            meshData.textureCoordinates,
-            meshData.materialId
-                ? materialStorage.materials.get(meshData.materialId)
-                : undefined
-        )
-
-        mesh.buildRenderPipeline(
-            device,
-            shaderModule,
-            swapChainFormat,
-            depthFormat,
-            viewParamsBindGroupLayout,
-            nodeParamsBindGroupLayout,
-            bufferStorage
-        )
-    })
-
-    children.forEach((child) => {
-        traversePreloadNode(
-            child,
-            gameObject,
-            objectManager,
-            pipelineParams,
-            bufferStorage,
-            materialStorage
-        )
-    })
-}
-
-const uploadImages = async (
-    modelData: IModelPreloadData,
-    bufferStorage: IBufferStorage,
-    imageStorage: IImageStorage
-) => {
-    for (let [key, value] of modelData.images.entries()) {
-        const {
-            bufferView: { buffer, byteLength, byteOffset },
-            mimeType,
-        } = value
-
-        const imageView = new Uint8Array(
-            bufferStorage.buffers.get(buffer) as ArrayBuffer,
-            byteOffset,
-            byteLength
-        )
-
-        const blob = new Blob([imageView], { type: mimeType })
-        const bitmap = await createImageBitmap(blob)
-        imageStorage.images.set(key, bitmap)
-    }
-}
-
-const uploadBuffers = (
-    modelData: IModelPreloadData,
-    bufferStorage: IBufferStorage
-) => {
-    modelData.buffers.forEach((value, key) => {
-        bufferStorage.buffers.set(key, value)
-    })
-}
-
-const uploadSamplers = (
-    modelData: IModelPreloadData,
-    samplerStorage: ISamplerStorage,
-    device: GPUDevice
-) => {
-    modelData.samplers.forEach((value, key) => {
-        const gpuSampler = device.createSampler({
-            magFilter: getTextureFilterMode(value?.magFilter),
-            minFilter: getTextureFilterMode(value?.minFilter),
-            addressModeU: getTextureAddressMode(value?.wrapS),
-            addressModeV: getTextureAddressMode(value?.wrapT),
-            //FIXME: use mipmap filtration
-            mipmapFilter: 'nearest',
-        })
-        samplerStorage.samplers.set(key, gpuSampler)
-    })
-}
-
-const uploadTextures = (
-    modelData: IModelPreloadData,
-    textureStorage: ITextureStorage
-) => {
-    modelData.textures.forEach((value, key) => {
-        textureStorage.textures.set(key, value)
-    })
-}
-
-const createGPUTexture = (
-    device: GPUDevice,
-    format: GPUTextureFormat,
-    samplerStorage: ISamplerStorage,
-    imageStorage: IImageStorage,
-    texturePreloadData?: ITexture
-) => {
-    let textureView: GPUTextureView | undefined
-    let textureSampler: GPUSampler | undefined
-
-    if (!texturePreloadData) {
-        console.warn('No texture data')
-
-        return
-    }
-
-    if (!texturePreloadData.imageId) {
-        throw new Error('No image view for this texture')
-    }
-
-    if (!texturePreloadData.samplerId) {
-        throw new Error('No sampler for this texture')
-    }
-
-    textureSampler = samplerStorage.samplers.get(
-        texturePreloadData.samplerId
-    ) as GPUSampler
-
-    const imageBitmap = imageStorage.images.get(
-        texturePreloadData.imageId
-    ) as ImageBitmap
-
-    const imageSize = [imageBitmap.width, imageBitmap.height, 1]
-
-    const imageTexture = device.createTexture({
-        size: imageSize,
-        format: format,
-        usage:
-            GPUTextureUsage.TEXTURE_BINDING |
-            GPUTextureUsage.COPY_DST |
-            GPUTextureUsage.RENDER_ATTACHMENT,
-    })
-
-    device.queue.copyExternalImageToTexture(
-        { source: imageBitmap },
-        { texture: imageTexture },
-        imageSize
-    )
-
-    textureView = imageTexture.createView()
-
-    return { view: textureView, sampler: textureSampler }
-}
-
-const uploadMaterials = (
-    modelData: IModelPreloadData,
-    textureStorage: ITextureStorage,
-    samplerStorage: ISamplerStorage,
-    imageStorage: IImageStorage,
-    device: GPUDevice
-) => {
-    modelData.materials.forEach((value, key) => {
-        const material: IMaterial = {
-            name: value.name,
-            emissiveFactor: value?.emissiveFactor ?? vec3.create(1, 1, 1),
-            metallicFactor: value?.metallicFactor ?? 1,
-            roughnessFactor: value.roughnessFactor ?? 1,
-            baseColorFactor: value?.baseColorFactor ?? vec4.create(1, 1, 1, 1),
-        }
-
-        if (value.baseColorTextureId) {
-            material.baseColorTexture = createGPUTexture(
-                device,
-                'rgba8unorm-srgb',
-                samplerStorage,
-                imageStorage,
-                textureStorage.textures.get(value.baseColorTextureId)
-            )
-        }
-
-        if (value.metallicRoughnessTextureId) {
-            material.metallicRoughnessTexture = createGPUTexture(
-                device,
-                'rgba8unorm',
-                samplerStorage,
-                imageStorage,
-                textureStorage.textures.get(value.metallicRoughnessTextureId)
-            )
-        }
-
-        if (value.normalTextureId) {
-            material.normalTexture = createGPUTexture(
-                device,
-                'rgba8unorm-srgb',
-                samplerStorage,
-                imageStorage,
-                textureStorage.textures.get(value.normalTextureId)
-            )
-        }
-
-        materialStorage.materials.set(key, material)
-    })
-}
-
-const uploadModel = async (
-    modelData: IModelPreloadData,
-    objectManager: IObjectManager,
-    pipelineParams: {
-        device: GPUDevice
-        shaderModule: GPUShaderModule
-        colorFormat: GPUTextureFormat
-        depthFormat: GPUTextureFormat
-        uniformsBGLayout: GPUBindGroupLayout
-        nodeParamsBGLayout: GPUBindGroupLayout
-    },
-    bufferStorage: IBufferStorage,
-    imageStorage: IImageStorage,
-    samplerStorage: ISamplerStorage,
-    materialStorage: IMaterialStorage
-) => {
-    uploadBuffers(modelData, bufferStorage)
-    await uploadImages(modelData, bufferStorage, imageStorage)
-    uploadSamplers(modelData, samplerStorage, pipelineParams.device)
-    uploadTextures(modelData, textureStorage)
-    uploadMaterials(
-        modelData,
-        textureStorage,
-        samplerStorage,
-        imageStorage,
-        pipelineParams.device
-    )
-
-    const { trsMatrix, meshes, children } = modelData.model
-
-    const sceneObject = new GameObject()
-
-    objectManager.addObject(sceneObject)
-
-    new Transform(sceneObject, trsMatrix)
-
-    const {
-        device,
-        shaderModule,
-        colorFormat: swapChainFormat,
-        depthFormat,
-        uniformsBGLayout: viewParamsBindGroupLayout,
-        nodeParamsBGLayout: nodeParamsBindGroupLayout,
-    } = pipelineParams
-
-    meshes.forEach((meshData) => {
-        const mesh = new Mesh(
-            sceneObject,
-            meshData.positions as GLTFAccessor,
-            meshData.indices,
-            meshData.normals,
-            meshData.textureCoordinates,
-            meshData.materialId
-                ? materialStorage.materials.get(meshData.materialId)
-                : undefined
-        )
-
-        mesh.buildRenderPipeline(
-            device,
-            shaderModule,
-            swapChainFormat,
-            depthFormat,
-            viewParamsBindGroupLayout,
-            nodeParamsBindGroupLayout,
-            bufferStorage
-        )
-    })
-
-    children.forEach((child) => {
-        traversePreloadNode(
-            child,
-            sceneObject,
-            objectManager,
-            pipelineParams,
-            bufferStorage,
-            materialStorage
-        )
-    })
-
-    return sceneObject
-}
 
 ;(async () => {
     const adapter = (await navigator.gpu.requestAdapter()) as GPUAdapter
@@ -475,7 +89,7 @@ const uploadModel = async (
         'static/models/DamagedHelmet.glb'
     )
 
-    const model = await uploadModel(
+    const model = await ModelUploader.uploadModel(
         modelData,
         objectManager,
         {
@@ -489,7 +103,8 @@ const uploadModel = async (
         bufferStorage,
         imageStorage,
         samplerStorage,
-        materialStorage
+        materialStorage,
+        textureStorage
     )
 
     const renderPassDesc = {
@@ -511,18 +126,6 @@ const uploadModel = async (
             stencilStoreOp: 'store' as GPUStoreOp,
         },
     }
-
-    // const camera = new PerspectiveCamera({
-    //     zFar: 1000,
-    //     zNear: 0.1,
-    //     canvasWidth: canvas.width,
-    //     canvasHeight: canvas.height,
-    //     // position: vec3.create(-30, 55, 700),
-    //     position: vec3.create(0, 0, 3),
-    //     // position: vec3.create(50, -20, 120),
-    // })
-
-    // const controller = new FPSController({ camera, canvas })
 
     const camera = new ArcBallCamera({
         zFar: 1000,
