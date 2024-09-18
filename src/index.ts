@@ -112,7 +112,7 @@ const materialStorage = new MaterialStorage()
             {
                 view: null as unknown as GPUTextureView,
                 loadOp: 'clear' as GPULoadOp,
-                clearValue: [0.0, 0.0, 0.0, 1],
+                clearValue: [0.4, 0.4, 0.4, 1],
                 storeOp: 'store' as GPUStoreOp,
             },
         ],
