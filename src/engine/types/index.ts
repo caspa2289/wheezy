@@ -12,6 +12,8 @@ export * from './core/BufferStorage'
 export * from './core/ImageStorage'
 export * from './core/SamplerStorage'
 export * from './core/TextureStorage'
+export * from './core/Scene'
+export * from './core/Engine'
 
 //FIXME: move this somewhere else
 export interface IPreloadMesh {

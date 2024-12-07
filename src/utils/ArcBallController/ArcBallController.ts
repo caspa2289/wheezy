@@ -1,4 +1,4 @@
-import { vec3 } from 'wgpu-matrix'
+import { mat4, vec3 } from 'wgpu-matrix'
 import { IArcBallCamera } from '../../engine/types/core/Camera'
 import { Stuff } from '../Stuff'
 
@@ -106,5 +106,7 @@ export class ArcBallController {
             this.camera.back,
             this.camera.distance
         )
+
+        this.camera.view = mat4.invert(this.camera.matrix)
     }
 }

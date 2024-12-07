@@ -17,6 +17,7 @@ export class ArcBallCamera extends Camera implements IArcBallCamera {
         super.back = vec3.normalize(super.position)
         this.recalculateRight()
         this.recalculateUp()
+        super.view = mat4.invert(super.matrix)
     }
 
     get axis() {
@@ -50,10 +51,5 @@ export class ArcBallCamera extends Camera implements IArcBallCamera {
 
     recalculateUp() {
         super.up = vec3.normalize(vec3.cross(super.back, super.right))
-    }
-
-    update() {
-        super.view = mat4.invert(super.matrix)
-        return super.view
     }
 }
