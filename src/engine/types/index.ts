@@ -1,6 +1,5 @@
 import { Mat4, Vec3, Vec4 } from 'wgpu-matrix'
 import { GLTFAccessor } from './core/Mesh'
-import { GLTFTextureFilter, GLTFTextureWrap } from '../..'
 
 export * from './core/Entity'
 export * from './core/GameObject'
@@ -13,6 +12,8 @@ export * from './core/BufferStorage'
 export * from './core/ImageStorage'
 export * from './core/SamplerStorage'
 export * from './core/TextureStorage'
+export * from './core/Scene'
+export * from './core/Engine'
 
 //FIXME: move this somewhere else
 export interface IPreloadMesh {
@@ -57,6 +58,21 @@ export interface ITexturePreloadData {
     samplerId: string
     imageId: string
     // usage: GPUTextureUsageFlags
+}
+
+export enum GLTFTextureFilter {
+    NEAREST = 9728,
+    LINEAR = 9729,
+    NEAREST_MIPMAP_NEAREST = 9984,
+    LINEAR_MIPMAP_NEAREST = 9985,
+    NEAREST_MIPMAP_LINEAR = 9986,
+    LINEAR_MIPMAP_LINEAR = 9987,
+}
+
+export enum GLTFTextureWrap {
+    REPEAT = 10497,
+    CLAMP_TO_EDGE = 33071,
+    MIRRORED_REPEAT = 33648,
 }
 
 export interface ISamplerPreloadData {
