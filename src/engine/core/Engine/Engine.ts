@@ -21,11 +21,34 @@ export class Engine implements IEngine {
 
     private _scene?: IScene
 
-    constructor({ canvas, swapChainFormat, depthTextureFormat }: IEngineProps) {
-        this._initializeContext(canvas, swapChainFormat, depthTextureFormat)
-
+    public static async getOrInit({
+        canvas,
+        swapChainFormat,
+        depthTextureFormat,
+    }: IEngineProps): Promise<Engine | undefined> {
         //FIXME: types
-        ;(window as any).WheezyEngine = this
+        try {
+            if ((window as any).WheezyEngine) {
+                console.warn('Engine has already been instanced')
+                return (window as any).WheezyEngine as Engine
+            }
+
+            const engineInstance = new Engine()
+
+            await engineInstance.initializeContext(canvas)
+
+            engineInstance.swapChainFormat =
+                swapChainFormat ?? DEFAULT_SWAP_CHAIN_FORMAT
+            engineInstance.depthTextureFormat =
+                depthTextureFormat ?? DEFAULT_DEPTH_FORMAT
+
+            engineInstance.initializeBindGroupLayouts()
+            ;(window as any).WheezyEngine = engineInstance
+
+            return engineInstance
+        } catch (err) {
+            alert(err)
+        }
     }
 
     get adapter() {
@@ -94,46 +117,29 @@ export class Engine implements IEngine {
         return this._viewParamsBufferSize
     }
 
-    private _initializeContext(
-        canvas: HTMLCanvasElement,
-        swapChainFormat: GPUTextureFormat | undefined,
-        depthTextureFormat?: GPUTextureFormat | undefined
-    ) {
-        navigator.gpu
-            .requestAdapter()
-            .then((adapter) => {
-                if (!adapter) {
-                    throw new Error('GPU Adapter Unavailable')
-                }
+    public async initializeContext(canvas: HTMLCanvasElement) {
+        const adapter = await navigator.gpu.requestAdapter()
 
-                adapter.requestDevice().then((device) => {
-                    this._device = device
-                    this._adapter = adapter
+        if (!adapter) {
+            throw new Error('GPU Adapter Unavailable')
+        }
 
-                    canvas.width =
-                        document.body.clientWidth * window.devicePixelRatio
-                    canvas.height =
-                        document.body.clientHeight * window.devicePixelRatio
+        const device = await adapter.requestDevice()
 
-                    this._context = canvas.getContext(
-                        'webgpu'
-                    ) as GPUCanvasContext
+        this._device = device
+        this._adapter = adapter
 
-                    if (!this._context) {
-                        throw new Error('Failed to acquire GpuCanvasContext')
-                    }
+        canvas.width = document.body.clientWidth * window.devicePixelRatio
+        canvas.height = document.body.clientHeight * window.devicePixelRatio
 
-                    this.swapChainFormat =
-                        swapChainFormat ?? DEFAULT_SWAP_CHAIN_FORMAT
-                    this.depthTextureFormat =
-                        depthTextureFormat ?? DEFAULT_DEPTH_FORMAT
-                    this._initializeBindGroupLayouts()
-                })
-            })
-            .catch((err) => alert(err))
+        this._context = canvas.getContext('webgpu') as GPUCanvasContext
+
+        if (!this._context) {
+            throw new Error('Failed to acquire GpuCanvasContext')
+        }
     }
 
-    private _initializeBindGroupLayouts() {
+    public initializeBindGroupLayouts() {
         this._uniformsBGLayout = this.device.createBindGroupLayout({
             entries: [
                 {

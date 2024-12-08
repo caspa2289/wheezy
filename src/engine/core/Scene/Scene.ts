@@ -5,7 +5,6 @@ import {
     IEngine,
     IGameObject,
     IImageStorage,
-    IMesh,
     IObjectManager,
     ISamplerStorage,
     IScene,
@@ -43,7 +42,8 @@ export class Scene implements IScene {
     private _viewParamsBuffer!: GPUBuffer
     private _viewParamsBindGroup!: GPUBindGroup
 
-    constructor({ camera }: ISceneProps) {
+    constructor(props?: ISceneProps) {
+        const { camera } = props ?? {}
         //FIXME: types
         this._engine = (window as any).WheezyEngine as IEngine | undefined
 
@@ -183,7 +183,6 @@ export class Scene implements IScene {
             )
         }
 
-        // this.camera.update()
         const meshesToRender: Mesh[] = []
 
         const viewParamsUploadBuffer = this._engine.device.createBuffer({
