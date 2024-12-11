@@ -160,4 +160,12 @@ export class Engine implements IEngine {
             ],
         })
     }
+
+    public render(callback: VoidFunction) {
+        if (!this.scene) return
+
+        this.scene.render(1)
+        callback()
+        requestAnimationFrame(() => this.render(callback))
+    }
 }

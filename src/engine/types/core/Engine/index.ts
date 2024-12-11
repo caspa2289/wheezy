@@ -11,6 +11,8 @@ export interface IEngine {
     uniformsBGLayout: GPUBindGroupLayout
     nodeParamsBGLayout: GPUBindGroupLayout
     viewParamsBufferSize: number
+
+    render: (placeHolderCB: VoidFunction) => void
 }
 
 export interface IEngineProps {
