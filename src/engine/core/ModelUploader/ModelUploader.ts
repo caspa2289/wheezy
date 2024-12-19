@@ -123,6 +123,7 @@ export class ModelUploader {
     private static createGPUTexture(
         device: GPUDevice,
         format: GPUTextureFormat,
+        msaaSampleCount: number | undefined,
         samplerStorage: ISamplerStorage,
         imageStorage: IImageStorage,
         texturePreloadData?: ITexture
@@ -154,9 +155,12 @@ export class ModelUploader {
 
         const imageSize = [imageBitmap.width, imageBitmap.height, 1]
 
+        console.log(msaaSampleCount)
+
         const imageTexture = device.createTexture({
             size: imageSize,
             format: format,
+            // sampleCount: msaaSampleCount,
             usage:
                 GPUTextureUsage.TEXTURE_BINDING |
                 GPUTextureUsage.COPY_DST |
@@ -180,7 +184,8 @@ export class ModelUploader {
         samplerStorage: ISamplerStorage,
         imageStorage: IImageStorage,
         materialStorage: IMaterialStorage,
-        device: GPUDevice
+        device: GPUDevice,
+        msaaSampleCount: number | undefined
     ) {
         modelData.materials.forEach((value, key) => {
             const material: IMaterial = {
@@ -196,6 +201,7 @@ export class ModelUploader {
                 material.baseColorTexture = this.createGPUTexture(
                     device,
                     'rgba8unorm-srgb',
+                    msaaSampleCount,
                     samplerStorage,
                     imageStorage,
                     textureStorage.textures.get(value.baseColorTextureId)
@@ -206,6 +212,7 @@ export class ModelUploader {
                 material.metallicRoughnessTexture = this.createGPUTexture(
                     device,
                     'rgba8unorm',
+                    msaaSampleCount,
                     samplerStorage,
                     imageStorage,
                     textureStorage.textures.get(
@@ -218,6 +225,7 @@ export class ModelUploader {
                 material.normalTexture = this.createGPUTexture(
                     device,
                     'rgba8unorm-srgb',
+                    msaaSampleCount,
                     samplerStorage,
                     imageStorage,
                     textureStorage.textures.get(value.normalTextureId)
@@ -237,6 +245,7 @@ export class ModelUploader {
             shaderModule: GPUShaderModule
             colorFormat: GPUTextureFormat
             depthFormat: GPUTextureFormat
+            msaaSampleCount: number | undefined
             uniformsBGLayout: GPUBindGroupLayout
             nodeParamsBGLayout: GPUBindGroupLayout
         },
@@ -256,6 +265,7 @@ export class ModelUploader {
             shaderModule,
             colorFormat: swapChainFormat,
             depthFormat,
+            msaaSampleCount,
             uniformsBGLayout: viewParamsBindGroupLayout,
             nodeParamsBGLayout: nodeParamsBindGroupLayout,
         } = pipelineParams
@@ -277,6 +287,7 @@ export class ModelUploader {
                 shaderModule,
                 swapChainFormat,
                 depthFormat,
+                msaaSampleCount,
                 viewParamsBindGroupLayout,
                 nodeParamsBindGroupLayout,
                 bufferStorage
@@ -305,6 +316,7 @@ export class ModelUploader {
             depthFormat: GPUTextureFormat
             uniformsBGLayout: GPUBindGroupLayout
             nodeParamsBGLayout: GPUBindGroupLayout
+            msaaSampleCount: number | undefined
         },
         bufferStorage: IBufferStorage,
         imageStorage: IImageStorage,
@@ -312,6 +324,16 @@ export class ModelUploader {
         materialStorage: IMaterialStorage,
         textureStorage: ITextureStorage
     ) {
+        const {
+            device,
+            shaderModule,
+            colorFormat: swapChainFormat,
+            depthFormat,
+            uniformsBGLayout: viewParamsBindGroupLayout,
+            nodeParamsBGLayout: nodeParamsBindGroupLayout,
+            msaaSampleCount,
+        } = pipelineParams
+
         this.uploadBuffers(modelData, bufferStorage)
         await this.uploadImages(modelData, bufferStorage, imageStorage)
         this.uploadSamplers(modelData, samplerStorage, pipelineParams.device)
@@ -322,7 +344,8 @@ export class ModelUploader {
             samplerStorage,
             imageStorage,
             materialStorage,
-            pipelineParams.device
+            pipelineParams.device,
+            msaaSampleCount
         )
 
         const { trsMatrix, meshes, children } = modelData.model
@@ -332,15 +355,6 @@ export class ModelUploader {
         objectManager.addObject(sceneObject)
 
         new Transform(sceneObject, trsMatrix)
-
-        const {
-            device,
-            shaderModule,
-            colorFormat: swapChainFormat,
-            depthFormat,
-            uniformsBGLayout: viewParamsBindGroupLayout,
-            nodeParamsBGLayout: nodeParamsBindGroupLayout,
-        } = pipelineParams
 
         meshes.forEach((meshData) => {
             const mesh = new Mesh(
@@ -359,6 +373,7 @@ export class ModelUploader {
                 shaderModule,
                 swapChainFormat,
                 depthFormat,
+                msaaSampleCount,
                 viewParamsBindGroupLayout,
                 nodeParamsBindGroupLayout,
                 bufferStorage

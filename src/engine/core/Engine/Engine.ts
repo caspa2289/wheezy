@@ -18,6 +18,7 @@ export class Engine implements IEngine {
     private _nodeParamsBGLayout!: GPUBindGroupLayout
 
     private _viewParamsBufferSize: number = VIEW_PARAMS_BUFFER_SIZE
+    private _msaaSampleCount: number = 1
 
     private _scene?: IScene
 
@@ -83,11 +84,12 @@ export class Engine implements IEngine {
     set depthTextureFormat(format: GPUTextureFormat) {
         this._depthTextureFormat = format
         this._depthTexture = this._device.createTexture({
+            label: 'depthTexture',
             size: {
                 width: this._context.canvas.width,
                 height: this._context.canvas.height,
-                depthOrArrayLayers: 1,
             },
+            sampleCount: this._msaaSampleCount,
             format,
             usage: GPUTextureUsage.RENDER_ATTACHMENT,
         })
@@ -115,6 +117,14 @@ export class Engine implements IEngine {
 
     get viewParamsBufferSize() {
         return this._viewParamsBufferSize
+    }
+
+    get msaaSampleCount() {
+        return this._msaaSampleCount
+    }
+
+    set msaaSampleCount(value) {
+        this._msaaSampleCount = value
     }
 
     public async initializeContext(canvas: HTMLCanvasElement) {

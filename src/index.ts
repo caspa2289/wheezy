@@ -39,7 +39,7 @@ const run = async () => {
 
     engine.render(() => {
         // controller.update(1 / 60)
-        transform.rotateRadians({ z: 0.015 })
+        // transform.rotateRadians({ z: 0.015 })
     })
 }
 

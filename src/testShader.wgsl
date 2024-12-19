@@ -40,22 +40,22 @@ var<uniform> node_params: NodeParams;
 @group(2) @binding(0)
 var<uniform> material_params: MaterialParams;
 
-@group(2) @binding(1)
+@group(3) @binding(1)
 var base_color_sampler: sampler;
 
-@group(2) @binding(2)
+@group(2) @binding(1)
 var base_color_texture: texture_2d<f32>;
 
-@group(2) @binding(3)
+@group(3) @binding(2)
 var metallic_roughness_sampler: sampler;
 
-@group(2) @binding(4)
+@group(2) @binding(2)
 var metallic_roughness_texture: texture_2d<f32>;
 
-@group(2) @binding(5)
+@group(3) @binding(3)
 var tangent_normal_sampler: sampler;
 
-@group(2) @binding(6)
+@group(2) @binding(3)
 var tangent_normal_texture: texture_2d<f32>;
 
 @vertex
