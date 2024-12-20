@@ -77,7 +77,6 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
         }
 
         const sampleType = 'float'
-        const isMultiSampled = msaaSampleCount !== 1
 
         let materialBindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [
             {
@@ -119,8 +118,6 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
             },
         ]
 
-        console.log(isMultiSampled)
-
         // If we have a base color texture, add the sampler and texture bindings
         if (this.material?.baseColorTexture) {
             samplerBindGroupLayoutEntries.push({
@@ -133,7 +130,6 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
                 visibility: GPUShaderStage.FRAGMENT,
                 texture: {
                     sampleType,
-                    // multisampled: isMultiSampled,
                 },
             })
 
@@ -158,7 +154,6 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
                 visibility: GPUShaderStage.FRAGMENT,
                 texture: {
                     sampleType,
-                    // multisampled: isMultiSampled,
                 },
             })
 
@@ -184,7 +179,6 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
                 visibility: GPUShaderStage.FRAGMENT,
                 texture: {
                     sampleType,
-                    // multisampled: isMultiSampled,
                 },
             })
 
@@ -287,7 +281,6 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
             ],
         })
 
-        console.log(msaaSampleCount)
         this.renderPipeline = device.createRenderPipeline({
             layout: layout,
             vertex: vertexState,
