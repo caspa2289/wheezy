@@ -18,7 +18,9 @@ export class Engine implements IEngine {
     private _nodeParamsBGLayout!: GPUBindGroupLayout
 
     private _viewParamsBufferSize: number = VIEW_PARAMS_BUFFER_SIZE
-    private _msaaSampleCount: number = 1
+    private _msaaSampleCount: number = 4
+
+    private _prevFrameTime: number = 0
 
     private _scene?: IScene
 
@@ -171,11 +173,14 @@ export class Engine implements IEngine {
         })
     }
 
-    public render(callback: VoidFunction) {
+    public render(callback: (time: number) => void, time: number) {
         if (!this.scene) return
 
-        this.scene.render(1)
-        callback()
-        requestAnimationFrame(() => this.render(callback))
+        const dt = (time - this._prevFrameTime) / 100
+        this._prevFrameTime = time
+
+        this.scene.render(dt)
+        callback(dt)
+        requestAnimationFrame((time: number) => this.render(callback, time))
     }
 }
