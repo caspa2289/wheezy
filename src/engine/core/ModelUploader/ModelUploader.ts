@@ -123,7 +123,6 @@ export class ModelUploader {
     private static createGPUTexture(
         device: GPUDevice,
         format: GPUTextureFormat,
-        msaaSampleCount: number | undefined,
         samplerStorage: ISamplerStorage,
         imageStorage: IImageStorage,
         texturePreloadData?: ITexture
@@ -155,12 +154,9 @@ export class ModelUploader {
 
         const imageSize = [imageBitmap.width, imageBitmap.height, 1]
 
-        console.log(msaaSampleCount)
-
         const imageTexture = device.createTexture({
             size: imageSize,
             format: format,
-            // sampleCount: msaaSampleCount,
             usage:
                 GPUTextureUsage.TEXTURE_BINDING |
                 GPUTextureUsage.COPY_DST |
@@ -184,8 +180,7 @@ export class ModelUploader {
         samplerStorage: ISamplerStorage,
         imageStorage: IImageStorage,
         materialStorage: IMaterialStorage,
-        device: GPUDevice,
-        msaaSampleCount: number | undefined
+        device: GPUDevice
     ) {
         modelData.materials.forEach((value, key) => {
             const material: IMaterial = {
@@ -201,7 +196,6 @@ export class ModelUploader {
                 material.baseColorTexture = this.createGPUTexture(
                     device,
                     'rgba8unorm-srgb',
-                    msaaSampleCount,
                     samplerStorage,
                     imageStorage,
                     textureStorage.textures.get(value.baseColorTextureId)
@@ -212,7 +206,6 @@ export class ModelUploader {
                 material.metallicRoughnessTexture = this.createGPUTexture(
                     device,
                     'rgba8unorm',
-                    msaaSampleCount,
                     samplerStorage,
                     imageStorage,
                     textureStorage.textures.get(
@@ -225,7 +218,6 @@ export class ModelUploader {
                 material.normalTexture = this.createGPUTexture(
                     device,
                     'rgba8unorm-srgb',
-                    msaaSampleCount,
                     samplerStorage,
                     imageStorage,
                     textureStorage.textures.get(value.normalTextureId)
@@ -344,8 +336,7 @@ export class ModelUploader {
             samplerStorage,
             imageStorage,
             materialStorage,
-            pipelineParams.device,
-            msaaSampleCount
+            pipelineParams.device
         )
 
         const { trsMatrix, meshes, children } = modelData.model
