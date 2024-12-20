@@ -314,7 +314,8 @@ export class ModelUploader {
         imageStorage: IImageStorage,
         samplerStorage: ISamplerStorage,
         materialStorage: IMaterialStorage,
-        textureStorage: ITextureStorage
+        textureStorage: ITextureStorage,
+        sceneObject: IGameObject
     ) {
         const {
             device,
@@ -341,15 +342,15 @@ export class ModelUploader {
 
         const { trsMatrix, meshes, children } = modelData.model
 
-        const sceneObject = new GameObject()
+        const meshObject = new GameObject()
 
-        objectManager.addObject(sceneObject)
+        objectManager.addObject(meshObject, sceneObject)
 
-        new Transform(sceneObject, trsMatrix)
+        new Transform(meshObject, trsMatrix)
 
         meshes.forEach((meshData) => {
             const mesh = new Mesh(
-                sceneObject,
+                meshObject,
                 meshData.positions as GLTFAccessor,
                 meshData.indices,
                 meshData.normals,
@@ -374,7 +375,7 @@ export class ModelUploader {
         children.forEach((child) => {
             this.traversePreloadNode(
                 child,
-                sceneObject,
+                meshObject,
                 objectManager,
                 pipelineParams,
                 bufferStorage,
@@ -382,6 +383,6 @@ export class ModelUploader {
             )
         })
 
-        return sceneObject
+        return meshObject
     }
 }

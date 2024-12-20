@@ -53,7 +53,11 @@ export class SceneTree implements ISceneTree {
     }
 
     public removeNode(targetPosition: SceneTreePosition): EntityID[] {
-        const parentPosition = targetPosition.slice(-1)
+        const parentPosition = targetPosition.slice(
+            0,
+            targetPosition.length - 1
+        )
+
         const parentNode = this.getNodeContentAt(parentPosition)
 
         const childrenIds: EntityID[] = []

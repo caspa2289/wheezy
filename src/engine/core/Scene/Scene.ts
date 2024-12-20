@@ -24,6 +24,7 @@ import { SamplerStorage } from '../SamplerStorage'
 import { TextureStorage } from '../TextureStorage'
 import { Stuff } from '../../../utils/Stuff'
 import { Mesh } from '../Mesh'
+import { GameObject } from '../GameObject'
 
 export class Scene implements IScene {
     private _objectManager: IObjectManager = new ObjectManager()
@@ -44,6 +45,8 @@ export class Scene implements IScene {
 
     private _multisampleTextureView?: GPUTextureView
 
+    private _root: IGameObject
+
     constructor(props?: ISceneProps) {
         const { camera } = props ?? {}
         //FIXME: types
@@ -54,6 +57,10 @@ export class Scene implements IScene {
                 'Failed to initialize scene as no instance of Wheezy Engine is found'
             )
         }
+
+        this._root = new GameObject()
+
+        this._objectManager.addObject(this._root)
 
         this._initializeViewParams()
 
@@ -201,7 +208,8 @@ export class Scene implements IScene {
             this._imageStorage,
             this._samplerStorage,
             this._materialStorage,
-            this._textureStorage
+            this._textureStorage,
+            this._root
         )
     }
 
