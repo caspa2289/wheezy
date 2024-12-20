@@ -24,6 +24,7 @@ export interface IScene {
     renderPassDescriptor: GPURenderPassDescriptor
     viewParamsBuffer: GPUBuffer
     viewParamsBindGroup: GPUBindGroup
+    multisampleTextureView?: GPUTextureView
 
     uploadModel: (props: ISceneUploadModelProps) => Promise<IGameObject>
     render: (deltaTime: number) => void

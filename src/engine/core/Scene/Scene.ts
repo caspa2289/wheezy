@@ -42,6 +42,8 @@ export class Scene implements IScene {
     private _viewParamsBuffer!: GPUBuffer
     private _viewParamsBindGroup!: GPUBindGroup
 
+    private _multisampleTextureView?: GPUTextureView
+
     constructor(props?: ISceneProps) {
         const { camera } = props ?? {}
         //FIXME: types
@@ -55,13 +57,35 @@ export class Scene implements IScene {
 
         this._initializeViewParams()
 
+        if (this._engine.msaaSampleCount !== 1) {
+            this._multisampleTextureView = this._engine.device
+                .createTexture({
+                    size: [
+                        this._engine.context.canvas.width,
+                        this._engine.context.canvas.height,
+                    ],
+                    sampleCount: this._engine.msaaSampleCount,
+                    format: this._engine.swapChainFormat,
+                    usage: GPUTextureUsage.RENDER_ATTACHMENT,
+                })
+                .createView()
+        } else {
+            this._multisampleTextureView = undefined
+        }
+
         this._renderPassDescriptor = {
             colorAttachments: [
                 {
                     view: null as unknown as GPUTextureView,
+                    resolveTarget: (this._engine.msaaSampleCount === 1
+                        ? undefined
+                        : null) as unknown as GPUTextureView,
                     loadOp: 'clear' as GPULoadOp,
                     clearValue: [0.4, 0.4, 0.4, 1],
-                    storeOp: 'store' as GPUStoreOp,
+                    storeOp:
+                        this._engine.msaaSampleCount === 1
+                            ? 'store'
+                            : ('discard' as GPUStoreOp),
                 },
             ],
             depthStencilAttachment: {
@@ -126,6 +150,10 @@ export class Scene implements IScene {
         return this._viewParamsBuffer
     }
 
+    get multisampleTextureView() {
+        return this._multisampleTextureView
+    }
+
     get viewParamsBindGroup() {
         return this._viewParamsBindGroup
     }
@@ -167,6 +195,7 @@ export class Scene implements IScene {
                 depthFormat: this._engine.depthTextureFormat,
                 uniformsBGLayout: this._engine.uniformsBGLayout,
                 nodeParamsBGLayout: this._engine.nodeParamsBGLayout,
+                msaaSampleCount: this._engine.msaaSampleCount,
             },
             this._bufferStorage,
             this._imageStorage,
@@ -288,6 +317,16 @@ export class Scene implements IScene {
         )
         ;(this.renderPassDescriptor as any).colorAttachments[0].view =
             this._engine.context.getCurrentTexture().createView()
+        if (this._engine.msaaSampleCount !== 1) {
+            ;(this.renderPassDescriptor as any).colorAttachments[0].view =
+                this._multisampleTextureView
+            ;(
+                this.renderPassDescriptor as any
+            ).colorAttachments[0].resolveTarget = this._engine.context
+                .getCurrentTexture()
+                .createView()
+        }
+
         const renderPass = commandEncoder.beginRenderPass(
             this.renderPassDescriptor
         )

@@ -27,6 +27,7 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
     private normalsBuffer?: GPUBuffer
     private materialParamsBuffer?: GPUBuffer
     private materialBindGroup?: GPUBindGroup
+    private samplerBindGroup?: GPUBindGroup
 
     constructor(
         parent: IGameObject,
@@ -50,6 +51,7 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
         shaderModule: GPUShaderModule,
         colorFormat: GPUTextureFormat,
         depthFormat: GPUTextureFormat,
+        msaaSampleCount: number | undefined,
         uniformsBGLayout: GPUBindGroupLayout,
         nodeParamsBGLayout: GPUBindGroupLayout,
         bufferStorage: IBufferStorage
@@ -74,12 +76,34 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
             this.materialParamsBuffer.unmap()
         }
 
+        const sampleType = 'float'
+
         let materialBindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [
             {
                 binding: 0,
                 visibility: GPUShaderStage.FRAGMENT,
                 buffer: {
                     type: 'uniform',
+                },
+            },
+        ]
+
+        let samplerBindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [
+            {
+                binding: 0,
+                visibility: GPUShaderStage.FRAGMENT,
+                buffer: {
+                    type: 'uniform',
+                },
+            },
+        ]
+
+        let samplerBindGroupEntries: GPUBindGroupEntry[] = [
+            {
+                binding: 0,
+                resource: {
+                    buffer: this.materialParamsBuffer,
+                    size: 8 * 4,
                 },
             },
         ]
@@ -96,68 +120,74 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
 
         // If we have a base color texture, add the sampler and texture bindings
         if (this.material?.baseColorTexture) {
-            materialBindGroupLayoutEntries.push({
+            samplerBindGroupLayoutEntries.push({
                 binding: 1,
                 visibility: GPUShaderStage.FRAGMENT,
                 sampler: {},
             })
             materialBindGroupLayoutEntries.push({
-                binding: 2,
+                binding: 1,
                 visibility: GPUShaderStage.FRAGMENT,
-                texture: {},
+                texture: {
+                    sampleType,
+                },
             })
 
-            materialBindGroupEntries.push({
+            samplerBindGroupEntries.push({
                 binding: 1,
                 resource: this.material.baseColorTexture.sampler,
             })
             materialBindGroupEntries.push({
-                binding: 2,
+                binding: 1,
                 resource: this.material.baseColorTexture.view,
             })
         }
 
         if (this.material?.metallicRoughnessTexture) {
-            materialBindGroupLayoutEntries.push({
-                binding: 3,
+            samplerBindGroupLayoutEntries.push({
+                binding: 2,
                 visibility: GPUShaderStage.FRAGMENT,
                 sampler: {},
             })
             materialBindGroupLayoutEntries.push({
-                binding: 4,
+                binding: 2,
                 visibility: GPUShaderStage.FRAGMENT,
-                texture: {},
+                texture: {
+                    sampleType,
+                },
             })
 
-            materialBindGroupEntries.push({
-                binding: 3,
+            samplerBindGroupEntries.push({
+                binding: 2,
                 resource: this.material?.metallicRoughnessTexture.sampler,
             })
             materialBindGroupEntries.push({
-                binding: 4,
+                binding: 2,
                 resource: this.material?.metallicRoughnessTexture.view,
             })
         }
 
         if (this.material?.normalTexture) {
-            materialBindGroupLayoutEntries.push({
-                binding: 5,
+            samplerBindGroupLayoutEntries.push({
+                binding: 3,
                 visibility: GPUShaderStage.FRAGMENT,
                 sampler: {},
             })
 
             materialBindGroupLayoutEntries.push({
-                binding: 6,
+                binding: 3,
                 visibility: GPUShaderStage.FRAGMENT,
-                texture: {},
+                texture: {
+                    sampleType,
+                },
             })
 
-            materialBindGroupEntries.push({
-                binding: 5,
+            samplerBindGroupEntries.push({
+                binding: 3,
                 resource: this.material?.normalTexture.sampler,
             })
             materialBindGroupEntries.push({
-                binding: 6,
+                binding: 3,
                 resource: this.material?.normalTexture.view,
             })
         }
@@ -215,14 +245,26 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
             topology: 'triangle-list',
             stripIndexFormat: undefined,
         }
+
         if (this.mode === 5) {
             primitive.topology = 'triangle-strip'
             primitive.stripIndexFormat = this?.indices
                 ?.elementType as GPUIndexFormat
         }
 
+        const samplerBindGroupLayout = device.createBindGroupLayout({
+            entries: samplerBindGroupLayoutEntries,
+            label: 'samplerBindGroupLayout',
+        })
+
         const materialBindGroupLayout = device.createBindGroupLayout({
             entries: materialBindGroupLayoutEntries,
+            label: 'materialBindGroupLayout',
+        })
+
+        this.samplerBindGroup = device.createBindGroup({
+            layout: samplerBindGroupLayout,
+            entries: samplerBindGroupEntries,
         })
 
         this.materialBindGroup = device.createBindGroup({
@@ -235,6 +277,7 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
                 uniformsBGLayout,
                 nodeParamsBGLayout,
                 materialBindGroupLayout,
+                samplerBindGroupLayout,
             ],
         })
 
@@ -247,6 +290,9 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
                 format: depthFormat,
                 depthWriteEnabled: true,
                 depthCompare: 'less',
+            },
+            multisample: {
+                count: msaaSampleCount,
             },
         })
 
@@ -332,6 +378,10 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
 
         if (this.materialBindGroup) {
             renderPassEncoder.setBindGroup(2, this.materialBindGroup)
+        }
+
+        if (this.samplerBindGroup) {
+            renderPassEncoder.setBindGroup(3, this.samplerBindGroup)
         }
 
         renderPassEncoder.setVertexBuffer(

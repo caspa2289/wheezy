@@ -237,6 +237,7 @@ export class ModelUploader {
             shaderModule: GPUShaderModule
             colorFormat: GPUTextureFormat
             depthFormat: GPUTextureFormat
+            msaaSampleCount: number | undefined
             uniformsBGLayout: GPUBindGroupLayout
             nodeParamsBGLayout: GPUBindGroupLayout
         },
@@ -256,6 +257,7 @@ export class ModelUploader {
             shaderModule,
             colorFormat: swapChainFormat,
             depthFormat,
+            msaaSampleCount,
             uniformsBGLayout: viewParamsBindGroupLayout,
             nodeParamsBGLayout: nodeParamsBindGroupLayout,
         } = pipelineParams
@@ -277,6 +279,7 @@ export class ModelUploader {
                 shaderModule,
                 swapChainFormat,
                 depthFormat,
+                msaaSampleCount,
                 viewParamsBindGroupLayout,
                 nodeParamsBindGroupLayout,
                 bufferStorage
@@ -305,6 +308,7 @@ export class ModelUploader {
             depthFormat: GPUTextureFormat
             uniformsBGLayout: GPUBindGroupLayout
             nodeParamsBGLayout: GPUBindGroupLayout
+            msaaSampleCount: number | undefined
         },
         bufferStorage: IBufferStorage,
         imageStorage: IImageStorage,
@@ -312,6 +316,16 @@ export class ModelUploader {
         materialStorage: IMaterialStorage,
         textureStorage: ITextureStorage
     ) {
+        const {
+            device,
+            shaderModule,
+            colorFormat: swapChainFormat,
+            depthFormat,
+            uniformsBGLayout: viewParamsBindGroupLayout,
+            nodeParamsBGLayout: nodeParamsBindGroupLayout,
+            msaaSampleCount,
+        } = pipelineParams
+
         this.uploadBuffers(modelData, bufferStorage)
         await this.uploadImages(modelData, bufferStorage, imageStorage)
         this.uploadSamplers(modelData, samplerStorage, pipelineParams.device)
@@ -333,15 +347,6 @@ export class ModelUploader {
 
         new Transform(sceneObject, trsMatrix)
 
-        const {
-            device,
-            shaderModule,
-            colorFormat: swapChainFormat,
-            depthFormat,
-            uniformsBGLayout: viewParamsBindGroupLayout,
-            nodeParamsBGLayout: nodeParamsBindGroupLayout,
-        } = pipelineParams
-
         meshes.forEach((meshData) => {
             const mesh = new Mesh(
                 sceneObject,
@@ -359,6 +364,7 @@ export class ModelUploader {
                 shaderModule,
                 swapChainFormat,
                 depthFormat,
+                msaaSampleCount,
                 viewParamsBindGroupLayout,
                 nodeParamsBindGroupLayout,
                 bufferStorage
