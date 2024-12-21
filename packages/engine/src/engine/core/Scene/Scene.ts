@@ -165,6 +165,10 @@ export class Scene implements IScene {
         return this._viewParamsBindGroup
     }
 
+    get engine() {
+        return this._engine as IEngine
+    }
+
     private _initializeViewParams() {
         if (!this._engine) {
             throw new Error(
@@ -213,12 +217,20 @@ export class Scene implements IScene {
         )
     }
 
-    public render(deltaTime?: number) {
+    protected onRender(deltaTime: number) {
+        throw new Error(
+            'onRender method should be redefined in extending class'
+        )
+    }
+
+    public render(deltaTime: number) {
         if (!this._engine) {
             throw new Error(
                 'Failed to render scene as no instance of Wheezy Engine is found'
             )
         }
+
+        this.onRender(deltaTime)
 
         const meshesToRender: Mesh[] = []
 

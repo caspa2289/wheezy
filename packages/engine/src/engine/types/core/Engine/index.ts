@@ -13,7 +13,7 @@ export interface IEngine {
     viewParamsBufferSize: number
     msaaSampleCount?: number
 
-    render: (placeHolderCB: (time: number) => void, time: number) => void
+    render: (time: number) => void
 }
 
 export interface IEngineProps {
