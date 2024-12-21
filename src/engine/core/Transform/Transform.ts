@@ -1,4 +1,4 @@
-import { mat4 } from 'wgpu-matrix'
+import { mat4, vec3, Vec3 } from 'wgpu-matrix'
 import {
     EntityTypes,
     IGameObject,
@@ -14,9 +14,20 @@ export class Transform
 {
     matrix: TransformationMatrix
 
+    private _position: Float32Array
+
     constructor(parent: IGameObject, matrix: TransformationMatrix) {
         super(parent, EntityTypes.transform)
-        this.matrix = matrix
+        this.matrix = mat4.copy(matrix)
+        this._position = new Float32Array(this.matrix.buffer, 4 * 12, 4)
+    }
+
+    scale(value: Vec3) {
+        mat4.scale(this.matrix, value, this.matrix)
+    }
+
+    translate(value: Vec3) {
+        this._position = vec3.copy(value, this._position)
     }
 
     rotateRadians({ x, y, z }: IRotateRadiansProps) {
@@ -26,6 +37,6 @@ export class Transform
         y && mat4.rotateY(newMatrix, y, newMatrix)
         z && mat4.rotateZ(newMatrix, z, newMatrix)
 
-        this.matrix = newMatrix
+        mat4.copy(newMatrix, this.matrix)
     }
 }
