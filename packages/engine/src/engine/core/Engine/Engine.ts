@@ -173,14 +173,13 @@ export class Engine implements IEngine {
         })
     }
 
-    public render(callback: (time: number) => void, time: number) {
+    public render(time: number = 0) {
         if (!this.scene) return
 
         const dt = (time - this._prevFrameTime) / 100
         this._prevFrameTime = time
 
         this.scene.render(dt)
-        callback(dt)
-        requestAnimationFrame((time: number) => this.render(callback, time))
+        requestAnimationFrame((time: number) => this.render(time))
     }
 }

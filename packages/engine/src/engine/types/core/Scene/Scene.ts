@@ -1,4 +1,4 @@
-import { IModelPreloadData } from '../..'
+import { IEngine, IModelPreloadData } from '../..'
 import { IBufferStorage } from '../BufferStorage'
 import { ICamera } from '../Camera'
 import { IGameObject } from '../GameObject'
@@ -25,6 +25,7 @@ export interface IScene {
     viewParamsBuffer: GPUBuffer
     viewParamsBindGroup: GPUBindGroup
     multisampleTextureView?: GPUTextureView
+    engine: IEngine
 
     uploadModel: (props: ISceneUploadModelProps) => Promise<IGameObject>
     render: (deltaTime: number) => void

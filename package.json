@@ -1,12 +1,11 @@
 {
-    "name": "Wheezy",
+    "name": "wheezy",
     "version": "0.1.0",
-    "description": "A game engine for the web",
+    "description": "A game engine for the web project",
     "private": true,
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
         "dev": "webpack serve --open --port 3000",
-        "prepare": "husky install",
         "build": "webpack build"
     },
     "keywords": [],
@@ -19,7 +18,6 @@
         "eslint": "8.56.0",
         "eslint-webpack-plugin": "4.0.1",
         "html-webpack-plugin": "5.6.0",
-        "husky": "9.0.10",
         "lint-staged": "15.2.1",
         "prettier": "3.2.4",
         "ts-loader": "9.5.1",
@@ -37,5 +35,9 @@
         "wgpu-matrix": "3.0.1",
         "@loaders.gl/core": "4.1.3",
         "@loaders.gl/gltf": "4.1.3"
-    }
+    },
+    "workspaces": [
+        "packages/engine",
+        "packages/demos"
+    ]
 }

@@ -1,0 +1,16 @@
+{
+    "name": "@wheezy/demos",
+    "version": "1.0.0",
+    "description": "Wheezy engine demos",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "dev": "webpack serve --open --port 3000",
+        "build": "webpack build"
+    },
+    "keywords": [],
+    "author": "caspa2289",
+    "license": "MIT-Modern-Variant",
+    "dependencies": {
+        "@wheezy/engine": "0.1.0"
+    }
+}
