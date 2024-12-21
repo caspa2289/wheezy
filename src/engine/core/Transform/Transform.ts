@@ -18,7 +18,7 @@ export class Transform
 
     constructor(parent: IGameObject, matrix: TransformationMatrix) {
         super(parent, EntityTypes.transform)
-        this.matrix = matrix
+        this.matrix = mat4.copy(matrix)
         this._position = new Float32Array(this.matrix.buffer, 4 * 12, 4)
     }
 

@@ -32,27 +32,10 @@ const run = async () => {
         'static/models/Duck.glb'
     )
 
-    const duckModelData1 = await WheezyGLBLoader.loadFromUrl(
-        'static/models/Duck.glb'
-    )
-
     const helmetGameObject = await scene.uploadModel({
         modelData: helmetModelData,
         shaderModule,
     })
-
-    const duckGameObject = await scene.uploadModel({
-        modelData: duckModelData,
-        shaderModule,
-    })
-
-    const duckGameObject1 = await scene.uploadModel({
-        modelData: duckModelData1,
-        shaderModule,
-    })
-
-    scene.objectManager.reparentObject(duckGameObject, helmetGameObject)
-    scene.objectManager.reparentObject(duckGameObject1, helmetGameObject)
 
     //FIXME: add component type getter to gameobject
     const helmetTransform = [...helmetGameObject.components.values()].find(
@@ -61,32 +44,57 @@ const run = async () => {
         }
     ) as ITransform
 
-    const duckTransform = [...duckGameObject.components.values()].find(
-        (component) => {
-            return component.type === EntityTypes.transform
-        }
-    ) as ITransform
+    const duckAmount = 20
 
-    const duckTransform1 = [...duckGameObject1.components.values()].find(
-        (component) => {
-            return component.type === EntityTypes.transform
-        }
-    ) as ITransform
+    const duckTransforms: ITransform[] = await Promise.all(
+        new Array(duckAmount).fill(1).map(() => {
+            return scene
+                .uploadModel({
+                    modelData: duckModelData,
+                    shaderModule,
+                })
+                .then((duckGameObject) => {
+                    const duckTransform = [
+                        ...duckGameObject.components.values(),
+                    ].find((component) => {
+                        return component.type === EntityTypes.transform
+                    }) as ITransform
 
-    //FIXME: changing either transform changes the other
-    //they reuse buffers, so its basically instanced but not intentionally
+                    scene.objectManager.reparentObject(
+                        duckGameObject,
+                        helmetGameObject
+                    )
+
+                    const radius = Math.random() * 1.7 + 1.25
+                    const angle = Math.random() * Math.PI * 2
+                    const x = Math.sin(angle) * radius
+                    const y = (Math.random() - 0.5) * 0.015
+                    const z = Math.cos(angle) * radius
+
+                    duckTransform.translate(vec3.create(x, y, z))
+                    duckTransform.rotateRadians({
+                        x: Math.random() * Math.PI,
+                        y: Math.random() * Math.PI,
+                    })
+                    duckTransform.scale(vec3.create(0.2, 0.2, 0.2))
+
+                    return duckTransform
+                })
+        })
+    )
 
     helmetTransform.rotateRadians({ x: 1.1 })
-    duckTransform.translate(vec3.create(0, 2, 0))
-    duckTransform.scale(vec3.create(0.5, 0.5, 0.5))
-    duckTransform1.translate(vec3.create(0, -2.5, 0))
-    duckTransform1.scale(vec3.create(0.8, 0.8, 0.8))
 
     engine.render((dt: number) => {
         // controller.update(1 / 60)
         helmetTransform.rotateRadians({ z: 0.1 * dt })
-        duckTransform.rotateRadians({ z: 0.1 * dt, y: 0.1 * dt, x: 0.1 * dt })
-        duckTransform1.rotateRadians({ z: 0.05 * dt })
+        duckTransforms.forEach((duckTransform) => {
+            duckTransform.rotateRadians({
+                z: 0.2 * dt,
+                y: 0.2 * dt,
+                x: 0.2 * dt,
+            })
+        })
     }, 1)
 }
 
