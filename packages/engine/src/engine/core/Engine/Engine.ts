@@ -2,6 +2,7 @@ import { IScene, IEngine, IEngineProps } from '../../types'
 import {
     DEFAULT_DEPTH_FORMAT,
     DEFAULT_SWAP_CHAIN_FORMAT,
+    MSAA_SAMPLE_COUNT,
     VIEW_PARAMS_BUFFER_SIZE,
 } from './constants'
 
@@ -18,7 +19,7 @@ export class Engine implements IEngine {
     private _nodeParamsBGLayout!: GPUBindGroupLayout
 
     private _viewParamsBufferSize: number = VIEW_PARAMS_BUFFER_SIZE
-    private _msaaSampleCount: number = 1
+    private _msaaSampleCount: number = MSAA_SAMPLE_COUNT
 
     private _prevFrameTime: number = 0
 
