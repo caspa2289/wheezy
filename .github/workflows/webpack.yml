@@ -1,0 +1,44 @@
+name: Wheezy demos autodeploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [22.x]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Configure Git
+      run: |
+        git config --global user.name $GITHUB_ACTOR
+        git config --global user.email blerp@ass.com
+
+    - name: Build
+      run: |
+        git pull
+        git checkout demo_deploy
+        git merge origin/master --allow-unrelated-histories
+        npm install
+        npm run demo:build
+
+    - name: Push to deployment branch
+      run: |
+        git add packages/demos/dist -f
+        git commit -m "Automated build"
+        git push
+
