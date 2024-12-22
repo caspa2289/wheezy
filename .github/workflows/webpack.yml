@@ -38,7 +38,9 @@ jobs:
 
     - name: Push to deployment branch
       run: |
-        git add packages/demos/dist -f
+        mkdir docs
+        cp -r packages/demos/dist/* docs
+        git add docs
         git commit -m "Automated build"
         git push
 
