@@ -23,19 +23,21 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
 
-    - name: Build
-      run: |
-        npm install
-        npm run demo:build
-
     - name: Configure Git
       run: |
         git config --global user.name $GITHUB_ACTOR
         git config --global user.email blerp@ass.com
 
+    - name: Build
+      run: |
+        git checkout demo_deploy
+        git merge origin master
+        npm install
+        npm run demo:build
+
     - name: Push to deployment branch
       run: |
         git add packages/demos/dist -f
         git commit -m "Automated build"
-        git push origin demo_deploy
+        git push
 
