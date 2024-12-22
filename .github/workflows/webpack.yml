@@ -35,7 +35,7 @@ jobs:
 
     - name: Push to deployment branch
       run: |
-        git add -A
+        git add packages/demos/dist -f
         git commit -m "Automated build"
         git push origin demo_deploy
 
