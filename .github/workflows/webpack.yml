@@ -30,6 +30,7 @@ jobs:
 
     - name: Build
       run: |
+        git pull
         git checkout demo_deploy
         git merge origin master
         npm install
