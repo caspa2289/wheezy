@@ -32,13 +32,15 @@ jobs:
       run: |
         git pull
         git checkout demo_deploy
-        git merge origin/master --allow-unrelated-histories
+        git merge origin/master --allow-unrelated-histories -X theirs
         npm install
         npm run demo:build
 
     - name: Push to deployment branch
       run: |
-        git add packages/demos/dist -f
+        mkdir docs
+        cp -r packages/demos/dist/* docs
+        git add .
         git commit -m "Automated build"
         git push
 
