@@ -5,8 +5,8 @@
     "private": true,
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "dev": "webpack serve --open --port 3000",
-        "build": "webpack build"
+        "demo:dev": "npm run dev --workspace=packages/demos",
+        "demo:build": "npm run build --workspace=packages/demos"
     },
     "keywords": [],
     "author": "caspa2289",
