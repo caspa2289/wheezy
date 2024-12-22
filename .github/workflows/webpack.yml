@@ -40,7 +40,7 @@ jobs:
       run: |
         mkdir docs
         cp -r packages/demos/dist/* docs
-        git add docs
+        git add .
         git commit -m "Automated build"
         git push
 
