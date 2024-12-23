@@ -88,25 +88,9 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
             },
         ]
 
-        let samplerBindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [
-            {
-                binding: 0,
-                visibility: GPUShaderStage.FRAGMENT,
-                buffer: {
-                    type: 'uniform',
-                },
-            },
-        ]
+        let samplerBindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = []
 
-        let samplerBindGroupEntries: GPUBindGroupEntry[] = [
-            {
-                binding: 0,
-                resource: {
-                    buffer: this.materialParamsBuffer,
-                    size: 8 * 4,
-                },
-            },
-        ]
+        let samplerBindGroupEntries: GPUBindGroupEntry[] = []
 
         let materialBindGroupEntries: GPUBindGroupEntry[] = [
             {
