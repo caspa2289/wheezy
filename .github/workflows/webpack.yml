@@ -38,6 +38,7 @@ jobs:
 
     - name: Push to deployment branch
       run: |
+        rm -rf docs
         mkdir docs
         cp -r packages/demos/dist/* docs
         git add .
