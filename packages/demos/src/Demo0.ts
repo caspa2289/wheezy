@@ -18,16 +18,16 @@ export class Demo0 extends Scene {
     private _shaderModule: GPUShaderModule
 
     //FIXME: The vertex count on these fuckers is insane
-    private sun!: IGameObject //==> OK
+    private sun!: IGameObject //==> OK, needs optimization
 
     private earth!: IGameObject //==> OK, but unnecessary transforms present
     private uranus!: IGameObject //==> OK, but unnecessary transforms present
-    private jupiter!: IGameObject //==> OK
+    private jupiter!: IGameObject //==> OK, needs optimization
     private mercury!: IGameObject //==> OK, but missing slobs of stuff, MODEL ISSUE, unnecessary transforms present
     private venus!: IGameObject //==> OK, but unnecessary transforms present
     private mars!: IGameObject //==> OK, but unnecessary transforms present (it`s off center for whatever reason)
-    private saturn!: IGameObject //==> OK
-    private neptune!: IGameObject //==> OK, but unnecessary transforms present
+    private saturn!: IGameObject //==> OK, but the model is huge
+    private neptune!: IGameObject //==> OK, needs optimization
 
     constructor() {
         super()
@@ -58,10 +58,10 @@ export class Demo0 extends Scene {
             modelData: planetMD,
             shaderModule: this._shaderModule,
         })
-        // this.sun.transform.scale(vec3.create(0.01, 0.01, 0.01))
+        this.sun.transform.rotateDegreesEuler({ x: 90 })
     }
 
     protected onRender(deltaTime: number): void {
-        // this.sun.transform.rotateRadians({ y: 0.05 * deltaTime })
+        this.sun.transform.rotateDegreesEuler({ z: 3 * deltaTime })
     }
 }
