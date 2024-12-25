@@ -88,7 +88,7 @@ export class Scene implements IScene {
                         ? undefined
                         : null) as unknown as GPUTextureView,
                     loadOp: 'clear' as GPULoadOp,
-                    clearValue: [0.4, 0.4, 0.4, 1],
+                    clearValue: [0.0, 0.0, 0.0, 1],
                     storeOp:
                         this._engine.msaaSampleCount === 1
                             ? 'store'
