@@ -36,7 +36,7 @@ export class Scene implements IScene {
 
     private _camera!: ICamera
 
-    private _engine?: IEngine
+    protected _engine?: IEngine
 
     private _renderPassDescriptor: GPURenderPassDescriptor
 
@@ -88,7 +88,7 @@ export class Scene implements IScene {
                         ? undefined
                         : null) as unknown as GPUTextureView,
                     loadOp: 'clear' as GPULoadOp,
-                    clearValue: [0.4, 0.4, 0.4, 1],
+                    clearValue: [0.0, 0.0, 0.0, 1],
                     storeOp:
                         this._engine.msaaSampleCount === 1
                             ? 'store'
@@ -249,9 +249,7 @@ export class Scene implements IScene {
         viewParamsUploadBuffer.unmap()
 
         const iterateNode = (node: SceneNodeContent, worldMatrix: Mat4) => {
-            const nodeTransform = [...node.gameObject.components.values()].find(
-                (component) => component.type === EntityTypes.transform
-            ) as ITransform | undefined
+            const nodeTransform = node.gameObject.transform
 
             const meshMatrix = nodeTransform
                 ? mat4.mul(worldMatrix, nodeTransform.matrix)

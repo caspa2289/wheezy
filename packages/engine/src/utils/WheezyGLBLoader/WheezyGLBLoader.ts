@@ -294,8 +294,8 @@ export class WheezyGLBLoader {
             byteStride: byteStride,
             byteLength: rawAccessor.count * (byteStride ?? 1),
             byteOffset:
-                (rawAccessor.byteOffset ?? 0) +
-                rawBufferView.byteOffset +
+                (rawAccessor?.byteOffset ?? 0) +
+                (rawBufferView?.byteOffset ?? 0) +
                 (buffer?.byteOffset ?? 0),
             count: rawAccessor.count,
             componentType: rawAccessor.componentType,
