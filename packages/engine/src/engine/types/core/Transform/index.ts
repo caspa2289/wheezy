@@ -13,6 +13,7 @@ export interface IRotateRadiansProps {
 export interface ITransform extends IComponent<EntityTypes.transform> {
     matrix: TransformationMatrix
     rotateRadians: (props: IRotateRadiansProps) => void
+    rotateDegreesEuler: (props: IRotateRadiansProps) => void
     translate: (vec: Vec3) => void
     scale: (vec: Vec3) => void
 }

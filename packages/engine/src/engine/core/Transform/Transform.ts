@@ -39,4 +39,13 @@ export class Transform
 
         mat4.copy(newMatrix, this.matrix)
     }
+
+    rotateDegreesEuler({ x, y, z }: IRotateRadiansProps) {
+        const degreeToRad = 0.01745329252
+        this.rotateRadians({
+            x: (x ?? 0) * degreeToRad,
+            y: (y ?? 0) * degreeToRad,
+            z: (z ?? 0) * degreeToRad,
+        })
+    }
 }
