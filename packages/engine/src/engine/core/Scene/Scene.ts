@@ -121,6 +121,10 @@ export class Scene implements IScene {
         return this._objectManager
     }
 
+    get root() {
+        return this._root
+    }
+
     get textureStorage() {
         return this._textureStorage
     }
