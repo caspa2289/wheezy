@@ -26,6 +26,7 @@ export interface IScene {
     viewParamsBindGroup: GPUBindGroup
     multisampleTextureView?: GPUTextureView
     engine: IEngine
+    root: IGameObject
 
     uploadModel: (props: ISceneUploadModelProps) => Promise<IGameObject>
     render: (deltaTime: number) => void

@@ -16,9 +16,9 @@ export class Transform
 
     private _position: Float32Array
 
-    constructor(parent: IGameObject, matrix: TransformationMatrix) {
+    constructor(parent: IGameObject, matrix?: TransformationMatrix) {
         super(parent, EntityTypes.transform)
-        this.matrix = mat4.copy(matrix)
+        this.matrix = matrix ? mat4.copy(matrix) : mat4.identity()
         this._position = new Float32Array(this.matrix.buffer, 4 * 12, 4)
     }
 

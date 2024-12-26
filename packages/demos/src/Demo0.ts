@@ -1,6 +1,12 @@
 import { vec3 } from 'wgpu-matrix'
 import shaderCode from '../shaders/testShader.wgsl'
-import { WheezyGLBLoader, Scene, IGameObject } from '@wheezy/engine'
+import {
+    WheezyGLBLoader,
+    Scene,
+    IGameObject,
+    GameObject,
+    Transform,
+} from '@wheezy/engine'
 import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCamera'
 
 //This is supposed to demonstrate basic workflow
@@ -10,13 +16,23 @@ export class Demo0 extends Scene {
     private sun!: IGameObject
 
     private mercury!: IGameObject
+    private mercuryHook: IGameObject = this._createTransformObject()
     private venus!: IGameObject
+    private venusHook: IGameObject = this._createTransformObject()
     private earth!: IGameObject
+    private earthHook: IGameObject = this._createTransformObject()
     private mars!: IGameObject
+    private marsHook: IGameObject = this._createTransformObject()
     private jupiter!: IGameObject
+    private jupiterHook: IGameObject = this._createTransformObject()
     private saturn!: IGameObject
+    private saturnHook: IGameObject = this._createTransformObject()
     private uranus!: IGameObject
+    private uranusHook: IGameObject = this._createTransformObject()
     private neptune!: IGameObject
+    private neptuneHook: IGameObject = this._createTransformObject()
+
+    public yearsPerMinute = 1
 
     constructor() {
         super()
@@ -25,12 +41,22 @@ export class Demo0 extends Scene {
             zNear: 0.1,
             canvasWidth: this._engine!.context.canvas.width,
             canvasHeight: this._engine!.context.canvas.height,
-            position: vec3.create(0, 6, 7),
+            position: vec3.create(0, 4, 5),
         })
 
         this._shaderModule = this.engine.device.createShaderModule({
             code: shaderCode,
         })
+    }
+
+    private _createTransformObject(): GameObject {
+        const gameObject = new GameObject()
+
+        this.objectManager.addObject(gameObject, this.root)
+
+        new Transform(gameObject)
+
+        return gameObject
     }
 
     private async _setupSun() {
@@ -42,7 +68,7 @@ export class Demo0 extends Scene {
             shaderModule: this._shaderModule,
         })
 
-        this.sun.transform.scale(vec3.create(0.1, 0.1, 0.1))
+        this.sun.transform.scale(vec3.create(0.12, 0.12, 0.12))
     }
 
     private async _setupMercury() {
@@ -54,10 +80,12 @@ export class Demo0 extends Scene {
             shaderModule: this._shaderModule,
         })
 
-        this.objectManager.reparentObject(this.mercury, this.sun)
+        this.objectManager.reparentObject(this.mercury, this.mercuryHook)
 
-        this.mercury.transform.scale(vec3.create(2, 2, 2))
-        this.mercury.transform.translate(vec3.create(18))
+        this.mercuryHook.transform.rotateDegreesEuler({ y: 80 })
+
+        this.mercury.transform.scale(vec3.create(0.08, 0.08, 0.08))
+        this.mercury.transform.translate(vec3.create(1.4))
     }
 
     private async _setupVenus() {
@@ -69,10 +97,12 @@ export class Demo0 extends Scene {
             shaderModule: this._shaderModule,
         })
 
-        this.objectManager.reparentObject(this.venus, this.sun)
+        this.objectManager.reparentObject(this.venus, this.venusHook)
 
-        this.venus.transform.scale(vec3.create(2, 2, 2))
-        this.venus.transform.translate(vec3.create(26, 0, 0))
+        this.venusHook.transform.rotateDegreesEuler({ y: 160 })
+
+        this.venus.transform.scale(vec3.create(0.12, 0.12, 0.12))
+        this.venus.transform.translate(vec3.create(1.7, 0, 0))
     }
 
     private async _setupEarth() {
@@ -84,10 +114,12 @@ export class Demo0 extends Scene {
             shaderModule: this._shaderModule,
         })
 
-        this.objectManager.reparentObject(this.earth, this.sun)
+        this.objectManager.reparentObject(this.earth, this.earthHook)
 
-        this.earth.transform.scale(vec3.create(2, 2, 2))
-        this.earth.transform.translate(vec3.create(38, 0, 0))
+        this.earthHook.transform.rotateDegreesEuler({ y: 10 })
+
+        this.earth.transform.scale(vec3.create(0.16, 0.16, 0.16))
+        this.earth.transform.translate(vec3.create(2.2, 0, 0))
     }
 
     private async _setupMars() {
@@ -99,10 +131,12 @@ export class Demo0 extends Scene {
             shaderModule: this._shaderModule,
         })
 
-        this.objectManager.reparentObject(this.mars, this.sun)
+        this.objectManager.reparentObject(this.mars, this.marsHook)
 
-        this.mars.transform.scale(vec3.create(2, 2, 2))
-        this.mars.transform.translate(vec3.create(47, 0, 0))
+        this.marsHook.transform.rotateDegreesEuler({ y: 50 })
+
+        this.mars.transform.scale(vec3.create(0.14, 0.14, 0.14))
+        this.mars.transform.translate(vec3.create(2.7, 0, 0))
     }
 
     private async _setupJupiter() {
@@ -114,11 +148,13 @@ export class Demo0 extends Scene {
             shaderModule: this._shaderModule,
         })
 
-        this.objectManager.reparentObject(this.jupiter, this.sun)
+        this.objectManager.reparentObject(this.jupiter, this.jupiterHook)
 
-        this.jupiter.transform.scale(vec3.create(2, 2, 2))
+        this.jupiterHook.transform.rotateDegreesEuler({ y: 150 })
+
+        this.jupiter.transform.scale(vec3.create(0.15, 0.15, 0.15))
         this.jupiter.transform.rotateDegreesEuler({ x: 90 })
-        this.jupiter.transform.translate(vec3.create(60, 0, 0))
+        this.jupiter.transform.translate(vec3.create(3.4, 0, 0))
     }
 
     private async _setupSaturn() {
@@ -130,11 +166,13 @@ export class Demo0 extends Scene {
             shaderModule: this._shaderModule,
         })
 
-        this.objectManager.reparentObject(this.saturn, this.sun)
+        this.objectManager.reparentObject(this.saturn, this.saturnHook)
 
-        this.saturn.transform.scale(vec3.create(0.02, 0.02, 0.02))
-        this.saturn.transform.rotateDegreesEuler({ x: 56 })
-        this.saturn.transform.translate(vec3.create(80, 0, 0))
+        this.saturnHook.transform.rotateDegreesEuler({ y: 210 })
+
+        this.saturn.transform.scale(vec3.create(0.0012, 0.0012, 0.0012))
+        this.saturn.transform.rotateDegreesEuler({ x: 76 })
+        this.saturn.transform.translate(vec3.create(4.3, 0, 0))
     }
 
     private async _setupUranus() {
@@ -146,11 +184,13 @@ export class Demo0 extends Scene {
             shaderModule: this._shaderModule,
         })
 
-        this.objectManager.reparentObject(this.uranus, this.sun)
+        this.objectManager.reparentObject(this.uranus, this.uranusHook)
 
-        this.uranus.transform.scale(vec3.create(2, 2, 2))
+        this.uranusHook.transform.rotateDegreesEuler({ y: 270 })
+
+        this.uranus.transform.scale(vec3.create(0.2, 0.2, 0.2))
         this.uranus.transform.rotateDegreesEuler({ x: 90 })
-        this.uranus.transform.translate(vec3.create(100, 0, 0))
+        this.uranus.transform.translate(vec3.create(5.2, 0, 0))
     }
 
     private async _setupNeptune() {
@@ -162,11 +202,13 @@ export class Demo0 extends Scene {
             shaderModule: this._shaderModule,
         })
 
-        this.objectManager.reparentObject(this.neptune, this.sun)
+        this.objectManager.reparentObject(this.neptune, this.neptuneHook)
 
-        this.neptune.transform.scale(vec3.create(2, 2, 2))
+        this.neptuneHook.transform.rotateDegreesEuler({ y: 100 })
+
+        this.neptune.transform.scale(vec3.create(0.2, 0.2, 0.2))
         this.neptune.transform.rotateDegreesEuler({ x: 90 })
-        this.neptune.transform.translate(vec3.create(113, 0, 0))
+        this.neptune.transform.translate(vec3.create(5.8, 0, 0))
     }
 
     public async init() {
@@ -177,20 +219,138 @@ export class Demo0 extends Scene {
         await this._setupMars()
         await this._setupJupiter()
         await this._setupSaturn()
-        await this._setupNeptune()
         await this._setupUranus()
+        await this._setupNeptune()
+
+        const wrapper = document.createElement('div')
+        wrapper.style.position = 'absolute'
+        wrapper.style.top = '0'
+        wrapper.style.zIndex = '10'
+
+        const button0 = document.createElement('button')
+        button0.textContent = '1 год в минуту'
+
+        button0.addEventListener('click', () => {
+            this.yearsPerMinute = 1
+        })
+
+        const button1 = document.createElement('button')
+        button1.textContent = '100 лет в минуту'
+
+        button1.addEventListener('click', () => {
+            this.yearsPerMinute = 100
+        })
+
+        wrapper.appendChild(button0)
+        wrapper.appendChild(button1)
+
+        document.body.appendChild(wrapper)
+    }
+
+    private getOrbitRotationPerFrame(name: string) {
+        const commonDivider = 3600 / this.yearsPerMinute
+
+        switch (name) {
+            case 'mercury':
+                return (360 * 4.17) / commonDivider
+            case 'venus':
+                return (360 * 1.63) / commonDivider
+            case 'earth':
+                return (360 * 1) / commonDivider
+            case 'mars':
+                return (360 * 0.53) / commonDivider
+            case 'jupiter':
+                return (360 * 0.084) / commonDivider
+            case 'saturn':
+                return (360 * 0.034) / commonDivider
+            case 'uranus':
+                return (360 * 0.012) / commonDivider
+            case 'neptune':
+                return (360 * 0.006) / commonDivider
+            default:
+                return 0
+        }
+    }
+
+    private getSelfRotationPerFrame(name: string) {
+        const commonDivider = 3600 / this.yearsPerMinute
+
+        switch (name) {
+            case 'sun':
+                return (360 * 0.04 * 365) / commonDivider
+            case 'mercury':
+                return (360 * 1.5 * 365) / commonDivider
+            case 'venus':
+                return (360 * 1.502 * 365) / commonDivider
+            case 'earth':
+                return (360 * 1 * 365) / commonDivider
+            case 'mars':
+                return (360 * 1.03 * 365) / commonDivider
+            case 'jupiter':
+                return (360 * 0.41 * 365) / commonDivider
+            case 'saturn':
+                return (360 * 0.45 * 365) / commonDivider
+            case 'uranus':
+                return (360 * 0.666 * 365) / commonDivider
+            case 'neptune':
+                return (360 * 0.708 * 365) / commonDivider
+            default:
+                return 0
+        }
     }
 
     protected onRender(deltaTime: number): void {
         //FYI: Always remember to reset orientation in blender :/
-        this.sun.transform.rotateDegreesEuler({ y: 1 * deltaTime })
-        this.mercury.transform.rotateDegreesEuler({ y: 10 * deltaTime })
-        this.venus.transform.rotateDegreesEuler({ y: 8 * deltaTime })
-        this.earth.transform.rotateDegreesEuler({ y: 6 * deltaTime })
-        this.mars.transform.rotateDegreesEuler({ y: 4 * deltaTime })
-        this.jupiter.transform.rotateDegreesEuler({ z: -2 * deltaTime })
-        this.saturn.transform.rotateDegreesEuler({ z: -4 * deltaTime })
-        this.uranus.transform.rotateDegreesEuler({ z: -12 * deltaTime })
-        this.neptune.transform.rotateDegreesEuler({ z: -6 * deltaTime })
+        this.sun.transform.rotateDegreesEuler({
+            y: this.getSelfRotationPerFrame('sun'),
+        })
+        this.mercury.transform.rotateDegreesEuler({
+            y: this.getSelfRotationPerFrame('mercury'),
+        })
+        this.mercuryHook.transform.rotateDegreesEuler({
+            y: this.getOrbitRotationPerFrame('mercury'),
+        })
+        this.venus.transform.rotateDegreesEuler({
+            y: this.getSelfRotationPerFrame('venus'),
+        })
+        this.venusHook.transform.rotateDegreesEuler({
+            y: this.getOrbitRotationPerFrame('venus'),
+        })
+        this.earth.transform.rotateDegreesEuler({
+            y: this.getSelfRotationPerFrame('earth'),
+        })
+        this.earthHook.transform.rotateDegreesEuler({
+            y: this.getOrbitRotationPerFrame('earth'),
+        })
+        this.mars.transform.rotateDegreesEuler({
+            y: this.getSelfRotationPerFrame('mars'),
+        })
+        this.marsHook.transform.rotateDegreesEuler({
+            y: this.getOrbitRotationPerFrame('mars'),
+        })
+        this.jupiter.transform.rotateDegreesEuler({
+            z: -this.getSelfRotationPerFrame('jupiter'),
+        })
+        this.jupiterHook.transform.rotateDegreesEuler({
+            y: this.getOrbitRotationPerFrame('jupiter'),
+        })
+        this.saturn.transform.rotateDegreesEuler({
+            z: -this.getSelfRotationPerFrame('saturn'),
+        })
+        this.saturnHook.transform.rotateDegreesEuler({
+            y: this.getOrbitRotationPerFrame('saturn'),
+        })
+        this.uranus.transform.rotateDegreesEuler({
+            z: -this.getSelfRotationPerFrame('uranus'),
+        })
+        this.uranusHook.transform.rotateDegreesEuler({
+            y: this.getOrbitRotationPerFrame('uranus'),
+        })
+        this.neptune.transform.rotateDegreesEuler({
+            z: -this.getSelfRotationPerFrame('neptune'),
+        })
+        this.neptuneHook.transform.rotateDegreesEuler({
+            y: this.getOrbitRotationPerFrame('neptune'),
+        })
     }
 }
