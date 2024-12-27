@@ -8,7 +8,7 @@ export interface IRenderer {
     uniformsBGLayout: GPUBindGroupLayout
     nodeParamsBGLayout: GPUBindGroupLayout
     viewParamsBufferSize: number
-    msaaSampleCount?: number
+    msaaSampleCount: number
 
     init: () => Promise<void>
 }
