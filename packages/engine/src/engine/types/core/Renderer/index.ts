@@ -1,21 +1,18 @@
-import { IScene } from '../Scene'
-
-export interface IEngine {
+export interface IRenderer {
     adapter: GPUAdapter
     device: GPUDevice
     context: GPUCanvasContext
     swapChainFormat: GPUTextureFormat
     depthTextureFormat: GPUTextureFormat
     depthTexture: GPUTexture
-    scene?: IScene
     uniformsBGLayout: GPUBindGroupLayout
     nodeParamsBGLayout: GPUBindGroupLayout
     viewParamsBufferSize: number
     msaaSampleCount?: number
 
-    render: (time: number) => void
+    init: () => Promise<void>
 }
 
-export interface IEngineProps {
+export interface IRendererProps {
     canvas: HTMLCanvasElement
 }
