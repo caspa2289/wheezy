@@ -1,3 +1,5 @@
+import { IScene } from '../Scene'
+
 export interface IRenderer {
     adapter: GPUAdapter
     device: GPUDevice
@@ -9,8 +11,13 @@ export interface IRenderer {
     nodeParamsBGLayout: GPUBindGroupLayout
     viewParamsBufferSize: number
     msaaSampleCount: number
+    renderPassDescriptor: GPURenderPassDescriptor
+    viewParamsBuffer: GPUBuffer
+    viewParamsBindGroup: GPUBindGroup
+    multisampleTextureView?: GPUTextureView
 
     init: () => Promise<void>
+    render: (dt: number, scene: IScene) => void
 }
 
 export interface IRendererProps {

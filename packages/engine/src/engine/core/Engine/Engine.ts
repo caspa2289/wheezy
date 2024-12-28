@@ -87,7 +87,8 @@ export class Engine implements IEngine {
         const dt = (time - this._prevFrameTime) / 100
         this._prevFrameTime = time
 
-        this.scene.render(dt)
+        this._renderer.render(dt, this.scene)
+
         requestAnimationFrame((time: number) => this.render(time))
     }
 }

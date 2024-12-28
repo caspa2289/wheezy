@@ -21,15 +21,11 @@ export interface IScene {
     samplerStorage: ISamplerStorage
     textureStorage: ITextureStorage
     materialStorage: IMaterialStorage
-    renderPassDescriptor: GPURenderPassDescriptor
-    viewParamsBuffer: GPUBuffer
-    viewParamsBindGroup: GPUBindGroup
-    multisampleTextureView?: GPUTextureView
     engine: IEngine
     root: IGameObject
 
     uploadModel: (props: ISceneUploadModelProps) => Promise<IGameObject>
-    render: (deltaTime: number) => void
+    onRender: (dt: number) => void
 }
 
 export interface ISceneProps {

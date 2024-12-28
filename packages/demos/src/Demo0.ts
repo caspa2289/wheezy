@@ -299,7 +299,7 @@ export class Demo0 extends Scene {
         }
     }
 
-    protected onRender(deltaTime: number): void {
+    public onRender(deltaTime: number): void {
         //FYI: Always remember to reset orientation in blender :/
         this.sun.transform.rotateDegreesEuler({
             y: this.getSelfRotationPerFrame('sun'),
