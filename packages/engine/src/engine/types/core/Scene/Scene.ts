@@ -4,13 +4,13 @@ import { ICamera } from '../Camera'
 import { IGameObject } from '../GameObject'
 import { IImageStorage } from '../ImageStorage'
 import { IMaterialStorage } from '../MaterialStorage'
+import { IMeshRenderDataStorage } from '../MeshRenderDataStorage'
 import { IObjectManager } from '../ObjectManager'
 import { ISamplerStorage } from '../SamplerStorage'
 import { ITextureStorage } from '../TextureStorage'
 
 export interface ISceneUploadModelProps {
     modelData: IModelPreloadData
-    shaderModule: GPUShaderModule
 }
 
 export interface IScene {
@@ -21,15 +21,12 @@ export interface IScene {
     samplerStorage: ISamplerStorage
     textureStorage: ITextureStorage
     materialStorage: IMaterialStorage
-    renderPassDescriptor: GPURenderPassDescriptor
-    viewParamsBuffer: GPUBuffer
-    viewParamsBindGroup: GPUBindGroup
-    multisampleTextureView?: GPUTextureView
+    meshRenderDataStorage: IMeshRenderDataStorage
     engine: IEngine
     root: IGameObject
 
     uploadModel: (props: ISceneUploadModelProps) => Promise<IGameObject>
-    render: (deltaTime: number) => void
+    onRender: (dt: number) => void
 }
 
 export interface ISceneProps {
