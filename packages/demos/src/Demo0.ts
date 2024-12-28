@@ -1,5 +1,4 @@
 import { vec3 } from 'wgpu-matrix'
-import shaderCode from '../shaders/testShader.wgsl'
 import {
     WheezyGLBLoader,
     Scene,
@@ -11,8 +10,6 @@ import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCam
 
 //This is supposed to demonstrate basic workflow
 export class Demo0 extends Scene {
-    private _shaderModule: GPUShaderModule
-
     private sun!: IGameObject
 
     private mercury!: IGameObject
@@ -39,13 +36,9 @@ export class Demo0 extends Scene {
         this.camera = new ArcBallCamera({
             zFar: 1000,
             zNear: 0.1,
-            canvasWidth: this._engine!.context.canvas.width,
-            canvasHeight: this._engine!.context.canvas.height,
+            canvasWidth: this._engine!.renderer.context.canvas.width,
+            canvasHeight: this._engine!.renderer.context.canvas.height,
             position: vec3.create(0, 4, 5),
-        })
-
-        this._shaderModule = this.engine.device.createShaderModule({
-            code: shaderCode,
         })
     }
 
@@ -65,7 +58,6 @@ export class Demo0 extends Scene {
         )
         this.sun = await this.uploadModel({
             modelData: planetMD,
-            shaderModule: this._shaderModule,
         })
 
         this.sun.transform.scale(vec3.create(0.12, 0.12, 0.12))
@@ -77,7 +69,6 @@ export class Demo0 extends Scene {
         )
         this.mercury = await this.uploadModel({
             modelData: planetMD,
-            shaderModule: this._shaderModule,
         })
 
         this.objectManager.reparentObject(this.mercury, this.mercuryHook)
@@ -94,7 +85,6 @@ export class Demo0 extends Scene {
         )
         this.venus = await this.uploadModel({
             modelData: planetMD,
-            shaderModule: this._shaderModule,
         })
 
         this.objectManager.reparentObject(this.venus, this.venusHook)
@@ -111,7 +101,6 @@ export class Demo0 extends Scene {
         )
         this.earth = await this.uploadModel({
             modelData: planetMD,
-            shaderModule: this._shaderModule,
         })
 
         this.objectManager.reparentObject(this.earth, this.earthHook)
@@ -128,7 +117,6 @@ export class Demo0 extends Scene {
         )
         this.mars = await this.uploadModel({
             modelData: planetMD,
-            shaderModule: this._shaderModule,
         })
 
         this.objectManager.reparentObject(this.mars, this.marsHook)
@@ -145,7 +133,6 @@ export class Demo0 extends Scene {
         )
         this.jupiter = await this.uploadModel({
             modelData: planetMD,
-            shaderModule: this._shaderModule,
         })
 
         this.objectManager.reparentObject(this.jupiter, this.jupiterHook)
@@ -163,7 +150,6 @@ export class Demo0 extends Scene {
         )
         this.saturn = await this.uploadModel({
             modelData: planetMD,
-            shaderModule: this._shaderModule,
         })
 
         this.objectManager.reparentObject(this.saturn, this.saturnHook)
@@ -181,7 +167,6 @@ export class Demo0 extends Scene {
         )
         this.uranus = await this.uploadModel({
             modelData: planetMD,
-            shaderModule: this._shaderModule,
         })
 
         this.objectManager.reparentObject(this.uranus, this.uranusHook)
@@ -199,7 +184,6 @@ export class Demo0 extends Scene {
         )
         this.neptune = await this.uploadModel({
             modelData: planetMD,
-            shaderModule: this._shaderModule,
         })
 
         this.objectManager.reparentObject(this.neptune, this.neptuneHook)
@@ -299,7 +283,7 @@ export class Demo0 extends Scene {
         }
     }
 
-    protected onRender(deltaTime: number): void {
+    public onRender(deltaTime: number): void {
         //FYI: Always remember to reset orientation in blender :/
         this.sun.transform.rotateDegreesEuler({
             y: this.getSelfRotationPerFrame('sun'),

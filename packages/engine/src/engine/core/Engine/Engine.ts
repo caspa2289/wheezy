@@ -1,34 +1,20 @@
-import { IScene, IEngine, IEngineProps } from '../../types'
-import {
-    DEFAULT_DEPTH_FORMAT,
-    DEFAULT_SWAP_CHAIN_FORMAT,
-    MSAA_SAMPLE_COUNT,
-    VIEW_PARAMS_BUFFER_SIZE,
-} from './constants'
+import { IScene, IEngine, IEngineProps, IRenderer } from '../../types'
+import { Renderer } from '../Renderer'
 
 export class Engine implements IEngine {
-    private _adapter!: GPUAdapter
-    private _device!: GPUDevice
-    private _context!: GPUCanvasContext
-
-    private _swapChainFormat!: GPUTextureFormat
-    private _depthTextureFormat!: GPUTextureFormat
-    private _depthTexture!: GPUTexture
-
-    private _uniformsBGLayout!: GPUBindGroupLayout
-    private _nodeParamsBGLayout!: GPUBindGroupLayout
-
-    private _viewParamsBufferSize: number = VIEW_PARAMS_BUFFER_SIZE
-    private _msaaSampleCount: number = MSAA_SAMPLE_COUNT
+    private _renderer!: IRenderer
 
     private _prevFrameTime: number = 0
 
     private _scene?: IScene
 
+    public async initRenderer(canvas: HTMLCanvasElement) {
+        this._renderer = new Renderer({ canvas })
+        await this._renderer.init()
+    }
+
     public static async getOrInit({
         canvas,
-        swapChainFormat,
-        depthTextureFormat,
     }: IEngineProps): Promise<Engine | undefined> {
         //FIXME: types
         try {
@@ -38,15 +24,7 @@ export class Engine implements IEngine {
             }
 
             const engineInstance = new Engine()
-
-            await engineInstance.initializeContext(canvas)
-
-            engineInstance.swapChainFormat =
-                swapChainFormat ?? DEFAULT_SWAP_CHAIN_FORMAT
-            engineInstance.depthTextureFormat =
-                depthTextureFormat ?? DEFAULT_DEPTH_FORMAT
-
-            engineInstance.initializeBindGroupLayouts()
+            await engineInstance.initRenderer(canvas)
             ;(window as any).WheezyEngine = engineInstance
 
             return engineInstance
@@ -55,51 +33,8 @@ export class Engine implements IEngine {
         }
     }
 
-    get adapter() {
-        return this._adapter
-    }
-
-    get device() {
-        return this._device
-    }
-
-    get context() {
-        return this._context
-    }
-
-    get swapChainFormat() {
-        return this._swapChainFormat
-    }
-
-    set swapChainFormat(format: GPUTextureFormat) {
-        this._swapChainFormat = format
-        this._context.configure({
-            device: this._device,
-            usage: GPUTextureUsage.RENDER_ATTACHMENT,
-            format,
-        })
-    }
-
-    get depthTextureFormat() {
-        return this._depthTextureFormat
-    }
-
-    set depthTextureFormat(format: GPUTextureFormat) {
-        this._depthTextureFormat = format
-        this._depthTexture = this._device.createTexture({
-            label: 'depthTexture',
-            size: {
-                width: this._context.canvas.width,
-                height: this._context.canvas.height,
-            },
-            sampleCount: this._msaaSampleCount,
-            format,
-            usage: GPUTextureUsage.RENDER_ATTACHMENT,
-        })
-    }
-
-    get depthTexture() {
-        return this._depthTexture
+    get renderer() {
+        return this._renderer
     }
 
     get scene() {
@@ -110,77 +45,14 @@ export class Engine implements IEngine {
         this._scene = scene
     }
 
-    get uniformsBGLayout() {
-        return this._uniformsBGLayout
-    }
-
-    get nodeParamsBGLayout() {
-        return this._nodeParamsBGLayout
-    }
-
-    get viewParamsBufferSize() {
-        return this._viewParamsBufferSize
-    }
-
-    get msaaSampleCount() {
-        return this._msaaSampleCount
-    }
-
-    set msaaSampleCount(value) {
-        this._msaaSampleCount = value
-    }
-
-    public async initializeContext(canvas: HTMLCanvasElement) {
-        const adapter = await navigator.gpu.requestAdapter()
-
-        if (!adapter) {
-            throw new Error('GPU Adapter Unavailable')
-        }
-
-        const device = await adapter.requestDevice()
-
-        this._device = device
-        this._adapter = adapter
-
-        canvas.width = document.body.clientWidth * window.devicePixelRatio
-        canvas.height = document.body.clientHeight * window.devicePixelRatio
-
-        this._context = canvas.getContext('webgpu') as GPUCanvasContext
-
-        if (!this._context) {
-            throw new Error('Failed to acquire GpuCanvasContext')
-        }
-    }
-
-    public initializeBindGroupLayouts() {
-        this._uniformsBGLayout = this.device.createBindGroupLayout({
-            entries: [
-                {
-                    binding: 0,
-                    visibility: GPUShaderStage.VERTEX,
-                    buffer: { type: 'uniform' },
-                },
-            ],
-        })
-
-        this._nodeParamsBGLayout = this.device.createBindGroupLayout({
-            entries: [
-                {
-                    binding: 0,
-                    visibility: GPUShaderStage.VERTEX,
-                    buffer: { type: 'uniform' },
-                },
-            ],
-        })
-    }
-
     public render(time: number = 0) {
         if (!this.scene) return
 
         const dt = (time - this._prevFrameTime) / 100
         this._prevFrameTime = time
 
-        this.scene.render(dt)
+        this._renderer.render(dt, this.scene)
+
         requestAnimationFrame((time: number) => this.render(time))
     }
 }
