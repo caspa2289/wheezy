@@ -20,6 +20,7 @@ import { ObjectManager } from '../ObjectManager'
 import { SamplerStorage } from '../SamplerStorage'
 import { TextureStorage } from '../TextureStorage'
 import { GameObject } from '../GameObject'
+import { MeshRenderDataStorage } from '../MeshRenderDataStorage'
 
 export class Scene implements IScene {
     private _objectManager: IObjectManager = new ObjectManager()
@@ -28,6 +29,7 @@ export class Scene implements IScene {
     private _samplerStorage: ISamplerStorage = new SamplerStorage()
     private _textureStorage = new TextureStorage()
     private _materialStorage = new MaterialStorage()
+    private _meshRenderDataStorage = new MeshRenderDataStorage()
 
     private _camera!: ICamera
 
@@ -55,8 +57,8 @@ export class Scene implements IScene {
             new ArcBallCamera({
                 zFar: 1000,
                 zNear: 0.1,
-                canvasWidth: this._engine.context.canvas.width,
-                canvasHeight: this._engine.context.canvas.height,
+                canvasWidth: this._engine.renderer.context.canvas.width,
+                canvasHeight: this._engine.renderer.context.canvas.height,
                 position: vec3.create(0, 0, 5),
             })
     }
@@ -71,6 +73,10 @@ export class Scene implements IScene {
 
     get textureStorage() {
         return this._textureStorage
+    }
+
+    get meshRenderDataStorage() {
+        return this._meshRenderDataStorage
     }
 
     get materialStorage() {
@@ -101,7 +107,9 @@ export class Scene implements IScene {
         return this._engine as IEngine
     }
 
-    public uploadModel(props: ISceneUploadModelProps): Promise<IGameObject> {
+    public async uploadModel(
+        props: ISceneUploadModelProps
+    ): Promise<IGameObject> {
         if (!this._engine) {
             throw new Error(
                 'Failed to upload model as no instance of Wheezy Engine is found'
@@ -111,21 +119,13 @@ export class Scene implements IScene {
         return ModelUploader.uploadModel(
             props.modelData,
             this._objectManager,
-            {
-                device: this._engine.device,
-                shaderModule: props.shaderModule,
-                colorFormat: this._engine.swapChainFormat,
-                depthFormat: this._engine.depthTextureFormat,
-                uniformsBGLayout: this._engine.uniformsBGLayout,
-                nodeParamsBGLayout: this._engine.nodeParamsBGLayout,
-                msaaSampleCount: this._engine.msaaSampleCount,
-            },
             this._bufferStorage,
             this._imageStorage,
             this._samplerStorage,
             this._materialStorage,
             this._textureStorage,
-            this._root
+            this._root,
+            this._engine.renderer.device
         )
     }
 

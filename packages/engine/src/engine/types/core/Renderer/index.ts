@@ -1,3 +1,4 @@
+import { IMesh } from '../Mesh'
 import { IScene } from '../Scene'
 
 export interface IRenderer {
@@ -18,6 +19,7 @@ export interface IRenderer {
 
     init: () => Promise<void>
     render: (dt: number, scene: IScene) => void
+    buildRenderPipeline: (mesh: IMesh, scene: IScene) => void
 }
 
 export interface IRendererProps {

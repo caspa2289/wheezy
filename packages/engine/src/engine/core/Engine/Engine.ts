@@ -33,28 +33,8 @@ export class Engine implements IEngine {
         }
     }
 
-    get adapter() {
-        return this._renderer.adapter
-    }
-
-    get device() {
-        return this._renderer.device
-    }
-
-    get context() {
-        return this._renderer.context
-    }
-
-    get swapChainFormat() {
-        return this._renderer.swapChainFormat
-    }
-
-    get depthTextureFormat() {
-        return this._renderer.depthTextureFormat
-    }
-
-    get depthTexture() {
-        return this._renderer.depthTexture
+    get renderer() {
+        return this._renderer
     }
 
     get scene() {
@@ -63,22 +43,6 @@ export class Engine implements IEngine {
 
     set scene(scene: IScene | undefined) {
         this._scene = scene
-    }
-
-    get uniformsBGLayout() {
-        return this._renderer.uniformsBGLayout
-    }
-
-    get nodeParamsBGLayout() {
-        return this._renderer.nodeParamsBGLayout
-    }
-
-    get viewParamsBufferSize() {
-        return this._renderer.viewParamsBufferSize
-    }
-
-    get msaaSampleCount() {
-        return this._renderer.msaaSampleCount
     }
 
     public render(time: number = 0) {
