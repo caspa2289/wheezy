@@ -7,6 +7,7 @@ import {
     Transform,
 } from '@wheezy/engine'
 import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCamera'
+import { ArcBallController } from '@wheezy/engine/src/utils/ArcBallController'
 
 //This is supposed to demonstrate basic workflow
 export class Demo0 extends Scene {
@@ -31,6 +32,8 @@ export class Demo0 extends Scene {
 
     public yearsPerMinute = 1
 
+    private controller: ArcBallController
+
     constructor() {
         super()
         this.camera = new ArcBallCamera({
@@ -39,6 +42,11 @@ export class Demo0 extends Scene {
             canvasWidth: this._engine!.renderer.context.canvas.width,
             canvasHeight: this._engine!.renderer.context.canvas.height,
             position: vec3.create(0, 4, 5),
+        })
+
+        this.controller = new ArcBallController({
+            camera: this.camera as ArcBallCamera,
+            canvas: this._engine?.renderer.context.canvas as HTMLCanvasElement,
         })
     }
 
@@ -106,6 +114,8 @@ export class Demo0 extends Scene {
         this.objectManager.reparentObject(this.earth, this.earthHook)
 
         this.earthHook.transform.rotateDegreesEuler({ y: 10 })
+
+        this.earth.transform.rotateDegreesEuler({ x: 90 })
 
         this.earth.transform.scale(vec3.create(0.16, 0.16, 0.16))
         this.earth.transform.translate(vec3.create(2.2, 0, 0))
@@ -284,6 +294,7 @@ export class Demo0 extends Scene {
     }
 
     public onRender(deltaTime: number): void {
+        this.controller.update(deltaTime)
         //FYI: Always remember to reset orientation in blender :/
         this.sun.transform.rotateDegreesEuler({
             y: this.getSelfRotationPerFrame('sun'),

@@ -13,12 +13,15 @@ struct VertexOutput {
     @location(0) world_pos: float3,
     @location(1) texcoords: float2,
     @location(2) object_normal: float3,
-    @location(3) camera_position: float3
+    @location(3) camera_position: float3,
+    @location(4) shadow_position: vec3f
 };
 
 struct ViewParams {
     view_proj: mat4x4<f32>,
-    camera_position: vec4f
+    camera_position: vec4f,
+    light_view_proj: mat4x4<f32>,
+    light_pos: vec4f,
 };
 
 struct NodeParams {
@@ -58,9 +61,29 @@ var tangent_normal_sampler: sampler;
 @group(2) @binding(3)
 var tangent_normal_texture: texture_2d<f32>;
 
+@group(3) @binding(4)
+var shadow_sampler: sampler_comparison;
+
+@group(2) @binding(4)
+var shadow_texture: texture_depth_2d;
+
+const ambientFactor = 0.1;
+
+
 @vertex
 fn vertex_main(vert: VertexInput) -> VertexOutput {
     var out: VertexOutput;
+
+    // XY is in (-1, 1) space, Z is in (0, 1) space
+    let posFromLight = view_params.light_view_proj * node_params.transform * float4(vert.position, 1.0);
+
+    // Convert XY to (0, 1)
+    // Y is flipped because texture coords are Y-down.
+    out.shadow_position = vec3(
+        posFromLight.xy * vec2(0.5, -0.5) + vec2(0.5),
+        posFromLight.z
+    );
+
     out.position = view_params.view_proj * node_params.transform * float4(vert.position, 1.0);
     out.world_pos = vert.position.xyz;
     out.texcoords = vert.texcoords;
@@ -83,10 +106,29 @@ fn decode_color(color: vec4f) -> vec4f {
 
 @fragment
 fn fragment_main(in: VertexOutput) -> @location(0) float4 {
-    let color = decode_color(
+    let albedoColor = decode_color(
         textureSample(base_color_texture, base_color_sampler, in.texcoords) 
             * material_params.base_color_factor
     );
 
-    return color;
+    var visibility = 0.0;
+    let oneOverShadowDepthTextureSize = 1.0 / 1024.0;
+    for (var y = -1; y <= 1; y++) {
+        for (var x = -1; x <= 1; x++) {
+            let offset = vec2f(vec2(x, y)) * oneOverShadowDepthTextureSize;
+
+            visibility += textureSampleCompare(
+                shadow_texture, shadow_sampler,
+                in.shadow_position.xy + offset, in.shadow_position.z - 0.007
+            );
+        }
+    }
+    
+    visibility /= 9.0;
+
+    let lambertFactor = max(dot(normalize(view_params.light_pos.xyz - in.world_pos), normalize(in.object_normal)), 0.0);
+
+    let lightingFactor = min(ambientFactor + visibility * lambertFactor, 1.0);
+
+    return vec4(lightingFactor * albedoColor.xyz, 1.0);
 };

@@ -1,4 +1,4 @@
-import { mat4, Mat4 } from 'wgpu-matrix'
+import { mat4, Mat4, vec3 } from 'wgpu-matrix'
 import {
     EntityTypes,
     IMesh,
@@ -9,6 +9,7 @@ import {
 } from '../../types'
 import {
     DEFAULT_DEPTH_FORMAT,
+    DEFAULT_SHADOW_DEPTH_FORMAT,
     DEFAULT_SWAP_CHAIN_FORMAT,
     MSAA_SAMPLE_COUNT,
     VIEW_PARAMS_BUFFER_SIZE,
@@ -16,6 +17,7 @@ import {
 import { Stuff } from '../../../utils/Stuff'
 import { IMeshRenderData } from '../../types/core/MeshRenderDataStorage'
 import shaderCode from '../../shaders/testShader.wgsl'
+import shadowShaderCode from '../../shaders/vertexShadow.wgsl'
 
 export const alignTo = (val: number, align: number) => {
     return Math.floor((val + align - 1) / align) * align
@@ -30,6 +32,9 @@ export class Renderer implements IRenderer {
     private _swapChainFormat: GPUTextureFormat = DEFAULT_SWAP_CHAIN_FORMAT
     private _depthTextureFormat: GPUTextureFormat = DEFAULT_DEPTH_FORMAT
     private _depthTexture!: GPUTexture
+    private _shadowDepthTexture!: GPUTexture
+    private _shadowDepthTextureView!: GPUTextureView
+    private _shadowDepthTextureSize = 1024
 
     private _uniformsBGLayout!: GPUBindGroupLayout
     private _nodeParamsBGLayout!: GPUBindGroupLayout
@@ -38,9 +43,11 @@ export class Renderer implements IRenderer {
     private _msaaSampleCount: number = MSAA_SAMPLE_COUNT
 
     private _renderPassDescriptor!: GPURenderPassDescriptor
+    private _shadowPassDescriptor!: GPURenderPassDescriptor
 
     private _viewParamsBuffer!: GPUBuffer
     private _viewParamsBindGroup!: GPUBindGroup
+    private _shadowViewParamsBindGroup!: GPUBindGroup
 
     private _multisampleTextureView?: GPUTextureView
 
@@ -70,7 +77,23 @@ export class Renderer implements IRenderer {
             usage: GPUTextureUsage.RENDER_ATTACHMENT,
         })
 
+        this._shadowDepthTexture = this._device.createTexture({
+            label: 'shadowDepthTexture',
+            size: [
+                this._shadowDepthTextureSize,
+                this._shadowDepthTextureSize,
+                1,
+            ],
+            usage:
+                GPUTextureUsage.RENDER_ATTACHMENT |
+                GPUTextureUsage.TEXTURE_BINDING,
+            format: DEFAULT_SHADOW_DEPTH_FORMAT,
+        })
+
+        this._shadowDepthTextureView = this._shadowDepthTexture.createView()
+
         this._shaderModule = this.device.createShaderModule({
+            label: 'main shader',
             code: shaderCode,
         })
 
@@ -92,6 +115,7 @@ export class Renderer implements IRenderer {
         }
 
         this._renderPassDescriptor = {
+            label: 'main render pass descriptor',
             colorAttachments: [
                 {
                     view: null as unknown as GPUTextureView,
@@ -114,6 +138,16 @@ export class Renderer implements IRenderer {
                 stencilLoadOp: 'clear' as GPULoadOp,
                 stencilClearValue: 0,
                 stencilStoreOp: 'store' as GPUStoreOp,
+            },
+        }
+
+        this._shadowPassDescriptor = {
+            colorAttachments: [],
+            depthStencilAttachment: {
+                view: this._shadowDepthTextureView,
+                depthClearValue: 1.0,
+                depthLoadOp: 'clear',
+                depthStoreOp: 'store',
             },
         }
     }
@@ -193,7 +227,7 @@ export class Renderer implements IRenderer {
             entries: [
                 {
                     binding: 0,
-                    visibility: GPUShaderStage.VERTEX,
+                    visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
                     buffer: { type: 'uniform' },
                 },
             ],
@@ -203,7 +237,7 @@ export class Renderer implements IRenderer {
             entries: [
                 {
                     binding: 0,
-                    visibility: GPUShaderStage.VERTEX,
+                    visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
                     buffer: { type: 'uniform' },
                 },
             ],
@@ -354,6 +388,35 @@ export class Renderer implements IRenderer {
             })
         }
 
+        samplerBindGroupLayoutEntries.push({
+            binding: 4,
+            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+            sampler: {
+                type: 'comparison',
+            },
+        })
+
+        materialBindGroupLayoutEntries.push({
+            binding: 4,
+            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+            texture: {
+                sampleType: 'depth',
+            },
+        })
+
+        samplerBindGroupEntries.push({
+            binding: 4,
+            resource: this.device.createSampler({
+                compare: 'less',
+                label: 'shadow depth sampler',
+            }),
+        })
+
+        materialBindGroupEntries.push({
+            binding: 4,
+            resource: this._shadowDepthTextureView,
+        })
+
         const vertexState: GPUVertexState = {
             module: this._shaderModule,
             entryPoint: 'vertex_main',
@@ -406,6 +469,7 @@ export class Renderer implements IRenderer {
         const primitive: GPUPrimitiveState = {
             topology: 'triangle-list',
             stripIndexFormat: undefined,
+            cullMode: 'back',
         }
 
         if (mesh.mode === 5) {
@@ -425,11 +489,13 @@ export class Renderer implements IRenderer {
         })
 
         meshDataEntry.samplerBindGroup = this.device.createBindGroup({
+            label: 'sampler bindgroup',
             layout: samplerBindGroupLayout,
             entries: samplerBindGroupEntries,
         })
 
         meshDataEntry.materialBindGroup = this.device.createBindGroup({
+            label: 'material bindgroup',
             layout: materialBindGroupLayout,
             entries: materialBindGroupEntries,
         })
@@ -443,7 +509,43 @@ export class Renderer implements IRenderer {
             ],
         })
 
+        meshDataEntry.shadowRenderPipeline = this.device.createRenderPipeline({
+            label: 'shadow render pipeline',
+            layout: this.device.createPipelineLayout({
+                label: 'shadow render pipeline layout',
+                bindGroupLayouts: [
+                    this.uniformsBGLayout,
+                    this.nodeParamsBGLayout,
+                ],
+            }),
+            vertex: {
+                module: this.device.createShaderModule({
+                    label: 'shadow shader module',
+                    code: shadowShaderCode,
+                }),
+                buffers: [
+                    {
+                        arrayStride: mesh.positions.byteStride,
+                        attributes: [
+                            {
+                                format: mesh.positions.elementType,
+                                offset: 0,
+                                shaderLocation: 0,
+                            },
+                        ],
+                    },
+                ],
+            },
+            depthStencil: {
+                depthWriteEnabled: true,
+                depthCompare: 'less',
+                format: 'depth32float',
+            },
+            primitive,
+        })
+
         meshDataEntry.renderPipeline = this.device.createRenderPipeline({
+            label: 'main render pipeline',
             layout: layout,
             vertex: vertexState,
             fragment: fragmentState,
@@ -612,11 +714,46 @@ export class Renderer implements IRenderer {
         }
     }
 
+    private renderMeshShadows(
+        mesh: IMesh,
+        scene: IScene,
+        renderPassEncoder: GPURenderPassEncoder
+    ) {
+        const {
+            shadowRenderPipeline,
+            positionsBuffer,
+            indicesBuffer,
+            nodeParamsBindGroup,
+        } = scene.meshRenderDataStorage.data.get(mesh.id) as IMeshRenderData
+
+        renderPassEncoder.setBindGroup(1, nodeParamsBindGroup as GPUBindGroup)
+
+        renderPassEncoder.setPipeline(shadowRenderPipeline as GPURenderPipeline)
+
+        renderPassEncoder.setVertexBuffer(
+            0,
+            positionsBuffer as GPUBuffer,
+            0,
+            mesh.positions.byteLength
+        )
+
+        if (mesh.indices) {
+            renderPassEncoder.setIndexBuffer(
+                indicesBuffer as GPUBuffer,
+                mesh.indices.elementType as GPUIndexFormat,
+                0,
+                mesh.indices.byteLength
+            )
+            renderPassEncoder.drawIndexed(mesh.indices.count)
+        } else {
+            renderPassEncoder.draw(mesh.positions.count)
+        }
+    }
+
     public render(deltaTime: number, scene: IScene) {
         scene.onRender(deltaTime)
 
         const meshesToRender: IMesh[] = []
-        const nodeParamsBindGroups: GPUBindGroup[] = []
 
         const viewParamsUploadBuffer = this.device.createBuffer({
             size: this.viewParamsBufferSize,
@@ -630,6 +767,30 @@ export class Renderer implements IRenderer {
         viewMap.set(scene.camera.projectionMatrix)
         viewMap.set(scene.camera.position, 16)
 
+        const upVector = scene.camera.up
+        const origin = vec3.fromValues(0, 0, 0)
+
+        const lightPosition = vec3.create(0, 300, 0)
+        const lightViewMatrix = mat4.lookAt(lightPosition, origin, upVector)
+        const lightProjectionMatrix = mat4.create()
+
+        const left = -80
+        const right = 80
+        const bottom = -80
+        const top = 80
+        const near = -200
+        const far = 300
+        //FIXME: try perspective as in camera.projectionMatrix
+        mat4.ortho(left, right, bottom, top, near, far, lightProjectionMatrix)
+
+        const lightViewProjMatrix = mat4.multiply(
+            lightProjectionMatrix,
+            lightViewMatrix
+        )
+
+        viewMap.set(lightViewProjMatrix, 20)
+        viewMap.set(lightPosition, 36)
+
         viewParamsUploadBuffer.unmap()
 
         const iterateNode = (node: SceneNodeContent, worldMatrix: Mat4) => {
@@ -639,6 +800,7 @@ export class Renderer implements IRenderer {
                 ? mat4.mul(worldMatrix, nodeTransform.matrix)
                 : worldMatrix
 
+            //FUCK!!!
             const viewMatrix = mat4.copy(scene.camera.view)
 
             mat4.translate(
@@ -649,7 +811,6 @@ export class Renderer implements IRenderer {
 
             mat4.scale(viewMatrix, mat4.getScaling(meshMatrix), viewMatrix)
 
-            //FIXME: Do this once on load
             const meshRotation = Stuff.extractEulerRotation(meshMatrix)
 
             mat4.rotateX(viewMatrix, meshRotation[0], viewMatrix)
@@ -723,17 +884,30 @@ export class Renderer implements IRenderer {
                 .createView()
         }
 
+        const shadowPass = commandEncoder.beginRenderPass(
+            this._shadowPassDescriptor
+        )
+
+        shadowPass.setBindGroup(0, this.viewParamsBindGroup)
+
+        meshesToRender.forEach((mesh) => {
+            this.renderMeshShadows(mesh, scene, shadowPass)
+        })
+
+        shadowPass.end()
+
         const renderPass = commandEncoder.beginRenderPass(
             this.renderPassDescriptor
         )
 
         renderPass.setBindGroup(0, this.viewParamsBindGroup)
 
-        meshesToRender.forEach((mesh, index) => {
+        meshesToRender.forEach((mesh) => {
             this.renderMesh(mesh, scene, renderPass)
         })
 
         renderPass.end()
+
         this.device.queue.submit([commandEncoder.finish()])
         viewParamsUploadBuffer.destroy()
     }
