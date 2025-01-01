@@ -7,10 +7,12 @@ struct VertexInput {
 };
 
 struct ViewParams {
-    view_proj: mat4x4<f32>,
+    camera_projection_matrix: mat4x4<f32>,
+    camera_view_matrix: mat4x4<f32>,
     camera_position: vec4f,
-    light_view_proj: mat4x4<f32>,
-    light_pos: vec4f,
+    light_projection_matrix: mat4x4<f32>,
+    light_view_matrix: mat4x4<f32>,
+    light_position: vec4f
 };
 
 struct NodeParams {
@@ -25,5 +27,7 @@ var<uniform> node_params: NodeParams;
 
 @vertex
 fn vertex_main(vert: VertexInput) -> @builtin(position) vec4f {
-    return view_params.light_view_proj * node_params.transform * float4(vert.position, 1.0);
+    let light_view_projection_matrix = view_params.light_projection_matrix * view_params.light_view_matrix;
+
+    return light_view_projection_matrix * node_params.transform * float4(vert.position, 1.0);
 };

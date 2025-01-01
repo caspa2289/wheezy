@@ -5,23 +5,25 @@ alias float2 = vec2<f32>;
 struct VertexInput {
     @location(0) position: float3,
     @location(1) texcoords: float2,
-    @location(2) object_normal: float3
+    @location(2) normal: float3
 };
 
 struct VertexOutput {
     @builtin(position) position: float4,
-    @location(0) world_pos: float3,
+    @location(0) world_position: float3,
     @location(1) texcoords: float2,
-    @location(2) object_normal: float3,
+    @location(2) normal: float3,
     @location(3) camera_position: float3,
     @location(4) shadow_position: vec3f
 };
 
 struct ViewParams {
-    view_proj: mat4x4<f32>,
+    camera_projection_matrix: mat4x4<f32>,
+    camera_view_matrix: mat4x4<f32>,
     camera_position: vec4f,
-    light_view_proj: mat4x4<f32>,
-    light_pos: vec4f,
+    light_projection_matrix: mat4x4<f32>,
+    light_view_matrix: mat4x4<f32>,
+    light_position: vec4f
 };
 
 struct NodeParams {
@@ -74,20 +76,18 @@ const ambientFactor = 0.1;
 fn vertex_main(vert: VertexInput) -> VertexOutput {
     var out: VertexOutput;
 
-    // XY is in (-1, 1) space, Z is in (0, 1) space
-    let posFromLight = view_params.light_view_proj * node_params.transform * float4(vert.position, 1.0);
+    let light_view_projection_matrix = view_params.light_projection_matrix * view_params.light_view_matrix;
+    let camera_view_projection_matrix = view_params.camera_projection_matrix * view_params.camera_view_matrix;
+    let position_from_light = light_view_projection_matrix * node_params.transform * float4(vert.position, 1.0);
 
-    // Convert XY to (0, 1)
-    // Y is flipped because texture coords are Y-down.
     out.shadow_position = vec3(
-        posFromLight.xy * vec2(0.5, -0.5) + vec2(0.5),
-        posFromLight.z
+        position_from_light.xy * vec2(0.5, -0.5) + vec2(0.5),
+        position_from_light.z
     );
-
-    out.position = view_params.view_proj * node_params.transform * float4(vert.position, 1.0);
-    out.world_pos = vert.position.xyz;
+    out.position = camera_view_projection_matrix * node_params.transform * float4(vert.position, 1.0);
+    out.world_position = out.position.xyz;
     out.texcoords = vert.texcoords;
-    out.object_normal = vert.object_normal;
+    out.normal = vert.normal;
     out.camera_position = view_params.camera_position.xyz;
 
     return out;
@@ -126,7 +126,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     
     visibility /= 9.0;
 
-    let lambertFactor = max(dot(normalize(view_params.light_pos.xyz - in.world_pos), normalize(in.object_normal)), 0.0);
+    let lambertFactor = max(dot(normalize(view_params.light_position.xyz - in.world_position), normalize(in.normal)), 0.0);
 
     let lightingFactor = min(ambientFactor + visibility * lambertFactor, 1.0);
 

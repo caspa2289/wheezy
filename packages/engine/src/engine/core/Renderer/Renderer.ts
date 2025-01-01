@@ -1,4 +1,4 @@
-import { mat4, Mat4, vec3 } from 'wgpu-matrix'
+import { mat4, Mat4, vec3, vec4 } from 'wgpu-matrix'
 import {
     EntityTypes,
     IMesh,
@@ -47,7 +47,6 @@ export class Renderer implements IRenderer {
 
     private _viewParamsBuffer!: GPUBuffer
     private _viewParamsBindGroup!: GPUBindGroup
-    private _shadowViewParamsBindGroup!: GPUBindGroup
 
     private _multisampleTextureView?: GPUTextureView
 
@@ -761,13 +760,7 @@ export class Renderer implements IRenderer {
             mappedAtCreation: true,
         })
 
-        const viewMap = new Float32Array(
-            viewParamsUploadBuffer.getMappedRange()
-        )
-        viewMap.set(scene.camera.projectionMatrix)
-        viewMap.set(scene.camera.position, 16)
-
-        const upVector = scene.camera.up
+        const upVector = vec3.create(0, 1, 0)
         const origin = vec3.fromValues(0, 0, 0)
 
         const lightPosition = vec3.create(0, 300, 0)
@@ -780,16 +773,16 @@ export class Renderer implements IRenderer {
         const top = 80
         const near = -200
         const far = 300
-        //FIXME: try perspective as in camera.projectionMatrix
         mat4.ortho(left, right, bottom, top, near, far, lightProjectionMatrix)
-
-        const lightViewProjMatrix = mat4.multiply(
-            lightProjectionMatrix,
-            lightViewMatrix
+        const viewMap = new Float32Array(
+            viewParamsUploadBuffer.getMappedRange()
         )
-
-        viewMap.set(lightViewProjMatrix, 20)
-        viewMap.set(lightPosition, 36)
+        viewMap.set(scene.camera.projectionMatrix)
+        viewMap.set(scene.camera.view, 16)
+        viewMap.set(scene.camera.position, 32)
+        viewMap.set(lightProjectionMatrix, 36)
+        viewMap.set(lightViewMatrix, 52)
+        viewMap.set(lightPosition, 68)
 
         viewParamsUploadBuffer.unmap()
 
@@ -800,23 +793,6 @@ export class Renderer implements IRenderer {
                 ? mat4.mul(worldMatrix, nodeTransform.matrix)
                 : worldMatrix
 
-            //FUCK!!!
-            const viewMatrix = mat4.copy(scene.camera.view)
-
-            mat4.translate(
-                viewMatrix,
-                mat4.getTranslation(meshMatrix),
-                viewMatrix
-            )
-
-            mat4.scale(viewMatrix, mat4.getScaling(meshMatrix), viewMatrix)
-
-            const meshRotation = Stuff.extractEulerRotation(meshMatrix)
-
-            mat4.rotateX(viewMatrix, meshRotation[0], viewMatrix)
-            mat4.rotateY(viewMatrix, meshRotation[1], viewMatrix)
-            mat4.rotateZ(viewMatrix, meshRotation[2], viewMatrix)
-
             const nodeParamsUploadBuffer = this.device.createBuffer({
                 size: 16 * 4,
                 usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -825,7 +801,7 @@ export class Renderer implements IRenderer {
             const nodeParamsMap = new Float32Array(
                 nodeParamsUploadBuffer.getMappedRange()
             )
-            nodeParamsMap.set(viewMatrix)
+            nodeParamsMap.set(meshMatrix)
             nodeParamsUploadBuffer.unmap()
 
             const nodeParamsBindGroup = this.device.createBindGroup({
