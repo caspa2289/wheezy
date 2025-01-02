@@ -763,16 +763,16 @@ export class Renderer implements IRenderer {
         const upVector = vec3.create(0, 1, 0)
         const origin = vec3.fromValues(0, 0, 0)
 
-        const lightPosition = vec3.create(0, 300, 0)
+        const lightPosition = vec4.create(0, 0, 0, 1)
         const lightViewMatrix = mat4.lookAt(lightPosition, origin, upVector)
         const lightProjectionMatrix = mat4.create()
 
-        const left = -80
-        const right = 80
-        const bottom = -80
-        const top = 80
-        const near = -200
-        const far = 300
+        const left = -1000
+        const right = 1000
+        const bottom = -1000
+        const top = 1000
+        const near = 0.1
+        const far = 1000
         mat4.ortho(left, right, bottom, top, near, far, lightProjectionMatrix)
         const viewMap = new Float32Array(
             viewParamsUploadBuffer.getMappedRange()

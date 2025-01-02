@@ -115,7 +115,7 @@ export class Demo0 extends Scene {
 
         this.earthHook.transform.rotateDegreesEuler({ y: 10 })
 
-        this.earth.transform.rotateDegreesEuler({ x: 90 })
+        this.earth.transform.rotateDegreesEuler({ x: -90 })
 
         this.earth.transform.scale(vec3.create(0.16, 0.16, 0.16))
         this.earth.transform.translate(vec3.create(2.2, 0, 0))
@@ -312,7 +312,7 @@ export class Demo0 extends Scene {
             y: this.getOrbitRotationPerFrame('venus'),
         })
         this.earth.transform.rotateDegreesEuler({
-            y: this.getSelfRotationPerFrame('earth'),
+            z: this.getSelfRotationPerFrame('earth'),
         })
         this.earthHook.transform.rotateDegreesEuler({
             y: this.getOrbitRotationPerFrame('earth'),
