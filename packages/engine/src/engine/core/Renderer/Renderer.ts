@@ -763,7 +763,7 @@ export class Renderer implements IRenderer {
         const upVector = vec3.create(0, 1, 0)
         const origin = vec3.fromValues(0, 0, 0)
 
-        const lightPosition = vec4.create(0, 0, 0, 1)
+        const lightPosition = vec4.create(0, 0, 4, 1)
         const lightViewMatrix = mat4.lookAt(lightPosition, origin, upVector)
         const lightProjectionMatrix = mat4.create()
 

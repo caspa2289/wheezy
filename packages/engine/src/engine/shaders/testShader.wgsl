@@ -78,12 +78,13 @@ fn vertex_main(vert: VertexInput) -> VertexOutput {
 
     let light_view_projection_matrix = view_params.light_projection_matrix * view_params.light_view_matrix;
     let camera_view_projection_matrix = view_params.camera_projection_matrix * view_params.camera_view_matrix;
-    let position_from_light = light_view_projection_matrix * float4(vert.position, 1.0);
+    let light_space_position = light_view_projection_matrix * float4(vert.position, 1.0);
 
     out.shadow_position = vec3(
-        position_from_light.xy * vec2(0.5, -0.5) + vec2(0.5),
-        position_from_light.z
+        light_space_position.xy * vec2(0.5, -0.5) + vec2(0.5),
+        light_space_position.z
     );
+
     out.position = camera_view_projection_matrix * node_params.transform * float4(vert.position, 1.0);
     out.world_position = (node_params.transform * float4(vert.position, 1.0)).xyz;
     out.texcoords = vert.texcoords;
