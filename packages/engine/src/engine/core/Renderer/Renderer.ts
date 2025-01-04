@@ -11,10 +11,10 @@ import {
     DEFAULT_DEPTH_FORMAT,
     DEFAULT_SHADOW_DEPTH_FORMAT,
     DEFAULT_SWAP_CHAIN_FORMAT,
+    DEFULT_SHADOW_TEXTURE_SIZE,
     MSAA_SAMPLE_COUNT,
     VIEW_PARAMS_BUFFER_SIZE,
 } from './constants'
-import { Stuff } from '../../../utils/Stuff'
 import { IMeshRenderData } from '../../types/core/MeshRenderDataStorage'
 import shaderCode from '../../shaders/testShader.wgsl'
 import shadowShaderCode from '../../shaders/vertexShadow.wgsl'
@@ -34,7 +34,8 @@ export class Renderer implements IRenderer {
     private _depthTexture!: GPUTexture
     private _shadowDepthTexture!: GPUTexture
     private _shadowDepthTextureView!: GPUTextureView
-    private _shadowDepthTextureSize = 1024
+    private _shadowDepthTextureSize = DEFULT_SHADOW_TEXTURE_SIZE
+    private _shadowDepthSampler!: GPUSampler
 
     private _uniformsBGLayout!: GPUBindGroupLayout
     private _nodeParamsBGLayout!: GPUBindGroupLayout
@@ -89,6 +90,11 @@ export class Renderer implements IRenderer {
             format: DEFAULT_SHADOW_DEPTH_FORMAT,
         })
 
+        this._shadowDepthSampler = this.device.createSampler({
+            compare: 'less',
+            label: 'shadow depth sampler',
+        })
+
         this._shadowDepthTextureView = this._shadowDepthTexture.createView()
 
         this._shaderModule = this.device.createShaderModule({
@@ -123,10 +129,7 @@ export class Renderer implements IRenderer {
                         : null) as unknown as GPUTextureView,
                     loadOp: 'clear' as GPULoadOp,
                     clearValue: [0.0, 0.0, 0.0, 1],
-                    storeOp:
-                        this.msaaSampleCount === 1
-                            ? 'store'
-                            : ('discard' as GPUStoreOp),
+                    storeOp: 'store',
                 },
             ],
             depthStencilAttachment: {
@@ -389,7 +392,7 @@ export class Renderer implements IRenderer {
 
         samplerBindGroupLayoutEntries.push({
             binding: 4,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+            visibility: GPUShaderStage.FRAGMENT,
             sampler: {
                 type: 'comparison',
             },
@@ -397,7 +400,7 @@ export class Renderer implements IRenderer {
 
         materialBindGroupLayoutEntries.push({
             binding: 4,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+            visibility: GPUShaderStage.FRAGMENT,
             texture: {
                 sampleType: 'depth',
             },
@@ -405,10 +408,7 @@ export class Renderer implements IRenderer {
 
         samplerBindGroupEntries.push({
             binding: 4,
-            resource: this.device.createSampler({
-                compare: 'less',
-                label: 'shadow depth sampler',
-            }),
+            resource: this._shadowDepthSampler,
         })
 
         materialBindGroupEntries.push({
@@ -763,16 +763,16 @@ export class Renderer implements IRenderer {
         const upVector = vec3.create(0, 1, 0)
         const origin = vec3.fromValues(0, 0, 0)
 
-        const lightPosition = vec4.create(0, 0, 4, 1)
+        const lightPosition = vec4.create(0, 0, 5, 1)
         const lightViewMatrix = mat4.lookAt(lightPosition, origin, upVector)
         const lightProjectionMatrix = mat4.create()
 
-        const left = -1000
-        const right = 1000
-        const bottom = -1000
-        const top = 1000
+        const left = -5
+        const right = 5
+        const bottom = -5
+        const top = 5
         const near = 0.1
-        const far = 1000
+        const far = 50
         mat4.ortho(left, right, bottom, top, near, far, lightProjectionMatrix)
         const viewMap = new Float32Array(
             viewParamsUploadBuffer.getMappedRange()

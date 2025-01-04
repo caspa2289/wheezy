@@ -1,4 +1,4 @@
-import { IGameObject, ITransform, Scene, WheezyGLBLoader } from '@wheezy/engine'
+import { ITransform, Scene, WheezyGLBLoader } from '@wheezy/engine'
 import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCamera'
 import { ArcBallController } from '@wheezy/engine/src/utils/ArcBallController'
 import { vec3 } from 'wgpu-matrix'
@@ -37,8 +37,8 @@ export class Demo1 extends Scene {
 
         modelGO0.transform.rotateDegreesEuler({ x: 90 })
         modelGO1.transform.rotateDegreesEuler({ x: 90 })
-        modelGO1.transform.scale(vec3.create(5, 5, 5))
-        modelGO1.transform.translate(vec3.create(0, 0, -5))
+        modelGO1.transform.scale(vec3.create(3, 3, 3))
+        modelGO1.transform.translate(vec3.create(0, 0, -10))
 
         this._helmet = modelGO0.transform
     }

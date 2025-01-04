@@ -29,5 +29,5 @@ var<uniform> node_params: NodeParams;
 fn vertex_main(vert: VertexInput) -> @builtin(position) vec4f {
     let light_view_projection_matrix = view_params.light_projection_matrix * view_params.light_view_matrix;
 
-    return light_view_projection_matrix * float4(vert.position, 1.0);
+    return light_view_projection_matrix * node_params.transform * float4(vert.position, 1.0);
 };

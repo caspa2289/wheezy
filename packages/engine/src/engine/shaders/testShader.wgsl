@@ -78,17 +78,14 @@ fn vertex_main(vert: VertexInput) -> VertexOutput {
 
     let light_view_projection_matrix = view_params.light_projection_matrix * view_params.light_view_matrix;
     let camera_view_projection_matrix = view_params.camera_projection_matrix * view_params.camera_view_matrix;
-    let light_space_position = light_view_projection_matrix * float4(vert.position, 1.0);
+    let light_space_position = light_view_projection_matrix * node_params.transform * float4(vert.position, 1.0);
 
-    out.shadow_position = vec3(
-        light_space_position.xy * vec2(0.5, -0.5) + vec2(0.5),
-        light_space_position.z
-    );
+    out.shadow_position = vec3(light_space_position.xy * vec2(0.5, -0.5) + vec2(0.5, 0.5), light_space_position.z);
 
     out.position = camera_view_projection_matrix * node_params.transform * float4(vert.position, 1.0);
     out.world_position = (node_params.transform * float4(vert.position, 1.0)).xyz;
     out.texcoords = vert.texcoords;
-    out.normal = (node_params.transform * float4(vert.normal, 0.0)).xyz;
+    out.normal = normalize((node_params.transform * float4(vert.normal, 0.0)).xyz);
     out.camera_position = view_params.camera_position.xyz;
 
     return out;
@@ -113,14 +110,14 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     );
 
     var visibility = 0.0;
-    let oneOverShadowDepthTextureSize = 1.0 / 1024.0;
+    let shadow_texel_size = 1.0 / f32(textureDimensions(shadow_texture).x);
     for (var y = -1; y <= 1; y++) {
         for (var x = -1; x <= 1; x++) {
-            let offset = vec2f(vec2(x, y)) * oneOverShadowDepthTextureSize;
+            let offset = vec2f(vec2(x, y)) * shadow_texel_size;
 
             visibility += textureSampleCompare(
                 shadow_texture, shadow_sampler,
-                in.shadow_position.xy + offset, in.shadow_position.z - 0.007
+                in.shadow_position.xy + offset, in.shadow_position.z - 0.005
             );
         }
     }
