@@ -1,4 +1,9 @@
-import { ITransform, Scene, WheezyGLBLoader } from '@wheezy/engine'
+import {
+    DirectionalLight,
+    ITransform,
+    Scene,
+    WheezyGLBLoader,
+} from '@wheezy/engine'
 import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCamera'
 import { ArcBallController } from '@wheezy/engine/src/utils/ArcBallController'
 import { vec3 } from 'wgpu-matrix'
@@ -15,6 +20,8 @@ export class Demo1 extends Scene {
             camera: this.camera as ArcBallCamera,
             canvas: this.engine.renderer.context.canvas as HTMLCanvasElement,
         })
+
+        this.light = new DirectionalLight({ parent: this.root })
     }
 
     public onRender(dt: number): void {

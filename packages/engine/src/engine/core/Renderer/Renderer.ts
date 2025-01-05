@@ -727,29 +727,16 @@ export class Renderer implements IRenderer {
             mappedAtCreation: true,
         })
 
-        const upVector = vec3.create(0, 1, 0)
-        const origin = vec3.fromValues(0, 0, 0)
-
-        const lightPosition = vec4.create(0, 0, 5, 1)
-        const lightViewMatrix = mat4.lookAt(lightPosition, origin, upVector)
-        const lightProjectionMatrix = mat4.create()
-
-        const left = -2
-        const right = 2
-        const bottom = -2
-        const top = 2
-        const near = 0.1
-        const far = 50
-        mat4.ortho(left, right, bottom, top, near, far, lightProjectionMatrix)
         const viewMap = new Float32Array(
             viewParamsUploadBuffer.getMappedRange()
         )
         viewMap.set(scene.camera.projectionMatrix)
         viewMap.set(scene.camera.view, 16)
         viewMap.set(scene.camera.position, 32)
-        viewMap.set(lightProjectionMatrix, 36)
-        viewMap.set(lightViewMatrix, 52)
-        viewMap.set(lightPosition, 68)
+        //FIXME: this will be an array of lights in the scene
+        viewMap.set(scene.light.projectionMatrix, 36)
+        viewMap.set(scene.light.viewMatrix, 52)
+        viewMap.set(scene.light.position, 68)
         viewMap.set(
             vec4.create(...this.ambientLightColor, this.ambientLightIntensity),
             72

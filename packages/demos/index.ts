@@ -1,6 +1,6 @@
 import { Engine } from '@wheezy/engine'
 import { Demo1 } from './src/Demo1'
-import { Demo0 } from './src/Demo0'
+// import { Demo0 } from './src/Demo0'
 
 const canvas = document.getElementById('webgpu-canvas') as HTMLCanvasElement
 

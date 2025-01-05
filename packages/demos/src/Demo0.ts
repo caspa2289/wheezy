@@ -5,6 +5,7 @@ import {
     IGameObject,
     GameObject,
     Transform,
+    DirectionalLight,
 } from '@wheezy/engine'
 import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCamera'
 import { ArcBallController } from '@wheezy/engine/src/utils/ArcBallController'
@@ -47,6 +48,11 @@ export class Demo0 extends Scene {
         this.controller = new ArcBallController({
             camera: this.camera as ArcBallCamera,
             canvas: this._engine?.renderer.context.canvas as HTMLCanvasElement,
+        })
+
+        this.light = new DirectionalLight({
+            parent: this.root,
+            position: vec3.create(0, 0, 0),
         })
     }
 
