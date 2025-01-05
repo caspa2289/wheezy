@@ -1,3 +1,4 @@
+import { Vec3 } from 'wgpu-matrix'
 import { IMesh } from '../Mesh'
 import { IScene } from '../Scene'
 
@@ -7,15 +8,8 @@ export interface IRenderer {
     context: GPUCanvasContext
     swapChainFormat: GPUTextureFormat
     depthTextureFormat: GPUTextureFormat
-    depthTexture: GPUTexture
-    uniformsBGLayout: GPUBindGroupLayout
-    nodeParamsBGLayout: GPUBindGroupLayout
-    viewParamsBufferSize: number
-    msaaSampleCount: number
-    renderPassDescriptor: GPURenderPassDescriptor
-    viewParamsBuffer: GPUBuffer
-    viewParamsBindGroup: GPUBindGroup
-    multisampleTextureView?: GPUTextureView
+    ambientLightIntensity: number
+    ambientLightColor: Vec3
 
     init: () => Promise<void>
     render: (dt: number, scene: IScene) => void

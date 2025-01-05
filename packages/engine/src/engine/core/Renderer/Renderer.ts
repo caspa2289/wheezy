@@ -53,6 +53,9 @@ export class Renderer implements IRenderer {
 
     private _shaderModule!: GPUShaderModule
 
+    public ambientLightColor = vec3.create(1, 1, 1)
+    public ambientLightIntensity: number = 0.1
+
     constructor({ canvas }: IRendererProps) {
         this._canvas = canvas
     }
@@ -106,11 +109,11 @@ export class Renderer implements IRenderer {
 
         this._initializeViewParams()
 
-        if (this.msaaSampleCount !== 1) {
+        if (this._msaaSampleCount !== 1) {
             this._multisampleTextureView = this.device
                 .createTexture({
                     size: [this._canvas.width, this._canvas.height],
-                    sampleCount: this.msaaSampleCount,
+                    sampleCount: this._msaaSampleCount,
                     format: this.swapChainFormat,
                     usage: GPUTextureUsage.RENDER_ATTACHMENT,
                 })
@@ -124,7 +127,7 @@ export class Renderer implements IRenderer {
             colorAttachments: [
                 {
                     view: null as unknown as GPUTextureView,
-                    resolveTarget: (this.msaaSampleCount === 1
+                    resolveTarget: (this._msaaSampleCount === 1
                         ? undefined
                         : null) as unknown as GPUTextureView,
                     loadOp: 'clear' as GPULoadOp,
@@ -133,7 +136,7 @@ export class Renderer implements IRenderer {
                 },
             ],
             depthStencilAttachment: {
-                view: this.depthTexture.createView(),
+                view: this._depthTexture.createView(),
                 depthLoadOp: 'clear' as GPULoadOp,
                 depthClearValue: 1.0,
                 depthStoreOp: 'store' as GPUStoreOp,
@@ -174,50 +177,14 @@ export class Renderer implements IRenderer {
         return this._depthTextureFormat
     }
 
-    get depthTexture() {
-        return this._depthTexture
-    }
-
-    get uniformsBGLayout() {
-        return this._uniformsBGLayout
-    }
-
-    get nodeParamsBGLayout() {
-        return this._nodeParamsBGLayout
-    }
-
-    get viewParamsBufferSize() {
-        return this._viewParamsBufferSize
-    }
-
-    get msaaSampleCount() {
-        return this._msaaSampleCount
-    }
-
-    get renderPassDescriptor() {
-        return this._renderPassDescriptor
-    }
-
-    get viewParamsBuffer() {
-        return this._viewParamsBuffer
-    }
-
-    get viewParamsBindGroup() {
-        return this._viewParamsBindGroup
-    }
-
-    get multisampleTextureView() {
-        return this._multisampleTextureView
-    }
-
     private _initializeViewParams() {
         this._viewParamsBuffer = this.device.createBuffer({
-            size: this.viewParamsBufferSize,
+            size: this._viewParamsBufferSize,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         })
 
         this._viewParamsBindGroup = this.device.createBindGroup({
-            layout: this.uniformsBGLayout,
+            layout: this._uniformsBGLayout,
             entries: [
                 { binding: 0, resource: { buffer: this._viewParamsBuffer } },
             ],
@@ -501,8 +468,8 @@ export class Renderer implements IRenderer {
 
         const layout = this.device.createPipelineLayout({
             bindGroupLayouts: [
-                this.uniformsBGLayout,
-                this.nodeParamsBGLayout,
+                this._uniformsBGLayout,
+                this._nodeParamsBGLayout,
                 materialBindGroupLayout,
                 samplerBindGroupLayout,
             ],
@@ -513,8 +480,8 @@ export class Renderer implements IRenderer {
             layout: this.device.createPipelineLayout({
                 label: 'shadow render pipeline layout',
                 bindGroupLayouts: [
-                    this.uniformsBGLayout,
-                    this.nodeParamsBGLayout,
+                    this._uniformsBGLayout,
+                    this._nodeParamsBGLayout,
                 ],
             }),
             vertex: {
@@ -555,7 +522,7 @@ export class Renderer implements IRenderer {
                 depthCompare: 'less',
             },
             multisample: {
-                count: this.msaaSampleCount,
+                count: this._msaaSampleCount,
             },
         })
 
@@ -755,7 +722,7 @@ export class Renderer implements IRenderer {
         const meshesToRender: IMesh[] = []
 
         const viewParamsUploadBuffer = this.device.createBuffer({
-            size: this.viewParamsBufferSize,
+            size: this._viewParamsBufferSize,
             usage: GPUBufferUsage.COPY_SRC,
             mappedAtCreation: true,
         })
@@ -767,10 +734,10 @@ export class Renderer implements IRenderer {
         const lightViewMatrix = mat4.lookAt(lightPosition, origin, upVector)
         const lightProjectionMatrix = mat4.create()
 
-        const left = -5
-        const right = 5
-        const bottom = -5
-        const top = 5
+        const left = -2
+        const right = 2
+        const bottom = -2
+        const top = 2
         const near = 0.1
         const far = 50
         mat4.ortho(left, right, bottom, top, near, far, lightProjectionMatrix)
@@ -783,6 +750,10 @@ export class Renderer implements IRenderer {
         viewMap.set(lightProjectionMatrix, 36)
         viewMap.set(lightViewMatrix, 52)
         viewMap.set(lightPosition, 68)
+        viewMap.set(
+            vec4.create(...this.ambientLightColor, this.ambientLightIntensity),
+            72
+        )
 
         viewParamsUploadBuffer.unmap()
 
@@ -805,7 +776,7 @@ export class Renderer implements IRenderer {
             nodeParamsUploadBuffer.unmap()
 
             const nodeParamsBindGroup = this.device.createBindGroup({
-                layout: this.nodeParamsBGLayout,
+                layout: this._nodeParamsBGLayout,
                 entries: [
                     {
                         binding: 0,
@@ -844,17 +815,17 @@ export class Renderer implements IRenderer {
         commandEncoder.copyBufferToBuffer(
             viewParamsUploadBuffer,
             0,
-            this.viewParamsBuffer,
+            this._viewParamsBuffer,
             0,
-            this.viewParamsBufferSize
+            this._viewParamsBufferSize
         )
-        ;(this.renderPassDescriptor as any).colorAttachments[0].view =
+        ;(this._renderPassDescriptor as any).colorAttachments[0].view =
             this.context.getCurrentTexture().createView()
-        if (this.msaaSampleCount !== 1) {
-            ;(this.renderPassDescriptor as any).colorAttachments[0].view =
+        if (this._msaaSampleCount !== 1) {
+            ;(this._renderPassDescriptor as any).colorAttachments[0].view =
                 this._multisampleTextureView
             ;(
-                this.renderPassDescriptor as any
+                this._renderPassDescriptor as any
             ).colorAttachments[0].resolveTarget = this.context
                 .getCurrentTexture()
                 .createView()
@@ -864,7 +835,7 @@ export class Renderer implements IRenderer {
             this._shadowPassDescriptor
         )
 
-        shadowPass.setBindGroup(0, this.viewParamsBindGroup)
+        shadowPass.setBindGroup(0, this._viewParamsBindGroup)
 
         meshesToRender.forEach((mesh) => {
             this.renderMeshShadows(mesh, scene, shadowPass)
@@ -873,10 +844,10 @@ export class Renderer implements IRenderer {
         shadowPass.end()
 
         const renderPass = commandEncoder.beginRenderPass(
-            this.renderPassDescriptor
+            this._renderPassDescriptor
         )
 
-        renderPass.setBindGroup(0, this.viewParamsBindGroup)
+        renderPass.setBindGroup(0, this._viewParamsBindGroup)
 
         meshesToRender.forEach((mesh) => {
             this.renderMesh(mesh, scene, renderPass)

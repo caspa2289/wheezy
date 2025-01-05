@@ -12,7 +12,8 @@ struct ViewParams {
     camera_position: vec4f,
     light_projection_matrix: mat4x4<f32>,
     light_view_matrix: mat4x4<f32>,
-    light_position: vec4f
+    light_position: vec4f,
+    ambient_light_color: vec4f,
 };
 
 struct NodeParams {

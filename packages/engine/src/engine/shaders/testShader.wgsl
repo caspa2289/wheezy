@@ -23,7 +23,8 @@ struct ViewParams {
     camera_position: vec4f,
     light_projection_matrix: mat4x4<f32>,
     light_view_matrix: mat4x4<f32>,
-    light_position: vec4f
+    light_position: vec4f,
+    ambient_light_color: vec4f,
 };
 
 struct NodeParams {
@@ -68,9 +69,6 @@ var shadow_sampler: sampler_comparison;
 
 @group(2) @binding(4)
 var shadow_texture: texture_depth_2d;
-
-const ambientFactor = 0.1;
-
 
 @vertex
 fn vertex_main(vert: VertexInput) -> VertexOutput {
@@ -126,7 +124,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
 
     let lambertFactor = max(dot(normalize(view_params.light_position.xyz - in.world_position), normalize(in.normal)), 0.0);
 
-    let lightingFactor = min(ambientFactor + visibility * lambertFactor, 1.0);
+    let lightingFactor = min(view_params.ambient_light_color.w + max(0.2, visibility) * lambertFactor, 1.0);
 
     return vec4(lightingFactor * albedoColor.xyz, 1.0);
 };
