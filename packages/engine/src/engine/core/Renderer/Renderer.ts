@@ -776,6 +776,7 @@ export class Renderer implements IRenderer {
 
             node?.gameObject?.components?.forEach((component: any) => {
                 if (component.type === EntityTypes.mesh) {
+                    //FIXME: transform calculations are not performed for the light transform as of now
                     meshesToRender.push(component)
 
                     if (!(component as IMesh).isPipelineBuilt) {
