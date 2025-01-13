@@ -7,14 +7,15 @@ import {
     IMaterialPreloadData,
     IModelPreloadData,
     IPreloadEntity,
+    IPreloadMesh,
     ISamplerPreloadData,
     ITexturePreloadData,
     MaterialMap,
     SamplerMap,
     TextureMap,
 } from '../../engine/types'
-import { getTypeSize, getVertexType } from './helpers'
-import { mat4, Vec3, Vec4 } from 'wgpu-matrix'
+import { getTypeSize, getVertexType, GLTFComponentType } from './helpers'
+import { mat4, vec2, vec3, Vec3, Vec4 } from 'wgpu-matrix'
 
 type IndexMap = Map<number, string>
 
@@ -253,7 +254,8 @@ export class WheezyGLBLoader {
                         nodeIndex,
                         modelData,
                         bufferIndexMap,
-                        materialsIndexMap
+                        materialsIndexMap,
+                        bufferMap
                     )
                 )
             })
@@ -313,7 +315,8 @@ export class WheezyGLBLoader {
         nodeIndex: number,
         modelData: Record<string, any>,
         bufferIndexMap: IndexMap,
-        materialsIndexMap: IndexMap
+        materialsIndexMap: IndexMap,
+        bufferMap: BufferMap
     ) {
         const nodeJsonData = modelData?.json?.nodes[nodeIndex]
         const dataStructEntry: IPreloadEntity = {
@@ -336,7 +339,7 @@ export class WheezyGLBLoader {
                     mode: number
                     material?: number
                 }) => {
-                    dataStructEntry.meshes.push({
+                    const meshData: IPreloadMesh = {
                         positions: WheezyGLBLoader.parseAccessor(
                             modelData,
                             primitive.attributes.POSITION,
@@ -366,7 +369,154 @@ export class WheezyGLBLoader {
                                 ? materialsIndexMap.get(primitive.material)
                                 : undefined,
                         mode: primitive.mode ?? 4,
-                    })
+                    }
+
+                    //REFACTOR: move to separate function
+                    const positionsBuffer = meshData.positions?.bufferId
+                        ? bufferMap.get(meshData.positions.bufferId)
+                        : null
+
+                    const textureCoordinatesBuffer = meshData.textureCoordinates
+                        ?.bufferId
+                        ? bufferMap.get(meshData.textureCoordinates.bufferId)
+                        : null
+
+                    const indexBuffer = meshData.indices?.bufferId
+                        ? bufferMap.get(meshData.indices.bufferId)
+                        : null
+
+                    //FIXME: add a workaround for not indexed meshes
+                    if (
+                        positionsBuffer &&
+                        textureCoordinatesBuffer &&
+                        indexBuffer
+                    ) {
+                        const vertices = new Float32Array(
+                            positionsBuffer,
+                            meshData.positions?.byteOffset,
+                            meshData.positions?.byteLength
+                        )
+                        const textureCoordinates = new Uint32Array(
+                            textureCoordinatesBuffer,
+                            meshData.textureCoordinates?.byteOffset,
+                            meshData.textureCoordinates?.byteLength
+                        )
+
+                        const indices =
+                            //FIXME: this could be something other than Uint16
+                            new Uint16Array(
+                                indexBuffer,
+                                meshData.indices?.byteOffset,
+                                meshData.indices?.byteLength
+                            )
+
+                        const tangents = new Float32Array(vertices.length)
+
+                        for (let i = 0; i < indices.length; i += 9) {
+                            const vert0 = vec3.create(
+                                vertices[indices[i]],
+                                vertices[indices[i + 1]],
+                                vertices[indices[i + 2]]
+                            )
+                            const vert1 = vec3.create(
+                                vertices[indices[i + 3]],
+                                vertices[indices[i + 4]],
+                                vertices[indices[i + 5]]
+                            )
+
+                            const vert2 = vec3.create(
+                                vertices[indices[i + 6]],
+                                vertices[indices[i + 7]],
+                                vertices[indices[i + 8]]
+                            )
+
+                            const uv0 = vec2.create(
+                                textureCoordinates[indices[i]],
+                                textureCoordinates[indices[i + 1]]
+                            )
+
+                            const uv1 = vec2.create(
+                                textureCoordinates[indices[i + 2]],
+                                textureCoordinates[indices[i + 3]]
+                            )
+
+                            const uv2 = vec2.create(
+                                textureCoordinates[indices[i + 4]],
+                                textureCoordinates[indices[i + 5]]
+                            )
+
+                            const edge1 = vec3.subtract(vert1, vert0)
+                            const edge2 = vec3.subtract(vert2, vert0)
+
+                            const deltaU1 = uv1[0] - uv0[0]
+                            const deltaV1 = uv1[1] - uv0[1]
+                            const deltaU2 = uv2[0] - uv0[0]
+                            const deltaV2 = uv2[1] - uv0[1]
+
+                            let f = 1 / (deltaU1 * deltaV2 - deltaU2 * deltaV1)
+
+                            //FIXME: im not sure it should be that
+                            if (!isFinite(f)) {
+                                // console.log(textureCoordinates)
+                                // console.log(i)
+                                // console.log(indices[i])
+                                // console.log(indices[i + 1])
+                                // console.log(uv0)
+                                // console.log(uv1)
+                                // console.log(uv2)
+                                // console.log('________')
+                                f = 0.0
+                            }
+                            const tangent = vec3.create(
+                                f * (deltaV2 * edge1[0] - deltaV1 * edge2[0]),
+                                f * (deltaV2 * edge1[1] - deltaV1 * edge2[1]),
+                                f * (deltaV2 * edge1[2] - deltaV1 * edge2[2])
+                            )
+
+                            //FIXME: gotta average this somehow
+                            tangents[indices[i]] += tangent[0]
+                            tangents[indices[i + 1]] += tangent[1]
+                            tangents[indices[i + 2]] += tangent[2]
+
+                            tangents[indices[i + 3]] += tangent[0]
+                            tangents[indices[i + 4]] += tangent[1]
+                            tangents[indices[i + 5]] += tangent[2]
+
+                            tangents[indices[i + 6]] += tangent[0]
+                            tangents[indices[i + 7]] += tangent[1]
+                            tangents[indices[i + 8]] += tangent[2]
+                        }
+
+                        for (let i = 0; i < tangents.length; i += 3) {
+                            const normalizedTangent = vec3.normalize(
+                                vec3.create(
+                                    tangents[i],
+                                    tangents[i + 1],
+                                    tangents[i + 2]
+                                )
+                            )
+                            tangents[i] = normalizedTangent[0]
+                            tangents[i + 1] = normalizedTangent[1]
+                            tangents[i + 2] = normalizedTangent[2]
+                        }
+
+                        const id = generateId()
+                        bufferIndexMap.set(Math.random(), id)
+                        bufferMap.set(id, tangents.buffer)
+
+                        meshData.tangents = {
+                            bufferId: id,
+                            byteStride: 12,
+                            byteLength: tangents.byteLength,
+                            byteOffset: 0,
+                            count: tangents.length / (4 * 3),
+                            componentType: GLTFComponentType.FLOAT,
+                            elementType: 'float32x3',
+                            usage: 32,
+                        } as GLTFAccessor
+                    }
+
+                    dataStructEntry.meshes.push(meshData)
                 }
             )
         }
@@ -377,7 +527,8 @@ export class WheezyGLBLoader {
                     childIndex,
                     modelData,
                     bufferIndexMap,
-                    materialsIndexMap
+                    materialsIndexMap,
+                    bufferMap
                 )
             )
         })

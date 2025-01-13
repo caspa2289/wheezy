@@ -251,6 +251,7 @@ export class ModelUploader {
                 meshData.indices,
                 meshData.normals,
                 meshData.textureCoordinates,
+                meshData.tangents,
                 meshData.materialId
                     ? materialStorage.materials.get(meshData.materialId)
                     : undefined
@@ -308,6 +309,7 @@ export class ModelUploader {
                 meshData.indices,
                 meshData.normals,
                 meshData.textureCoordinates,
+                meshData.tangents,
                 meshData.materialId
                     ? materialStorage.materials.get(meshData.materialId)
                     : undefined

@@ -1,4 +1,4 @@
-import { mat4, vec3, Vec3 } from 'wgpu-matrix'
+import { mat4, vec3, Vec3, vec4, Vec4 } from 'wgpu-matrix'
 import {
     EntityTypes,
     IGameObject,
@@ -20,6 +20,14 @@ export class Transform
         super(parent, EntityTypes.transform)
         this.matrix = matrix ? mat4.copy(matrix) : mat4.identity()
         this._position = new Float32Array(this.matrix.buffer, 4 * 12, 4)
+    }
+
+    get position() {
+        return this._position
+    }
+
+    set position(value: Vec4) {
+        vec4.copy(value, this._position)
     }
 
     scale(value: Vec3) {
