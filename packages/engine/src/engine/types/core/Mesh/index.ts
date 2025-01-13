@@ -44,7 +44,7 @@ export interface GLTFAccessor {
 export interface IMesh extends IComponent<EntityTypes.mesh> {
     //https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-mesh-primitive
     normals?: GLTFAccessor
-    tangent?: GLTFAccessor
+    tangents?: GLTFAccessor
     indices?: GLTFAccessor
     textureCoordinates?: GLTFAccessor
     //FIXME: implement default material according to defaults https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-material

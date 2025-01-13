@@ -5,6 +5,8 @@ import {
     IRenderer,
     IRendererProps,
     IScene,
+    RENDER_MODES,
+    RENDER_OUTPUT_SOURCES,
     SceneNodeContent,
 } from '../../types'
 import {
@@ -49,12 +51,17 @@ export class Renderer implements IRenderer {
     private _viewParamsBuffer!: GPUBuffer
     private _viewParamsBindGroup!: GPUBindGroup
 
+    private _debugParamsBuffer!: GPUBuffer
+
     private _multisampleTextureView?: GPUTextureView
 
     private _shaderModule!: GPUShaderModule
 
     public ambientLightColor = vec3.create(1, 1, 1)
     public ambientLightIntensity: number = 0.1
+
+    public outputSource = RENDER_OUTPUT_SOURCES.DEFAULT
+    public renderingMode = RENDER_MODES.USE_F_NORMAL
 
     constructor({ canvas }: IRendererProps) {
         this._canvas = canvas
@@ -183,10 +190,16 @@ export class Renderer implements IRenderer {
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         })
 
+        this._debugParamsBuffer = this.device.createBuffer({
+            size: 4 + 4,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+
         this._viewParamsBindGroup = this.device.createBindGroup({
             layout: this._uniformsBGLayout,
             entries: [
                 { binding: 0, resource: { buffer: this._viewParamsBuffer } },
+                { binding: 1, resource: { buffer: this._debugParamsBuffer } },
             ],
         })
     }
@@ -196,6 +209,11 @@ export class Renderer implements IRenderer {
             entries: [
                 {
                     binding: 0,
+                    visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+                    buffer: { type: 'uniform' },
+                },
+                {
+                    binding: 1,
                     visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
                     buffer: { type: 'uniform' },
                 },
@@ -426,6 +444,19 @@ export class Renderer implements IRenderer {
             })
         }
 
+        if (mesh.tangents) {
+            ;(vertexState.buffers as GPUVertexBufferLayout[]).push({
+                arrayStride: mesh.tangents.byteStride,
+                attributes: [
+                    {
+                        format: mesh.tangents.elementType,
+                        offset: 0,
+                        shaderLocation: 3,
+                    },
+                ],
+            })
+        }
+
         const fragmentState: GPUFragmentState = {
             module: this._shaderModule,
             entryPoint: 'fragment_main',
@@ -589,6 +620,28 @@ export class Renderer implements IRenderer {
             meshDataEntry.normalsBuffer.unmap()
         }
 
+        if (mesh.tangents) {
+            const tangentsBuffer = scene.bufferStorage.buffers.get(
+                mesh?.tangents.bufferId
+            )
+
+            const tangentsView = new Uint8Array(
+                tangentsBuffer as ArrayBuffer,
+                mesh.tangents.byteOffset,
+                mesh.tangents.byteLength
+            )
+
+            meshDataEntry.tangentsBuffer = this.device.createBuffer({
+                size: alignTo(mesh.tangents.byteLength, 4),
+                usage: mesh.tangents.usage,
+                mappedAtCreation: true,
+            })
+            new Uint8Array(meshDataEntry.tangentsBuffer.getMappedRange()).set(
+                tangentsView
+            )
+            meshDataEntry.tangentsBuffer.unmap()
+        }
+
         if (mesh.indices) {
             const indicesBuffer = scene.bufferStorage.buffers.get(
                 mesh?.indices.bufferId
@@ -625,6 +678,7 @@ export class Renderer implements IRenderer {
             samplerBindGroup,
             positionsBuffer,
             textureCoordinatesBuffer,
+            tangentsBuffer,
             normalsBuffer,
             indicesBuffer,
             nodeParamsBindGroup,
@@ -665,6 +719,12 @@ export class Renderer implements IRenderer {
                 0,
                 mesh.normals.byteLength
             )
+        }
+
+        if (mesh.tangents) {
+            renderPassEncoder.setVertexBuffer(3, tangentsBuffer as GPUBuffer),
+                0,
+                mesh.tangents.byteLength
         }
 
         if (mesh.indices) {
@@ -721,6 +781,16 @@ export class Renderer implements IRenderer {
 
         const meshesToRender: IMesh[] = []
 
+        const debugInfoArray = new ArrayBuffer(4 + 4)
+        const debugInfoView = new DataView(
+            debugInfoArray,
+            0,
+            debugInfoArray.byteLength
+        )
+
+        debugInfoView.setUint32(0, this.outputSource, true)
+        debugInfoView.setUint32(4, this.renderingMode, true)
+
         const viewParamsUploadBuffer = this.device.createBuffer({
             size: this._viewParamsBufferSize,
             usage: GPUBufferUsage.COPY_SRC,
@@ -730,6 +800,7 @@ export class Renderer implements IRenderer {
         const viewMap = new Float32Array(
             viewParamsUploadBuffer.getMappedRange()
         )
+
         viewMap.set(scene.camera.projectionMatrix)
         viewMap.set(scene.camera.view, 16)
         viewMap.set(scene.camera.position, 32)
@@ -743,6 +814,21 @@ export class Renderer implements IRenderer {
         )
 
         viewParamsUploadBuffer.unmap()
+
+        const debugParamsArray = new ArrayBuffer(this._debugParamsBuffer.size)
+        const debugParamsView = new DataView(
+            debugParamsArray,
+            0,
+            debugParamsArray.byteLength
+        )
+        debugParamsView.setUint32(0, 0)
+        debugParamsView.setUint32(4, 0)
+
+        this.device.queue.writeBuffer(
+            this._debugParamsBuffer,
+            0,
+            debugInfoArray
+        )
 
         const iterateNode = (node: SceneNodeContent, worldMatrix: Mat4) => {
             const nodeTransform = node.gameObject.transform
@@ -837,6 +923,7 @@ export class Renderer implements IRenderer {
 
         renderPass.setBindGroup(0, this._viewParamsBindGroup)
 
+        //FIXME: move samplers and textures back to the same bindgroup
         meshesToRender.forEach((mesh) => {
             this.renderMesh(mesh, scene, renderPass)
         })

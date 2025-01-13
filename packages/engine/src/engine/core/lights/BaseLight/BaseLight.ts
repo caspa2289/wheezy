@@ -61,7 +61,7 @@ export class BaseLight
         this._target = props?.target ?? vec3.copy(this.position)
         this._back = vec3.normalize(vec3.sub(this.position, this.target))
 
-        vec4.copy(props?.position ?? vec4.create(0, 0, 2, 1), this.position)
+        vec4.copy(props?.position ?? vec4.create(0, 0, 10, 1), this.position)
 
         this._viewMatrix = mat4.lookAt(this.position, this.target, this.up)
     }

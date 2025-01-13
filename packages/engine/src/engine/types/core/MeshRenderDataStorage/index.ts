@@ -6,6 +6,7 @@ export interface IMeshRenderData {
     positionsBuffer?: GPUBuffer
     indicesBuffer?: GPUBuffer
     textureCoordinatesBuffer?: GPUBuffer
+    tangentsBuffer?: GPUBuffer
     normalsBuffer?: GPUBuffer
     materialParamsBuffer?: GPUBuffer
     materialBindGroup?: GPUBindGroup

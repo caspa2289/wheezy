@@ -8,6 +8,18 @@
         <script type="module" src="index.ts"></script>
     </head>
     <body style="width: 100%; height: 100%; margin: 0; padding: 0">
+        <div
+            id="debug-container"
+            style="
+                position: fixed;
+                right: 0;
+                top: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                padding: 10px;
+            "
+        ></div>
         <canvas style="width: 100%; height: 100%" id="webgpu-canvas"></canvas>
     </body>
 </html>

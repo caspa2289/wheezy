@@ -2,6 +2,26 @@ import { Vec3 } from 'wgpu-matrix'
 import { IMesh } from '../Mesh'
 import { IScene } from '../Scene'
 
+export enum RENDER_OUTPUT_SOURCES {
+    DEFAULT,
+    V_NORMAL,
+    AMBIENT,
+    DIFFUSE,
+    METALLIC,
+    ROUGHNESS,
+    F_NORMAL,
+    V_TANGENT,
+}
+
+export type TRenderOutputSource = number
+
+export enum RENDER_MODES {
+    USE_V_NORMAL,
+    USE_F_NORMAL,
+}
+
+export type TRenderMode = number
+
 export interface IRenderer {
     adapter: GPUAdapter
     device: GPUDevice
@@ -10,6 +30,9 @@ export interface IRenderer {
     depthTextureFormat: GPUTextureFormat
     ambientLightIntensity: number
     ambientLightColor: Vec3
+
+    outputSource: TRenderOutputSource
+    renderingMode: TRenderMode
 
     init: () => Promise<void>
     render: (dt: number, scene: IScene) => void
