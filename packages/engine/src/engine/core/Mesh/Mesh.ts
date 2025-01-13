@@ -12,6 +12,7 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
     positions: GLTFAccessor
     indices?: GLTFAccessor
     textureCoordinates?: GLTFAccessor
+    tangents?: GLTFAccessor
     normals?: GLTFAccessor
     material?: IMaterial
     isPipelineBuilt: boolean = false
@@ -22,6 +23,7 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
         indices?: GLTFAccessor,
         normals?: GLTFAccessor,
         textureCoordinates?: GLTFAccessor,
+        tangents?: GLTFAccessor,
         material?: IMaterial
     ) {
         super(parent, EntityTypes.mesh)
@@ -31,5 +33,6 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
         this.textureCoordinates = textureCoordinates
         this.material = material
         this.normals = normals
+        this.tangents = tangents
     }
 }
