@@ -457,14 +457,6 @@ export class WheezyGLBLoader {
 
                             //FIXME: im not sure it should be that
                             if (!isFinite(f)) {
-                                // console.log(textureCoordinates)
-                                // console.log(i)
-                                // console.log(indices[i])
-                                // console.log(indices[i + 1])
-                                // console.log(uv0)
-                                // console.log(uv1)
-                                // console.log(uv2)
-                                // console.log('________')
                                 f = 0.0
                             }
                             const tangent = vec3.create(
@@ -473,7 +465,6 @@ export class WheezyGLBLoader {
                                 f * (deltaV2 * edge1[2] - deltaV1 * edge2[2])
                             )
 
-                            //FIXME: gotta average this somehow
                             tangents[indices[i]] += tangent[0]
                             tangents[indices[i + 1]] += tangent[1]
                             tangents[indices[i + 2]] += tangent[2]
@@ -485,19 +476,6 @@ export class WheezyGLBLoader {
                             tangents[indices[i + 6]] += tangent[0]
                             tangents[indices[i + 7]] += tangent[1]
                             tangents[indices[i + 8]] += tangent[2]
-                        }
-
-                        for (let i = 0; i < tangents.length; i += 3) {
-                            const normalizedTangent = vec3.normalize(
-                                vec3.create(
-                                    tangents[i],
-                                    tangents[i + 1],
-                                    tangents[i + 2]
-                                )
-                            )
-                            tangents[i] = normalizedTangent[0]
-                            tangents[i + 1] = normalizedTangent[1]
-                            tangents[i + 2] = normalizedTangent[2]
                         }
 
                         const id = generateId()
