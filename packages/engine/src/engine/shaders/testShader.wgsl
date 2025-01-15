@@ -107,7 +107,7 @@ fn vertex_main(vert: VertexInput) -> VertexOutput {
     out.texcoords = vert.texcoords;
     out.vertex_normal = normalize(node_params.transform * float4(vert.vertex_normal, 0.0)).xyz;
     //FIXME: w component is tangent handedness 1 or -1, google more on that
-    out.vertex_tangent = normalize(node_params.transform * float4(vert.vertex_tangent, -1.0)).xyz;
+    out.vertex_tangent = normalize(node_params.transform * float4(vert.vertex_tangent, 1.0)).xyz;
     out.camera_position = view_params.camera_position.xyz;
 
     return out;
@@ -156,15 +156,15 @@ const LIGHT_DIFFUSE_INTENSITY = 1.0;
 const SPECULAR_POWER = 32.0;
 
 fn calculateBumpedNormal(in: VertexOutput) -> float3 {
-    let Normal = normalize(in.vertex_normal);
-    var Tangent = normalize(in.vertex_tangent);
-    Tangent = normalize(Tangent - dot(Tangent, Normal) * Normal);
-    let Bitangent = cross(Tangent, Normal);
-    let BumpMapNormal = normalize(textureSample(fragment_normal_texture, fragment_normal_sampler, in.texcoords).rgb * 2.0 - 1.0);
-    let TBN = mat3x3f(Tangent, Bitangent, Normal);
-    let NewNormal = normalize(TBN * BumpMapNormal);
+    let normal = normalize(in.vertex_normal);
+    var tangent = normalize(in.vertex_tangent);
+    //gram-schmidt orthogonalization
+    tangent = normalize(tangent - dot(tangent, normal) * normal);
+    let bitangent = cross(tangent, normal);
+    let bump_map_normal = normalize(textureSample(fragment_normal_texture, fragment_normal_sampler, in.texcoords).rgb * 2.0 - 1.0);
+    let tbn_matrix = mat3x3f(tangent, bitangent, normal);
 
-    return NewNormal;
+    return normalize(tbn_matrix * bump_map_normal);
 }
 
 @fragment
