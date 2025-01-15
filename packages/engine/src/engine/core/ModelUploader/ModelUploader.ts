@@ -217,7 +217,7 @@ export class ModelUploader {
             if (value.normalTextureId) {
                 material.normalTexture = this.createGPUTexture(
                     device,
-                    'rgba8unorm-srgb',
+                    'rgba8unorm',
                     samplerStorage,
                     imageStorage,
                     textureStorage.textures.get(value.normalTextureId)
