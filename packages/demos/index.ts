@@ -36,6 +36,7 @@ const initDebugControls = (engine: IEngine) => {
         { label: 'Fragment normal', value: 6 },
         { label: 'Vertex tangent', value: 7 },
     ]
+
     outputOptions.forEach((item) => {
         const option = document.createElement('option')
         if (item.value === defaultOutputSource) {
