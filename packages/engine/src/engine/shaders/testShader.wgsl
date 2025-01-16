@@ -10,6 +10,7 @@ const OUT_METALLIC = 4;
 const OUT_ROUGHNESS = 5;
 const OUT_F_NORMAL = 6;
 const OUT_V_TANGENT = 7;
+const OUT_OCCLUSION = 8;
 
 const USE_V_NORMAL = 0;
 const USE_F_NORMAL = 1;
@@ -87,9 +88,15 @@ var fragment_normal_sampler: sampler;
 var fragment_normal_texture: texture_2d<f32>;
 
 @group(3) @binding(4)
-var shadow_sampler: sampler_comparison;
+var occlusion_sampler: sampler;
 
 @group(2) @binding(4)
+var occlusion_texture: texture_2d<f32>;
+
+@group(3) @binding(5)
+var shadow_sampler: sampler_comparison;
+
+@group(2) @binding(5)
 var shadow_texture: texture_depth_2d;
 
 @vertex
@@ -169,10 +176,11 @@ fn calculateBumpedNormal(in: VertexOutput) -> float3 {
 
 @fragment
 fn fragment_main(in: VertexOutput) -> @location(0) float4 {
-    let albedo_color = decode_color(
-        textureSample(base_color_texture, base_color_sampler, in.texcoords) 
-            * material_params.base_color_factor
-    );
+    let albedo_color = textureSample(base_color_texture, base_color_sampler, in.texcoords) 
+            * material_params.base_color_factor;
+
+    let metallic_roughness = textureSample(metallic_roughness_texture, metallic_roughness_sampler, in.texcoords);
+    let occlusion = textureSample(occlusion_texture, occlusion_sampler, in.texcoords).r;
 
     var fragment_normal: float3;
     switch(debug_params.normal_type) {
@@ -187,7 +195,6 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
 
     let ambient_color = vec4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 1.0f);
 
-    let metallic_roughness = textureSample(metallic_roughness_texture, metallic_roughness_sampler, in.texcoords);
     let roughness = metallic_roughness.g;
     let metallic = metallic_roughness.b;
 
@@ -241,12 +248,15 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
         case(OUT_V_TANGENT): {
             return vec4(in.vertex_tangent, 1.0);
         }
+        case(OUT_OCCLUSION) : {
+            return vec4(occlusion);
+        }
         default: {
-            return vec4(
+            return decode_color(vec4(
                 (ambient_color.xyz + lighting_factor *
                 (specular_color.xyz + diffuse_color.xyz)) * albedo_color.xyz,
                 1.0
-            );
+            ));
         }
     }
 };

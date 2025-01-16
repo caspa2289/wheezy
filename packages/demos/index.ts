@@ -32,6 +32,7 @@ const initDebugControls = (engine: IEngine) => {
         { label: 'Diffuse color', value: 3 },
         { label: 'Metallic component', value: 4 },
         { label: 'Roughness component', value: 5 },
+        { label: 'Occlusion component', value: 8 },
         { label: 'Surface normal', value: 1 },
         { label: 'Fragment normal', value: 6 },
         { label: 'Vertex tangent', value: 7 },

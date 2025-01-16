@@ -375,8 +375,33 @@ export class Renderer implements IRenderer {
             })
         }
 
+        if (mesh.material?.occlusionTexture) {
+            samplerBindGroupLayoutEntries.push({
+                binding: 4,
+                visibility: GPUShaderStage.FRAGMENT,
+                sampler: {},
+            })
+
+            materialBindGroupLayoutEntries.push({
+                binding: 4,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: {
+                    sampleType,
+                },
+            })
+
+            samplerBindGroupEntries.push({
+                binding: 4,
+                resource: mesh.material?.occlusionTexture.sampler,
+            })
+            materialBindGroupEntries.push({
+                binding: 4,
+                resource: mesh.material?.occlusionTexture.view,
+            })
+        }
+
         samplerBindGroupLayoutEntries.push({
-            binding: 4,
+            binding: 5,
             visibility: GPUShaderStage.FRAGMENT,
             sampler: {
                 type: 'comparison',
@@ -384,7 +409,7 @@ export class Renderer implements IRenderer {
         })
 
         materialBindGroupLayoutEntries.push({
-            binding: 4,
+            binding: 5,
             visibility: GPUShaderStage.FRAGMENT,
             texture: {
                 sampleType: 'depth',
@@ -392,12 +417,12 @@ export class Renderer implements IRenderer {
         })
 
         samplerBindGroupEntries.push({
-            binding: 4,
+            binding: 5,
             resource: this._shadowDepthSampler,
         })
 
         materialBindGroupEntries.push({
-            binding: 4,
+            binding: 5,
             resource: this._shadowDepthTextureView,
         })
 
