@@ -14,6 +14,9 @@ const OUT_OCCLUSION = 8;
 
 const USE_V_NORMAL = 0;
 const USE_F_NORMAL = 1;
+const USE_PBR = 2;
+
+const PI = 3.14159265359;
 
 struct VertexInput {
     @location(0) position: float3,
@@ -174,12 +177,49 @@ fn calculateBumpedNormal(in: VertexOutput) -> float3 {
     return normalize(tbn_matrix * bump_map_normal);
 }
 
+fn DistributionGGX( N: float3, H: float3, roughness: f32) -> f32 {
+    let a = roughness*roughness;
+    let a2 = a * a;
+    let NdotH  = max(dot(N, H), 0.0);
+    let NdotH2 = NdotH*NdotH;
+	
+    let num = a2;
+    var denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+	
+    return num / denom;
+}
+
+fn GeometrySchlickGGX(NdotV: f32, roughness: f32) -> f32 {
+    let r = (roughness + 1.0);
+    let k = (r*r) / 8.0;
+
+    let num = NdotV;
+    let denom = NdotV * (1.0 - k) + k;
+	
+    return num / denom;
+}
+
+fn GeometrySmith( N: float3, V: float3, L: float3, roughness: f32) -> f32 {
+    let NdotV = max(dot(N, V), 0.0);
+    let NdotL = max(dot(N, L), 0.0);
+    let ggx2  = GeometrySchlickGGX(NdotV, roughness);
+    let ggx1  = GeometrySchlickGGX(NdotL, roughness);
+	
+    return ggx1 * ggx2;
+}
+
+fn fresnelSchlick(cosTheta: f32, F0: float3) -> float3 {
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
 @fragment
 fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     let albedo_color = textureSample(base_color_texture, base_color_sampler, in.texcoords) 
             * material_params.base_color_factor;
-
     let metallic_roughness = textureSample(metallic_roughness_texture, metallic_roughness_sampler, in.texcoords);
+    let roughness = metallic_roughness.g;
+    let metallic = metallic_roughness.b;
     let occlusion = textureSample(occlusion_texture, occlusion_sampler, in.texcoords).r;
 
     var fragment_normal: float3;
@@ -188,15 +228,56 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
             fragment_normal = in.vertex_normal;
             break;
         }
+        case(USE_PBR): {
+            let N = calculateBumpedNormal(in);
+            let V = normalize(in.camera_position - in.world_position);
+
+            var F0 = vec3(0.04); 
+            F0 = mix(F0, albedo_color.rgb, vec3(metallic));
+                    
+            // reflectance equation
+            var Lo = vec3(0.0);
+            
+            // calculate per-light radiance
+            let L = normalize(view_params.light_position.xyz - in.world_position);
+            let H = normalize(V + L);
+            let distance = length(view_params.light_position.xyz - in.world_position);
+            let attenuation = 1.0; //not applicable to directional light
+            //1.0 / (distance * distance);
+            let radiance = LIGHT_COLOR.rgb * attenuation;        
+            
+            // cook-torrance brdf
+            let NDF = DistributionGGX(N, H, roughness);        
+            let G = GeometrySmith(N, V, L, roughness);      
+            let F = fresnelSchlick(max(dot(H, V), 0.0), F0);       
+            
+            let kS = F;
+            var kD = vec3(1.0) - kS;
+            kD *= 1.0 - vec3(metallic);	  
+            
+            let numerator = NDF * G * F;
+            let denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+            let specular = numerator / denominator;  
+                
+            // add to outgoing radiance Lo
+            let NdotL = max(dot(N, L), 0.0);            
+            Lo += (kD * albedo_color.rgb / PI + specular) * radiance * NdotL;
+  
+            let ambient_color = vec4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 1.0f) * albedo_color * occlusion;
+            
+            var color = ambient_color.rgb + Lo;
+
+            color = color / (color + vec3(1.0));
+            color = pow(color, vec3(1.0/2.2));
+        
+            return vec4(color, 1.0);
+        }
         default: {
             fragment_normal = calculateBumpedNormal(in);
         }
     }
 
     let ambient_color = vec4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 1.0f);
-
-    let roughness = metallic_roughness.g;
-    let metallic = metallic_roughness.b;
 
     let visibility = get_visibility(in.shadow_position);
     let diffuse_factor = get_lambert_factor(view_params.light_position.xyz, in.world_position, fragment_normal);

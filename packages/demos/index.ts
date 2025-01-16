@@ -49,8 +49,9 @@ const initDebugControls = (engine: IEngine) => {
     })
 
     const renderModes = [
-        { label: 'Use Surface Normals (No bump mapping)', value: 0 },
-        { label: 'Use Fragment Normals (With bump mapping)', value: 1 },
+        { label: 'Blinn-Phong (No bump mapping)', value: 0 },
+        { label: 'Blinn-Phong (With bump mapping)', value: 1 },
+        { label: 'Terrence-Cook (No IRL)', value: 2 },
     ]
 
     renderModes.forEach((item) => {

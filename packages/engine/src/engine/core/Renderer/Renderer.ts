@@ -58,7 +58,7 @@ export class Renderer implements IRenderer {
     private _shaderModule!: GPUShaderModule
 
     public ambientLightColor = vec3.create(1, 1, 1)
-    public ambientLightIntensity: number = 0.1
+    public ambientLightIntensity: number = 0.03
 
     public outputSource = RENDER_OUTPUT_SOURCES.DEFAULT
     public renderingMode = RENDER_MODES.USE_F_NORMAL
