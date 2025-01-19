@@ -234,7 +234,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
             let V = normalize(in.camera_position - in.world_position);
 
             var F0 = vec3(0.04); 
-            F0 = mix(F0, albedo_color.rgb, vec3(metallic));
+            F0 = mix(F0, albedo_color.rgb, metallic);
                     
             // reflectance equation
             var Lo = vec3(0.0);
@@ -264,7 +264,14 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
             let NdotL = max(dot(N, L), 0.0);            
             Lo += (kD * albedo_color.rgb / PI + specular) * radiance * NdotL;
   
-            let ambient_color = vec4(0.03) * albedo_color * occlusion;
+            let kSl = fresnelSchlick(max(dot(N, V), 0.0), F0);
+            var kDl = 1.0 - kSl;
+            kDl *= 1.0 - metallic; 
+            //FIXME: this should be sampled from cubemap
+            let irradiance = vec3f(0.0, 0.12, 0.06); 
+            let diffuse = irradiance * albedo_color.rgb;
+            let ambient_color = (kDl * diffuse) * occlusion;
+            // let ambient_color = vec4(0.03) * albedo_color * occlusion;
             // vec4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 1.0f) * albedo_color * occlusion;
             
             var color = ambient_color.rgb + Lo;

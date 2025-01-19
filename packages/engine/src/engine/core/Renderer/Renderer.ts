@@ -138,7 +138,7 @@ export class Renderer implements IRenderer {
                         ? undefined
                         : null) as unknown as GPUTextureView,
                     loadOp: 'clear' as GPULoadOp,
-                    clearValue: [0.0, 0.0, 0.0, 1],
+                    clearValue: [0.0, 0.12, 0.06, 1],
                     storeOp: 'store',
                 },
             ],
