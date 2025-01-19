@@ -215,7 +215,7 @@ fn fresnelSchlick(cosTheta: f32, F0: float3) -> float3 {
 
 @fragment
 fn fragment_main(in: VertexOutput) -> @location(0) float4 {
-    let albedo_color = textureSample(base_color_texture, base_color_sampler, in.texcoords) 
+    var albedo_color = textureSample(base_color_texture, base_color_sampler, in.texcoords) 
             * material_params.base_color_factor;
     let metallic_roughness = textureSample(metallic_roughness_texture, metallic_roughness_sampler, in.texcoords);
     let roughness = metallic_roughness.g;
@@ -229,6 +229,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
             break;
         }
         case(USE_PBR): {
+            albedo_color = pow(albedo_color, vec4f(2.2));
             let N = calculateBumpedNormal(in);
             let V = normalize(in.camera_position - in.world_position);
 
@@ -251,19 +252,20 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
             let G = GeometrySmith(N, V, L, roughness);      
             let F = fresnelSchlick(max(dot(H, V), 0.0), F0);       
             
-            let kS = F;
-            var kD = vec3(1.0) - kS;
-            kD *= 1.0 - vec3(metallic);	  
-            
             let numerator = NDF * G * F;
             let denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
             let specular = numerator / denominator;  
-                
+ 
+            let kS = F;
+            var kD = vec3(1.0) - kS;
+            kD *= 1.0 - vec3(metallic);	  
+
             // add to outgoing radiance Lo
             let NdotL = max(dot(N, L), 0.0);            
             Lo += (kD * albedo_color.rgb / PI + specular) * radiance * NdotL;
   
-            let ambient_color = vec4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 1.0f) * albedo_color * occlusion;
+            let ambient_color = vec4(0.03) * albedo_color * occlusion;
+            // vec4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 1.0f) * albedo_color * occlusion;
             
             var color = ambient_color.rgb + Lo;
 

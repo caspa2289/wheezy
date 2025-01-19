@@ -1,4 +1,4 @@
-export const DEFAULT_SWAP_CHAIN_FORMAT: GPUTextureFormat = 'bgra8unorm'
+export const DEFAULT_SWAP_CHAIN_FORMAT: GPUTextureFormat = 'rgba8unorm'
 export const DEFAULT_DEPTH_FORMAT: GPUTextureFormat = 'depth24plus-stencil8'
 export const DEFAULT_SHADOW_DEPTH_FORMAT: GPUTextureFormat = 'depth32float'
 export const DEFULT_SHADOW_TEXTURE_SIZE: number = 1024
