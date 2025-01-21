@@ -23,6 +23,12 @@ export class Demo1 extends Scene {
     constructor() {
         super()
 
+        this.camera = new ArcBallCamera({
+            canvasHeight: this.engine.renderer.context.canvas.height,
+            canvasWidth: this.engine.renderer.context.canvas.width,
+            position: vec3.create(7, 0, -7),
+        })
+
         this._controller = new ArcBallController({
             camera: this.camera as ArcBallCamera,
             canvas: this.engine.renderer.context.canvas as HTMLCanvasElement,
@@ -51,16 +57,16 @@ export class Demo1 extends Scene {
 
         this.light = new DirectionalLight({
             parent: this.root,
-            position: vec3.create(-5, 0, 5),
+            position: vec3.create(-5, 0, -25),
         })
 
         modelGO0.transform.rotateDegreesEuler({ x: 90 })
-        modelGO0.transform.translate(vec3.create(0, 0, -1))
+        modelGO0.transform.translate(vec3.create(0, 0, -4))
         modelGO0.transform.scale(vec3.create(1.5, 1.5, 1.5))
 
-        modelGO1.transform.rotateDegreesEuler({ x: 90 })
+        modelGO1.transform.rotateDegreesEuler({ x: 90, z: 130 })
         modelGO1.transform.scale(vec3.create(3, 3, 3))
-        modelGO1.transform.translate(vec3.create(0, 0, -11))
+        modelGO1.transform.translate(vec3.create(10, 0, 7))
 
         this._helmet = modelGO0.transform
         this._helmet1 = modelGO1.transform

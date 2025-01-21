@@ -51,7 +51,7 @@ const initDebugControls = (engine: IEngine) => {
     const renderModes = [
         { label: 'Blinn-Phong (No bump mapping)', value: 0 },
         { label: 'Blinn-Phong (With bump mapping)', value: 1 },
-        { label: 'Terrence-Cook (No IBL)', value: 2 },
+        { label: 'Terrence-Cook (No mipmapping)', value: 2 },
     ]
 
     renderModes.forEach((item) => {

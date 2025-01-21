@@ -102,6 +102,12 @@ var shadow_sampler: sampler_comparison;
 @group(2) @binding(5)
 var shadow_texture: texture_depth_2d;
 
+@group(3) @binding(6)
+var skybox_sampler: sampler;
+
+@group(2) @binding(6)
+var skybox_texture: texture_cube<f32>;
+
 @vertex
 fn vertex_main(vert: VertexInput) -> VertexOutput {
     var out: VertexOutput;
@@ -232,6 +238,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
             albedo_color = pow(albedo_color, vec4f(2.2));
             let N = calculateBumpedNormal(in);
             let V = normalize(in.camera_position - in.world_position);
+            let R = reflect(-V, N);
 
             var F0 = vec3(0.04); 
             F0 = mix(F0, albedo_color.rgb, metallic);
@@ -267,14 +274,16 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
             let kSl = fresnelSchlick(max(dot(N, V), 0.0), F0);
             var kDl = 1.0 - kSl;
             kDl *= 1.0 - metallic; 
+            let reflection_color = textureSample(skybox_texture, skybox_sampler, R).xyz * roughness;
             //FIXME: this should be sampled from cubemap
-            let irradiance = vec3f(0.0, 0.12, 0.06); 
+            let irradiance = vec3f(0.1, 0.1, 0.1); 
             let diffuse = irradiance * albedo_color.rgb;
+
             let ambient_color = (kDl * diffuse) * occlusion;
             // let ambient_color = vec4(0.03) * albedo_color * occlusion;
             // vec4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 1.0f) * albedo_color * occlusion;
-            
-            var color = ambient_color.rgb + Lo;
+
+            var color = ambient_color.rgb + Lo + (F * reflection_color);
 
             color = color / (color + vec3(1.0));
             color = pow(color, vec3(1.0/2.2));
