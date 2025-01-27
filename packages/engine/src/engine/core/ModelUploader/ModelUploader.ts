@@ -224,6 +224,16 @@ export class ModelUploader {
                 )
             }
 
+            if (value.occlusionTextureId) {
+                material.occlusionTexture = this.createGPUTexture(
+                    device,
+                    'rgba8unorm',
+                    samplerStorage,
+                    imageStorage,
+                    textureStorage.textures.get(value.occlusionTextureId)
+                )
+            }
+
             materialStorage.materials.set(key, material)
         })
     }
