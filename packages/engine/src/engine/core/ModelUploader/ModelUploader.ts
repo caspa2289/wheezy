@@ -234,6 +234,16 @@ export class ModelUploader {
                 )
             }
 
+            if (value.emissiveTextureId) {
+                material.emissiveTexture = this.createGPUTexture(
+                    device,
+                    'rgba8unorm',
+                    samplerStorage,
+                    imageStorage,
+                    textureStorage.textures.get(value.emissiveTextureId)
+                )
+            }
+
             materialStorage.materials.set(key, material)
         })
     }
