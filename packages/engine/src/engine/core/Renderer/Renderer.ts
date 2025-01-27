@@ -243,12 +243,12 @@ export class Renderer implements IRenderer {
 
         // The order of the array layers is [+X, -X, +Y, -Y, +Z, -Z]
         const imgSrcs = [
-            '/static/cubemaps/bridge/posx.jpg',
-            '/static/cubemaps/bridge/negx.jpg',
-            '/static/cubemaps/bridge/posy.jpg',
-            '/static/cubemaps/bridge/negy.jpg',
-            '/static/cubemaps/bridge/posz.jpg',
-            '/static/cubemaps/bridge/negz.jpg',
+            'static/cubemaps/bridge/posx.jpg',
+            'static/cubemaps/bridge/negx.jpg',
+            'static/cubemaps/bridge/posy.jpg',
+            'static/cubemaps/bridge/negy.jpg',
+            'static/cubemaps/bridge/posz.jpg',
+            'static/cubemaps/bridge/negz.jpg',
         ]
         const promises = imgSrcs.map(async (src) => {
             const response = await fetch(src)
