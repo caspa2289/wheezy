@@ -20,6 +20,14 @@ import {
 import { IMeshRenderData } from '../../types/core/MeshRenderDataStorage'
 import shaderCode from '../../shaders/testShader.wgsl'
 import shadowShaderCode from '../../shaders/vertexShadow.wgsl'
+import skyboxShaderCode from '../../shaders/skybox.wgsl'
+import {
+    cubePositionOffset,
+    cubeUVOffset,
+    cubeVertexArray,
+    cubeVertexCount,
+    cubeVertexSize,
+} from '../../primitives/cube'
 
 export const alignTo = (val: number, align: number) => {
     return Math.floor((val + align - 1) / align) * align
@@ -38,6 +46,18 @@ export class Renderer implements IRenderer {
     private _shadowDepthTextureView!: GPUTextureView
     private _shadowDepthTextureSize = DEFULT_SHADOW_TEXTURE_SIZE
     private _shadowDepthSampler!: GPUSampler
+
+    private _skyBoxVerticesBuffer!: GPUBuffer
+    private _skyBoxPipeline!: GPURenderPipeline
+    private _skyBoxUniformBuffer!: GPUBuffer
+    private _skyBoxUniformBufferSize = 16 * 4 * 3 + 4 * 4
+    private _skyBoxRenderPassDescriptor!: GPURenderPassDescriptor
+    private _skyBoxUniformBindGroup!: GPUBindGroup
+    private _skyBoxModelMatrix: Mat4 = mat4.scaling(
+        vec3.fromValues(100, 100, 100)
+    )
+    private _skyboxTexture!: GPUTexture
+    private _skyboxSampler!: GPUSampler
 
     private _uniformsBGLayout!: GPUBindGroupLayout
     private _nodeParamsBGLayout!: GPUBindGroupLayout
@@ -58,7 +78,7 @@ export class Renderer implements IRenderer {
     private _shaderModule!: GPUShaderModule
 
     public ambientLightColor = vec3.create(1, 1, 1)
-    public ambientLightIntensity: number = 0.1
+    public ambientLightIntensity: number = 0.03
 
     public outputSource = RENDER_OUTPUT_SOURCES.DEFAULT
     public renderingMode = RENDER_MODES.USE_F_NORMAL
@@ -137,8 +157,8 @@ export class Renderer implements IRenderer {
                     resolveTarget: (this._msaaSampleCount === 1
                         ? undefined
                         : null) as unknown as GPUTextureView,
-                    loadOp: 'clear' as GPULoadOp,
-                    clearValue: [0.0, 0.0, 0.0, 1],
+                    loadOp: 'load' as GPULoadOp,
+                    clearValue: [0.0, 0.0, 0.0, 0.0],
                     storeOp: 'store',
                 },
             ],
@@ -160,6 +180,154 @@ export class Renderer implements IRenderer {
                 depthClearValue: 1.0,
                 depthLoadOp: 'clear',
                 depthStoreOp: 'store',
+            },
+        }
+
+        this._skyBoxVerticesBuffer = this._device.createBuffer({
+            size: cubeVertexArray.byteLength,
+            usage: GPUBufferUsage.VERTEX,
+            mappedAtCreation: true,
+        })
+        new Float32Array(this._skyBoxVerticesBuffer.getMappedRange()).set(
+            cubeVertexArray
+        )
+        this._skyBoxVerticesBuffer.unmap()
+
+        this._skyBoxPipeline = this._device.createRenderPipeline({
+            layout: 'auto',
+            vertex: {
+                module: this._device.createShaderModule({
+                    code: skyboxShaderCode,
+                }),
+                buffers: [
+                    {
+                        arrayStride: cubeVertexSize,
+                        attributes: [
+                            {
+                                shaderLocation: 0,
+                                offset: cubePositionOffset,
+                                format: 'float32x4',
+                            },
+                            {
+                                shaderLocation: 1,
+                                offset: cubeUVOffset,
+                                format: 'float32x2',
+                            },
+                        ],
+                    },
+                ],
+            },
+            fragment: {
+                module: this._device.createShaderModule({
+                    code: skyboxShaderCode,
+                }),
+                targets: [
+                    {
+                        format: this._swapChainFormat,
+                    },
+                ],
+            },
+            primitive: {
+                topology: 'triangle-list',
+                cullMode: 'front',
+            },
+            depthStencil: {
+                depthWriteEnabled: true,
+                depthCompare: 'less',
+                format: this._depthTextureFormat,
+            },
+            multisample: {
+                count: this._msaaSampleCount,
+            },
+        })
+
+        // The order of the array layers is [+X, -X, +Y, -Y, +Z, -Z]
+        const imgSrcs = [
+            '/static/cubemaps/bridge/posx.jpg',
+            '/static/cubemaps/bridge/negx.jpg',
+            '/static/cubemaps/bridge/posy.jpg',
+            '/static/cubemaps/bridge/negy.jpg',
+            '/static/cubemaps/bridge/posz.jpg',
+            '/static/cubemaps/bridge/negz.jpg',
+        ]
+        const promises = imgSrcs.map(async (src) => {
+            const response = await fetch(src)
+            return createImageBitmap(await response.blob())
+        })
+        const imageBitmaps = await Promise.all(promises)
+
+        this._skyboxTexture = this._device.createTexture({
+            dimension: '2d',
+            size: [imageBitmaps[0].width, imageBitmaps[0].height, 6],
+            format: 'rgba8unorm',
+            usage:
+                GPUTextureUsage.TEXTURE_BINDING |
+                GPUTextureUsage.COPY_DST |
+                GPUTextureUsage.RENDER_ATTACHMENT,
+        })
+
+        for (let i = 0; i < imageBitmaps.length; i++) {
+            const imageBitmap = imageBitmaps[i]
+            this._device.queue.copyExternalImageToTexture(
+                { source: imageBitmap },
+                { texture: this._skyboxTexture, origin: [0, 0, i] },
+                [imageBitmap.width, imageBitmap.height]
+            )
+        }
+
+        this._skyboxSampler = this._device.createSampler({
+            magFilter: 'linear',
+            minFilter: 'linear',
+        })
+
+        const skyBoxUniformBufferSize = 4 * 16 + 4 * 16 + 4 * 16 + 4 * 4
+        this._skyBoxUniformBuffer = this._device.createBuffer({
+            size: skyBoxUniformBufferSize,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+
+        this._skyBoxUniformBindGroup = this._device.createBindGroup({
+            label: 'skybox uniform bindgroup',
+            layout: this._skyBoxPipeline.getBindGroupLayout(0),
+            entries: [
+                {
+                    binding: 0,
+                    resource: {
+                        buffer: this._skyBoxUniformBuffer,
+                        offset: 0,
+                        size: skyBoxUniformBufferSize,
+                    },
+                },
+                {
+                    binding: 1,
+                    resource: this._skyboxSampler,
+                },
+                {
+                    binding: 2,
+                    resource: this._skyboxTexture.createView({
+                        dimension: 'cube',
+                    }),
+                },
+            ],
+        })
+
+        this._skyBoxRenderPassDescriptor = {
+            label: 'skybox render pass',
+            colorAttachments: [
+                {
+                    view: null as unknown as GPUTextureView, // Assigned later
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                },
+            ],
+            depthStencilAttachment: {
+                view: this._depthTexture.createView(),
+                depthLoadOp: 'clear' as GPULoadOp,
+                depthClearValue: 1.0,
+                depthStoreOp: 'store' as GPUStoreOp,
+                stencilLoadOp: 'clear' as GPULoadOp,
+                stencilClearValue: 0,
+                stencilStoreOp: 'store' as GPUStoreOp,
             },
         }
     }
@@ -375,8 +543,33 @@ export class Renderer implements IRenderer {
             })
         }
 
+        if (mesh.material?.occlusionTexture) {
+            samplerBindGroupLayoutEntries.push({
+                binding: 4,
+                visibility: GPUShaderStage.FRAGMENT,
+                sampler: {},
+            })
+
+            materialBindGroupLayoutEntries.push({
+                binding: 4,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: {
+                    sampleType,
+                },
+            })
+
+            samplerBindGroupEntries.push({
+                binding: 4,
+                resource: mesh.material?.occlusionTexture.sampler,
+            })
+            materialBindGroupEntries.push({
+                binding: 4,
+                resource: mesh.material?.occlusionTexture.view,
+            })
+        }
+
         samplerBindGroupLayoutEntries.push({
-            binding: 4,
+            binding: 5,
             visibility: GPUShaderStage.FRAGMENT,
             sampler: {
                 type: 'comparison',
@@ -384,7 +577,7 @@ export class Renderer implements IRenderer {
         })
 
         materialBindGroupLayoutEntries.push({
-            binding: 4,
+            binding: 5,
             visibility: GPUShaderStage.FRAGMENT,
             texture: {
                 sampleType: 'depth',
@@ -392,13 +585,38 @@ export class Renderer implements IRenderer {
         })
 
         samplerBindGroupEntries.push({
-            binding: 4,
+            binding: 5,
             resource: this._shadowDepthSampler,
         })
 
         materialBindGroupEntries.push({
-            binding: 4,
+            binding: 5,
             resource: this._shadowDepthTextureView,
+        })
+
+        samplerBindGroupLayoutEntries.push({
+            binding: 6,
+            visibility: GPUShaderStage.FRAGMENT,
+            sampler: {},
+        })
+
+        materialBindGroupLayoutEntries.push({
+            binding: 6,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: {
+                sampleType,
+                viewDimension: 'cube',
+            },
+        })
+
+        samplerBindGroupEntries.push({
+            binding: 6,
+            resource: this._skyboxSampler,
+        })
+
+        materialBindGroupEntries.push({
+            binding: 6,
+            resource: this._skyboxTexture.createView({ dimension: 'cube' }),
         })
 
         const vertexState: GPUVertexState = {
@@ -815,6 +1033,23 @@ export class Renderer implements IRenderer {
 
         viewParamsUploadBuffer.unmap()
 
+        const skyBoxViewParamsUploadBuffer = this.device.createBuffer({
+            size: this._skyBoxUniformBufferSize,
+            usage: GPUBufferUsage.COPY_SRC,
+            mappedAtCreation: true,
+        })
+
+        const skyboxViewMap = new Float32Array(
+            skyBoxViewParamsUploadBuffer.getMappedRange()
+        )
+
+        skyboxViewMap.set(this._skyBoxModelMatrix)
+        skyboxViewMap.set(scene.camera.projectionMatrix, 16)
+        skyboxViewMap.set(scene.camera.view, 32)
+        skyboxViewMap.set(scene.camera.position, 48)
+
+        skyBoxViewParamsUploadBuffer.unmap()
+
         const debugParamsArray = new ArrayBuffer(this._debugParamsBuffer.size)
         const debugParamsView = new DataView(
             debugParamsArray,
@@ -893,6 +1128,14 @@ export class Renderer implements IRenderer {
             0,
             this._viewParamsBufferSize
         )
+
+        commandEncoder.copyBufferToBuffer(
+            skyBoxViewParamsUploadBuffer,
+            0,
+            this._skyBoxUniformBuffer,
+            0,
+            this._skyBoxUniformBufferSize
+        )
         ;(this._renderPassDescriptor as any).colorAttachments[0].view =
             this.context.getCurrentTexture().createView()
         if (this._msaaSampleCount !== 1) {
@@ -904,6 +1147,28 @@ export class Renderer implements IRenderer {
                 .getCurrentTexture()
                 .createView()
         }
+
+        ;(this._skyBoxRenderPassDescriptor as any).colorAttachments[0].view =
+            this.context.getCurrentTexture().createView()
+        if (this._msaaSampleCount !== 1) {
+            ;(
+                this._skyBoxRenderPassDescriptor as any
+            ).colorAttachments[0].view = this._multisampleTextureView
+            ;(
+                this._renderPassDescriptor as any
+            ).colorAttachments[0].resolveTarget = this.context
+                .getCurrentTexture()
+                .createView()
+        }
+
+        const skyBoxPass = commandEncoder.beginRenderPass(
+            this._skyBoxRenderPassDescriptor
+        )
+        skyBoxPass.setPipeline(this._skyBoxPipeline)
+        skyBoxPass.setVertexBuffer(0, this._skyBoxVerticesBuffer)
+        skyBoxPass.setBindGroup(0, this._skyBoxUniformBindGroup)
+        skyBoxPass.draw(cubeVertexCount)
+        skyBoxPass.end()
 
         const shadowPass = commandEncoder.beginRenderPass(
             this._shadowPassDescriptor
@@ -932,5 +1197,6 @@ export class Renderer implements IRenderer {
 
         this.device.queue.submit([commandEncoder.finish()])
         viewParamsUploadBuffer.destroy()
+        skyBoxViewParamsUploadBuffer.destroy()
     }
 }

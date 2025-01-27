@@ -10,9 +10,13 @@ const OUT_METALLIC = 4;
 const OUT_ROUGHNESS = 5;
 const OUT_F_NORMAL = 6;
 const OUT_V_TANGENT = 7;
+const OUT_OCCLUSION = 8;
 
 const USE_V_NORMAL = 0;
 const USE_F_NORMAL = 1;
+const USE_PBR = 2;
+
+const PI = 3.14159265359;
 
 struct VertexInput {
     @location(0) position: float3,
@@ -87,10 +91,22 @@ var fragment_normal_sampler: sampler;
 var fragment_normal_texture: texture_2d<f32>;
 
 @group(3) @binding(4)
-var shadow_sampler: sampler_comparison;
+var occlusion_sampler: sampler;
 
 @group(2) @binding(4)
+var occlusion_texture: texture_2d<f32>;
+
+@group(3) @binding(5)
+var shadow_sampler: sampler_comparison;
+
+@group(2) @binding(5)
 var shadow_texture: texture_depth_2d;
+
+@group(3) @binding(6)
+var skybox_sampler: sampler;
+
+@group(2) @binding(6)
+var skybox_texture: texture_cube<f32>;
 
 @vertex
 fn vertex_main(vert: VertexInput) -> VertexOutput {
@@ -167,12 +183,50 @@ fn calculateBumpedNormal(in: VertexOutput) -> float3 {
     return normalize(tbn_matrix * bump_map_normal);
 }
 
+fn DistributionGGX( N: float3, H: float3, roughness: f32) -> f32 {
+    let a = roughness*roughness;
+    let a2 = a * a;
+    let NdotH  = max(dot(N, H), 0.0);
+    let NdotH2 = NdotH*NdotH;
+	
+    let num = a2;
+    var denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+	
+    return num / denom;
+}
+
+fn GeometrySchlickGGX(NdotV: f32, roughness: f32) -> f32 {
+    let r = (roughness + 1.0);
+    let k = (r*r) / 8.0;
+
+    let num = NdotV;
+    let denom = NdotV * (1.0 - k) + k;
+	
+    return num / denom;
+}
+
+fn GeometrySmith( N: float3, V: float3, L: float3, roughness: f32) -> f32 {
+    let NdotV = max(dot(N, V), 0.0);
+    let NdotL = max(dot(N, L), 0.0);
+    let ggx2  = GeometrySchlickGGX(NdotV, roughness);
+    let ggx1  = GeometrySchlickGGX(NdotL, roughness);
+	
+    return ggx1 * ggx2;
+}
+
+fn fresnelSchlick(cosTheta: f32, F0: float3, roughness: f32) -> float3 {
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
 @fragment
 fn fragment_main(in: VertexOutput) -> @location(0) float4 {
-    let albedo_color = decode_color(
-        textureSample(base_color_texture, base_color_sampler, in.texcoords) 
-            * material_params.base_color_factor
-    );
+    var albedo_color = textureSample(base_color_texture, base_color_sampler, in.texcoords) 
+            * material_params.base_color_factor;
+    let metallic_roughness = textureSample(metallic_roughness_texture, metallic_roughness_sampler, in.texcoords);
+    let roughness = metallic_roughness.g;
+    let metallic = metallic_roughness.b;
+    let occlusion = textureSample(occlusion_texture, occlusion_sampler, in.texcoords).r;
 
     var fragment_normal: float3;
     switch(debug_params.normal_type) {
@@ -180,16 +234,66 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
             fragment_normal = in.vertex_normal;
             break;
         }
+        case(USE_PBR): {
+            albedo_color = pow(albedo_color, vec4f(2.2));
+            let N = calculateBumpedNormal(in);
+            let V = normalize(in.camera_position - in.world_position);
+            let R = reflect(-V, N);
+
+            var F0 = vec3(0.04); 
+            F0 = mix(F0, albedo_color.rgb, vec3(metallic));
+                    
+            // reflectance equation
+            var Lo = vec3(0.0);
+            
+            // calculate per-light radiance
+            let L = normalize(view_params.light_position.xyz - in.world_position);
+            let H = normalize(V + L);
+            let distance = length(view_params.light_position.xyz - in.world_position);
+            let attenuation = 1.0; //not applicable to directional light
+            //1.0 / (distance * distance);
+            let radiance = LIGHT_COLOR.rgb * attenuation;        
+            
+            // cook-torrance brdf
+            let NDF = DistributionGGX(N, H, roughness);        
+            let G = GeometrySmith(N, V, L, roughness);      
+            let F = fresnelSchlick(max(dot(H, V), 0.0), F0, roughness);       
+            
+            let numerator = NDF * G * F;
+            let denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+            let specular = numerator / denominator;  
+ 
+            let kS = F;
+            var kD = vec3(1.0) - kS;
+            kD *= 1.0 - vec3(metallic);	  
+
+            // add to outgoing radiance Lo
+            let NdotL = max(dot(N, L), 0.0);            
+            Lo += (kD * albedo_color.rgb / PI + specular) * radiance * NdotL;
+  
+            let kSl = fresnelSchlick(max(dot(N, V), 0.0), F0, roughness);
+            var kDl = 1.0 - kSl;
+            kDl *= 1.0 - metallic; 
+            let reflection_color = textureSample(skybox_texture, skybox_sampler, R).xyz;
+            //FIXME: this should be sampled from cubemap
+            let irradiance = vec3f(1, 1, 1); 
+            let diffuse = irradiance * albedo_color.rgb;
+
+            let ambient_color = (kDl * diffuse) * occlusion * vec3(0.03);
+           
+            var color = ambient_color.rgb + Lo + (F * reflection_color);
+
+            color = color / (color + vec3(1.0));
+            color = pow(color, vec3(1.0/2.2));
+        
+            return vec4(color, 1.0);
+        }
         default: {
             fragment_normal = calculateBumpedNormal(in);
         }
     }
 
     let ambient_color = vec4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 1.0f);
-
-    let metallic_roughness = textureSample(metallic_roughness_texture, metallic_roughness_sampler, in.texcoords);
-    let roughness = metallic_roughness.g;
-    let metallic = metallic_roughness.b;
 
     let visibility = get_visibility(in.shadow_position);
     let diffuse_factor = get_lambert_factor(view_params.light_position.xyz, in.world_position, fragment_normal);
@@ -241,12 +345,15 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
         case(OUT_V_TANGENT): {
             return vec4(in.vertex_tangent, 1.0);
         }
+        case(OUT_OCCLUSION) : {
+            return vec4(occlusion);
+        }
         default: {
-            return vec4(
+            return decode_color(vec4(
                 (ambient_color.xyz + lighting_factor *
                 (specular_color.xyz + diffuse_color.xyz)) * albedo_color.xyz,
                 1.0
-            );
+            ));
         }
     }
 };

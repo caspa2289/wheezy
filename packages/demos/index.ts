@@ -32,6 +32,7 @@ const initDebugControls = (engine: IEngine) => {
         { label: 'Diffuse color', value: 3 },
         { label: 'Metallic component', value: 4 },
         { label: 'Roughness component', value: 5 },
+        { label: 'Occlusion component', value: 8 },
         { label: 'Surface normal', value: 1 },
         { label: 'Fragment normal', value: 6 },
         { label: 'Vertex tangent', value: 7 },
@@ -48,8 +49,9 @@ const initDebugControls = (engine: IEngine) => {
     })
 
     const renderModes = [
-        { label: 'Use Surface Normals (No bump mapping)', value: 0 },
-        { label: 'Use Fragment Normals (With bump mapping)', value: 1 },
+        { label: 'Blinn-Phong (No bump mapping)', value: 0 },
+        { label: 'Blinn-Phong (With bump mapping)', value: 1 },
+        { label: 'Terrence-Cook (No mipmapping)', value: 2 },
     ]
 
     renderModes.forEach((item) => {
