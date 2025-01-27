@@ -57,7 +57,7 @@ export class Demo1 extends Scene {
 
         this.light = new DirectionalLight({
             parent: this.root,
-            position: vec3.create(-5, 0, -25),
+            position: vec3.create(10, 0, -10),
         })
 
         modelGO0.transform.rotateDegreesEuler({ x: 90 })

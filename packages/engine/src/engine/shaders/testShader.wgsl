@@ -215,8 +215,8 @@ fn GeometrySmith( N: float3, V: float3, L: float3, roughness: f32) -> f32 {
     return ggx1 * ggx2;
 }
 
-fn fresnelSchlick(cosTheta: f32, F0: float3) -> float3 {
-    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+fn fresnelSchlick(cosTheta: f32, F0: float3, roughness: f32) -> float3 {
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
 @fragment
@@ -241,7 +241,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
             let R = reflect(-V, N);
 
             var F0 = vec3(0.04); 
-            F0 = mix(F0, albedo_color.rgb, metallic);
+            F0 = mix(F0, albedo_color.rgb, vec3(metallic));
                     
             // reflectance equation
             var Lo = vec3(0.0);
@@ -257,7 +257,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
             // cook-torrance brdf
             let NDF = DistributionGGX(N, H, roughness);        
             let G = GeometrySmith(N, V, L, roughness);      
-            let F = fresnelSchlick(max(dot(H, V), 0.0), F0);       
+            let F = fresnelSchlick(max(dot(H, V), 0.0), F0, roughness);       
             
             let numerator = NDF * G * F;
             let denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
@@ -271,18 +271,16 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
             let NdotL = max(dot(N, L), 0.0);            
             Lo += (kD * albedo_color.rgb / PI + specular) * radiance * NdotL;
   
-            let kSl = fresnelSchlick(max(dot(N, V), 0.0), F0);
+            let kSl = fresnelSchlick(max(dot(N, V), 0.0), F0, roughness);
             var kDl = 1.0 - kSl;
             kDl *= 1.0 - metallic; 
-            let reflection_color = textureSample(skybox_texture, skybox_sampler, R).xyz * roughness;
+            let reflection_color = textureSample(skybox_texture, skybox_sampler, R).xyz;
             //FIXME: this should be sampled from cubemap
-            let irradiance = vec3f(0.1, 0.1, 0.1); 
+            let irradiance = vec3f(1, 1, 1); 
             let diffuse = irradiance * albedo_color.rgb;
 
-            let ambient_color = (kDl * diffuse) * occlusion;
-            // let ambient_color = vec4(0.03) * albedo_color * occlusion;
-            // vec4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 1.0f) * albedo_color * occlusion;
-
+            let ambient_color = (kDl * diffuse) * occlusion * vec3(0.03);
+           
             var color = ambient_color.rgb + Lo + (F * reflection_color);
 
             color = color / (color + vec3(1.0));
