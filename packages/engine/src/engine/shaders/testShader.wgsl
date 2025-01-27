@@ -293,6 +293,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
         }
     }
 
+    albedo_color *= occlusion;
     let ambient_color = vec4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 1.0f);
 
     let visibility = get_visibility(in.shadow_position);
