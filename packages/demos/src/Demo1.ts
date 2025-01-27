@@ -66,7 +66,7 @@ export class Demo1 extends Scene {
 
         modelGO1.transform.rotateDegreesEuler({ x: 90, z: 130 })
         modelGO1.transform.scale(vec3.create(3, 3, 3))
-        modelGO1.transform.translate(vec3.create(10, 0, 7))
+        modelGO1.transform.translate(vec3.create(-1, 0, 7))
 
         this._helmet = modelGO0.transform
         this._helmet1 = modelGO1.transform
