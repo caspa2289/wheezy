@@ -108,6 +108,12 @@ var skybox_sampler: sampler;
 @group(2) @binding(6)
 var skybox_texture: texture_cube<f32>;
 
+@group(3) @binding(7)
+var emission_sampler: sampler;
+
+@group(2) @binding(7)
+var emission_texture: texture_2d<f32>;
+
 @vertex
 fn vertex_main(vert: VertexInput) -> VertexOutput {
     var out: VertexOutput;
@@ -227,6 +233,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     let roughness = metallic_roughness.g;
     let metallic = metallic_roughness.b;
     let occlusion = textureSample(occlusion_texture, occlusion_sampler, in.texcoords).r;
+    let emission = textureSample(emission_texture, emission_sampler, in.texcoords);
 
     var fragment_normal: float3;
     switch(debug_params.normal_type) {
@@ -281,7 +288,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
 
             let ambient_color = (kDl * diffuse) * occlusion * vec3(0.03);
            
-            var color = ambient_color.rgb + Lo + (F * reflection_color);
+            var color = ambient_color.rgb + Lo + (F * reflection_color) + emission.rgb;
 
             color = color / (color + vec3(1.0));
             color = pow(color, vec3(1.0/2.2));
@@ -293,6 +300,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
         }
     }
 
+    albedo_color *= occlusion;
     let ambient_color = vec4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 1.0f);
 
     let visibility = get_visibility(in.shadow_position);
@@ -351,7 +359,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
         default: {
             return decode_color(vec4(
                 (ambient_color.xyz + lighting_factor *
-                (specular_color.xyz + diffuse_color.xyz)) * albedo_color.xyz,
+                (specular_color.xyz + diffuse_color.xyz)) * albedo_color.xyz + emission.xyz,
                 1.0
             ));
         }

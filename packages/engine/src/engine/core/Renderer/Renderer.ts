@@ -568,6 +568,31 @@ export class Renderer implements IRenderer {
             })
         }
 
+        if (mesh.material?.emissiveTexture) {
+            samplerBindGroupLayoutEntries.push({
+                binding: 7,
+                visibility: GPUShaderStage.FRAGMENT,
+                sampler: {},
+            })
+
+            materialBindGroupLayoutEntries.push({
+                binding: 7,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: {
+                    sampleType,
+                },
+            })
+
+            samplerBindGroupEntries.push({
+                binding: 7,
+                resource: mesh.material?.emissiveTexture.sampler,
+            })
+            materialBindGroupEntries.push({
+                binding: 7,
+                resource: mesh.material?.emissiveTexture.view,
+            })
+        }
+
         samplerBindGroupLayoutEntries.push({
             binding: 5,
             visibility: GPUShaderStage.FRAGMENT,
