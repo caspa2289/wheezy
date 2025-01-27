@@ -6,13 +6,13 @@ struct Uniforms {
 }
 
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
-@group(0) @binding(1) var mySampler: sampler;
-@group(0) @binding(2) var myTexture: texture_cube<f32>;
+@group(0) @binding(1) var skybox_sampler: sampler;
+@group(0) @binding(2) var skybox_texture: texture_cube<f32>;
 
 struct VertexOutput {
     @builtin(position) Position : vec4f,
-    @location(0) fragUV : vec2f,
-    @location(1) fragPosition: vec4f,
+    @location(0) texture_coordinates : vec2f,
+    @location(1) world_position: vec4f,
 }
 
 @vertex
@@ -24,17 +24,17 @@ fn vertex_main(
     let camera_view_projection_matrix = uniforms.camera_projection_matrix * uniforms.camera_view_matrix;
 
     output.Position = camera_view_projection_matrix * uniforms.transform * position;
-    output.fragUV = uv;
-    output.fragPosition = 0.5 * (position + vec4(1.0, 1.0, 1.0, 1.0));
+    output.texture_coordinates = uv;
+    output.world_position = 0.5 * (position + vec4(1.0, 1.0, 1.0, 1.0));
     return output;
 }
 
 @fragment
 fn fragment_main(
-    @location(0) fragUV: vec2f,
-    @location(1) fragPosition: vec4f
+    @location(0) texture_coordinates: vec2f,
+    @location(1) world_position: vec4f
 ) -> @location(0) vec4f {
-    var cubemapVec = fragPosition.xyz - vec3(0.5);
-    cubemapVec.z *= -1;
-    return textureSample(myTexture, mySampler, cubemapVec);
+    var sample_vector = world_position.xyz - vec3(0.5);
+    sample_vector.z *= -1;
+    return textureSample(skybox_texture, skybox_sampler, sample_vector);
 }
