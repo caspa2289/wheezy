@@ -446,204 +446,6 @@ export class Renderer implements IRenderer {
 
         const sampleType = 'float'
 
-        let materialBindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [
-            {
-                binding: 0,
-                visibility: GPUShaderStage.FRAGMENT,
-                buffer: {
-                    type: 'uniform',
-                },
-            },
-        ]
-
-        let samplerBindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = []
-
-        let samplerBindGroupEntries: GPUBindGroupEntry[] = []
-
-        let materialBindGroupEntries: GPUBindGroupEntry[] = [
-            {
-                binding: 0,
-                resource: {
-                    buffer: meshDataEntry.materialParamsBuffer,
-                    size: 8 * 4,
-                },
-            },
-        ]
-
-        if (mesh.material?.baseColorTexture) {
-            samplerBindGroupLayoutEntries.push({
-                binding: 1,
-                visibility: GPUShaderStage.FRAGMENT,
-                sampler: {},
-            })
-            materialBindGroupLayoutEntries.push({
-                binding: 1,
-                visibility: GPUShaderStage.FRAGMENT,
-                texture: {
-                    sampleType,
-                },
-            })
-
-            samplerBindGroupEntries.push({
-                binding: 1,
-                resource: mesh.material.baseColorTexture.sampler,
-            })
-            materialBindGroupEntries.push({
-                binding: 1,
-                resource: mesh.material.baseColorTexture.view,
-            })
-        }
-
-        if (mesh.material?.metallicRoughnessTexture) {
-            samplerBindGroupLayoutEntries.push({
-                binding: 2,
-                visibility: GPUShaderStage.FRAGMENT,
-                sampler: {},
-            })
-            materialBindGroupLayoutEntries.push({
-                binding: 2,
-                visibility: GPUShaderStage.FRAGMENT,
-                texture: {
-                    sampleType,
-                },
-            })
-
-            samplerBindGroupEntries.push({
-                binding: 2,
-                resource: mesh.material?.metallicRoughnessTexture.sampler,
-            })
-            materialBindGroupEntries.push({
-                binding: 2,
-                resource: mesh.material?.metallicRoughnessTexture.view,
-            })
-        }
-
-        if (mesh.material?.normalTexture) {
-            samplerBindGroupLayoutEntries.push({
-                binding: 3,
-                visibility: GPUShaderStage.FRAGMENT,
-                sampler: {},
-            })
-
-            materialBindGroupLayoutEntries.push({
-                binding: 3,
-                visibility: GPUShaderStage.FRAGMENT,
-                texture: {
-                    sampleType,
-                },
-            })
-
-            samplerBindGroupEntries.push({
-                binding: 3,
-                resource: mesh.material?.normalTexture.sampler,
-            })
-            materialBindGroupEntries.push({
-                binding: 3,
-                resource: mesh.material?.normalTexture.view,
-            })
-        }
-
-        if (mesh.material?.occlusionTexture) {
-            samplerBindGroupLayoutEntries.push({
-                binding: 4,
-                visibility: GPUShaderStage.FRAGMENT,
-                sampler: {},
-            })
-
-            materialBindGroupLayoutEntries.push({
-                binding: 4,
-                visibility: GPUShaderStage.FRAGMENT,
-                texture: {
-                    sampleType,
-                },
-            })
-
-            samplerBindGroupEntries.push({
-                binding: 4,
-                resource: mesh.material?.occlusionTexture.sampler,
-            })
-            materialBindGroupEntries.push({
-                binding: 4,
-                resource: mesh.material?.occlusionTexture.view,
-            })
-        }
-
-        if (mesh.material?.emissiveTexture) {
-            samplerBindGroupLayoutEntries.push({
-                binding: 7,
-                visibility: GPUShaderStage.FRAGMENT,
-                sampler: {},
-            })
-
-            materialBindGroupLayoutEntries.push({
-                binding: 7,
-                visibility: GPUShaderStage.FRAGMENT,
-                texture: {
-                    sampleType,
-                },
-            })
-
-            samplerBindGroupEntries.push({
-                binding: 7,
-                resource: mesh.material?.emissiveTexture.sampler,
-            })
-            materialBindGroupEntries.push({
-                binding: 7,
-                resource: mesh.material?.emissiveTexture.view,
-            })
-        }
-
-        samplerBindGroupLayoutEntries.push({
-            binding: 5,
-            visibility: GPUShaderStage.FRAGMENT,
-            sampler: {
-                type: 'comparison',
-            },
-        })
-
-        materialBindGroupLayoutEntries.push({
-            binding: 5,
-            visibility: GPUShaderStage.FRAGMENT,
-            texture: {
-                sampleType: 'depth',
-            },
-        })
-
-        samplerBindGroupEntries.push({
-            binding: 5,
-            resource: this._shadowDepthSampler,
-        })
-
-        materialBindGroupEntries.push({
-            binding: 5,
-            resource: this._shadowDepthTextureView,
-        })
-
-        samplerBindGroupLayoutEntries.push({
-            binding: 6,
-            visibility: GPUShaderStage.FRAGMENT,
-            sampler: {},
-        })
-
-        materialBindGroupLayoutEntries.push({
-            binding: 6,
-            visibility: GPUShaderStage.FRAGMENT,
-            texture: {
-                sampleType,
-                viewDimension: 'cube',
-            },
-        })
-
-        samplerBindGroupEntries.push({
-            binding: 6,
-            resource: this._skyboxSampler,
-        })
-
-        materialBindGroupEntries.push({
-            binding: 6,
-            resource: this._skyboxTexture.createView({ dimension: 'cube' }),
-        })
-
         const vertexState: GPUVertexState = {
             module: this._shaderModule,
             entryPoint: 'vertex_main',
@@ -718,26 +520,190 @@ export class Renderer implements IRenderer {
                 ?.elementType as GPUIndexFormat
         }
 
-        const samplerBindGroupLayout = this.device.createBindGroupLayout({
-            entries: samplerBindGroupLayoutEntries,
-            label: 'samplerBindGroupLayout',
+        //REFACTOR: this is constant now
+        const materialBindGroupLayout = this.device.createBindGroupLayout({
+            label: 'materialBindGroupLayout',
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {
+                        type: 'uniform',
+                    },
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType,
+                    },
+                },
+                {
+                    binding: 2,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType,
+                    },
+                },
+                {
+                    binding: 3,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType,
+                    },
+                },
+                {
+                    binding: 4,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType,
+                    },
+                },
+                {
+                    binding: 5,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType: 'depth',
+                    },
+                },
+                {
+                    binding: 6,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType,
+                        viewDimension: 'cube',
+                    },
+                },
+                {
+                    binding: 7,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType,
+                    },
+                },
+            ],
         })
 
-        const materialBindGroupLayout = this.device.createBindGroupLayout({
-            entries: materialBindGroupLayoutEntries,
-            label: 'materialBindGroupLayout',
+        const samplerBindGroupLayout = this.device.createBindGroupLayout({
+            label: 'samplerBindGroupLayout',
+            entries: [
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {},
+                },
+                {
+                    binding: 2,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {},
+                },
+                {
+                    binding: 3,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {},
+                },
+                {
+                    binding: 4,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {},
+                },
+                {
+                    binding: 5,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {
+                        type: 'comparison',
+                    },
+                },
+                {
+                    binding: 6,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {},
+                },
+                {
+                    binding: 7,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {},
+                },
+            ],
         })
 
         meshDataEntry.samplerBindGroup = this.device.createBindGroup({
             label: 'sampler bindgroup',
             layout: samplerBindGroupLayout,
-            entries: samplerBindGroupEntries,
+            entries: [
+                {
+                    binding: 1,
+                    resource: mesh.material.baseColorTexture.sampler,
+                },
+                {
+                    binding: 2,
+                    resource: mesh.material.metallicRoughnessTexture.sampler,
+                },
+                {
+                    binding: 3,
+                    resource: mesh.material.normalTexture.sampler,
+                },
+                {
+                    binding: 4,
+                    resource: mesh.material.occlusionTexture.sampler,
+                },
+                {
+                    binding: 5,
+                    resource: this._shadowDepthSampler,
+                },
+                {
+                    binding: 6,
+                    resource: this._skyboxSampler,
+                },
+                {
+                    binding: 7,
+                    resource: mesh.material?.emissiveTexture.sampler,
+                },
+            ],
         })
 
         meshDataEntry.materialBindGroup = this.device.createBindGroup({
             label: 'material bindgroup',
             layout: materialBindGroupLayout,
-            entries: materialBindGroupEntries,
+            entries: [
+                {
+                    binding: 0,
+                    resource: {
+                        buffer: meshDataEntry.materialParamsBuffer,
+                        size: 8 * 4,
+                    },
+                },
+                {
+                    binding: 1,
+                    resource: mesh.material.baseColorTexture.view,
+                },
+                {
+                    binding: 2,
+                    resource: mesh.material?.metallicRoughnessTexture.view,
+                },
+                {
+                    binding: 3,
+                    resource: mesh.material?.normalTexture.view,
+                },
+                {
+                    binding: 4,
+                    resource: mesh.material?.occlusionTexture.view,
+                },
+                {
+                    binding: 5,
+                    resource: this._shadowDepthTextureView,
+                },
+                {
+                    binding: 6,
+                    resource: this._skyboxTexture.createView({
+                        dimension: 'cube',
+                    }),
+                },
+                {
+                    binding: 7,
+                    resource: mesh.material?.emissiveTexture.view,
+                },
+            ],
         })
 
         const layout = this.device.createPipelineLayout({
@@ -749,6 +715,7 @@ export class Renderer implements IRenderer {
             ],
         })
 
+        //FIXME: this should not be created per mesh when all stuff is stubbed
         meshDataEntry.shadowRenderPipeline = this.device.createRenderPipeline({
             label: 'shadow render pipeline',
             layout: this.device.createPipelineLayout({
@@ -931,13 +898,9 @@ export class Renderer implements IRenderer {
 
         renderPassEncoder.setPipeline(renderPipeline as GPURenderPipeline)
 
-        if (materialBindGroup) {
-            renderPassEncoder.setBindGroup(2, materialBindGroup)
-        }
+        renderPassEncoder.setBindGroup(2, materialBindGroup)
 
-        if (samplerBindGroup) {
-            renderPassEncoder.setBindGroup(3, samplerBindGroup)
-        }
+        renderPassEncoder.setBindGroup(3, samplerBindGroup)
 
         renderPassEncoder.setVertexBuffer(
             0,
@@ -946,41 +909,34 @@ export class Renderer implements IRenderer {
             mesh.positions.byteLength
         )
 
-        if (mesh.textureCoordinates) {
-            renderPassEncoder.setVertexBuffer(
-                1,
-                textureCoordinatesBuffer as GPUBuffer,
-                0,
-                mesh.textureCoordinates.byteLength
-            )
-        }
+        renderPassEncoder.setVertexBuffer(
+            1,
+            textureCoordinatesBuffer as GPUBuffer,
+            0,
+            mesh.textureCoordinates.byteLength
+        )
 
-        if (mesh.normals) {
-            renderPassEncoder.setVertexBuffer(
-                2,
-                normalsBuffer as GPUBuffer,
-                0,
-                mesh.normals.byteLength
-            )
-        }
+        renderPassEncoder.setVertexBuffer(
+            2,
+            normalsBuffer as GPUBuffer,
+            0,
+            mesh.normals.byteLength
+        )
 
-        if (mesh.tangents) {
-            renderPassEncoder.setVertexBuffer(3, tangentsBuffer as GPUBuffer),
-                0,
-                mesh.tangents.byteLength
-        }
+        renderPassEncoder.setVertexBuffer(
+            3,
+            tangentsBuffer as GPUBuffer,
+            0,
+            mesh.tangents.byteLength
+        )
 
-        if (mesh.indices) {
-            renderPassEncoder.setIndexBuffer(
-                indicesBuffer as GPUBuffer,
-                mesh.indices.elementType as GPUIndexFormat,
-                0,
-                mesh.indices.byteLength
-            )
-            renderPassEncoder.drawIndexed(mesh.indices.count)
-        } else {
-            renderPassEncoder.draw(mesh.positions.count)
-        }
+        renderPassEncoder.setIndexBuffer(
+            indicesBuffer as GPUBuffer,
+            mesh.indices.elementType as GPUIndexFormat,
+            0,
+            mesh.indices.byteLength
+        )
+        renderPassEncoder.drawIndexed(mesh.indices.count)
     }
 
     private renderMeshShadows(
@@ -1006,17 +962,13 @@ export class Renderer implements IRenderer {
             mesh.positions.byteLength
         )
 
-        if (mesh.indices) {
-            renderPassEncoder.setIndexBuffer(
-                indicesBuffer as GPUBuffer,
-                mesh.indices.elementType as GPUIndexFormat,
-                0,
-                mesh.indices.byteLength
-            )
-            renderPassEncoder.drawIndexed(mesh.indices.count)
-        } else {
-            renderPassEncoder.draw(mesh.positions.count)
-        }
+        renderPassEncoder.setIndexBuffer(
+            indicesBuffer as GPUBuffer,
+            mesh.indices.elementType as GPUIndexFormat,
+            0,
+            mesh.indices.byteLength
+        )
+        renderPassEncoder.drawIndexed(mesh.indices.count)
     }
 
     public render(deltaTime: number, scene: IScene) {

@@ -131,9 +131,7 @@ export class ModelUploader {
         let textureSampler: GPUSampler | undefined
 
         if (!texturePreloadData) {
-            console.warn('No texture data')
-
-            return
+            throw new Error('No texture data')
         }
 
         if (!texturePreloadData.imageId) {
@@ -190,58 +188,53 @@ export class ModelUploader {
                 roughnessFactor: value.roughnessFactor ?? 1,
                 baseColorFactor:
                     value?.baseColorFactor ?? vec4.create(1, 1, 1, 1),
-            }
-
-            if (value.baseColorTextureId) {
-                material.baseColorTexture = this.createGPUTexture(
+                baseColorTexture: this.createGPUTexture(
                     device,
                     'rgba8unorm-srgb',
                     samplerStorage,
                     imageStorage,
-                    textureStorage.textures.get(value.baseColorTextureId)
-                )
-            }
-
-            if (value.metallicRoughnessTextureId) {
-                material.metallicRoughnessTexture = this.createGPUTexture(
+                    value.baseColorTextureId
+                        ? textureStorage.textures.get(value.baseColorTextureId)
+                        : textureStorage.defaultBaseColor
+                ),
+                metallicRoughnessTexture: this.createGPUTexture(
                     device,
                     'rgba8unorm',
                     samplerStorage,
                     imageStorage,
-                    textureStorage.textures.get(
-                        value.metallicRoughnessTextureId
-                    )
-                )
-            }
-
-            if (value.normalTextureId) {
-                material.normalTexture = this.createGPUTexture(
+                    value.metallicRoughnessTextureId
+                        ? textureStorage.textures.get(
+                              value.metallicRoughnessTextureId
+                          )
+                        : textureStorage.defaultMetallicRoughness
+                ),
+                normalTexture: this.createGPUTexture(
                     device,
                     'rgba8unorm',
                     samplerStorage,
                     imageStorage,
-                    textureStorage.textures.get(value.normalTextureId)
-                )
-            }
-
-            if (value.occlusionTextureId) {
-                material.occlusionTexture = this.createGPUTexture(
+                    value.normalTextureId
+                        ? textureStorage.textures.get(value.normalTextureId)
+                        : textureStorage.defaultNormal
+                ),
+                occlusionTexture: this.createGPUTexture(
                     device,
                     'rgba8unorm',
                     samplerStorage,
                     imageStorage,
-                    textureStorage.textures.get(value.occlusionTextureId)
-                )
-            }
-
-            if (value.emissiveTextureId) {
-                material.emissiveTexture = this.createGPUTexture(
+                    value.occlusionTextureId
+                        ? textureStorage.textures.get(value.occlusionTextureId)
+                        : textureStorage.defaultOcclusion
+                ),
+                emissiveTexture: this.createGPUTexture(
                     device,
                     'rgba8unorm',
                     samplerStorage,
                     imageStorage,
-                    textureStorage.textures.get(value.emissiveTextureId)
-                )
+                    value.emissiveTextureId
+                        ? textureStorage.textures.get(value.emissiveTextureId)
+                        : textureStorage.defaultEmission
+                ),
             }
 
             materialStorage.materials.set(key, material)

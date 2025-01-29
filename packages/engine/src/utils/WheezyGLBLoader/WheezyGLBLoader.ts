@@ -465,6 +465,7 @@ export class WheezyGLBLoader {
                     mode: number
                     material?: number
                 }) => {
+                    //FIXME: generate all of it
                     const meshData: IPreloadMesh = {
                         positions: WheezyGLBLoader.parseAccessor(
                             modelData,

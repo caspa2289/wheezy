@@ -36,6 +36,8 @@ export class Demo1 extends Scene {
     }
 
     public async init() {
+        await super.init()
+
         const modelData = await WheezyGLBLoader.loadFromUrl(
             'static/models/DamagedHelmet.glb'
         )
