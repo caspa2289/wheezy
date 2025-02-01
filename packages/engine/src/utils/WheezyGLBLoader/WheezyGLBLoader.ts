@@ -271,12 +271,114 @@ export class WheezyGLBLoader {
         }
     }
 
+    private static createNormalsBuffer = (
+        meshData: IPreloadMesh,
+        bufferIndexMap: IndexMap,
+        bufferMap: BufferMap
+    ) => {
+        const positionsBuffer = meshData.positions?.bufferId
+            ? bufferMap.get(meshData.positions.bufferId)
+            : null
+
+        const indexBuffer = meshData.indices?.bufferId
+            ? bufferMap.get(meshData.indices.bufferId)
+            : null
+
+        if (!positionsBuffer || !indexBuffer) {
+            throw new Error('Failed to construct normals buffer')
+        }
+
+        const vertices = new Float32Array(
+            positionsBuffer,
+            meshData.positions?.byteOffset,
+            meshData.positions?.byteLength
+        )
+
+        const indices = new Uint16Array(
+            indexBuffer,
+            meshData.indices?.byteOffset,
+            meshData.indices?.byteLength
+        )
+
+        const normals = new Float32Array(vertices.length)
+
+        for (let i = 0; i < indices.length; i += 9) {
+            const vert0 = vec3.create(
+                vertices[indices[i]],
+                vertices[indices[i + 1]],
+                vertices[indices[i + 2]]
+            )
+            const vert1 = vec3.create(
+                vertices[indices[i + 3]],
+                vertices[indices[i + 4]],
+                vertices[indices[i + 5]]
+            )
+
+            const vert2 = vec3.create(
+                vertices[indices[i + 6]],
+                vertices[indices[i + 7]],
+                vertices[indices[i + 8]]
+            )
+
+            // p = cross(B-A, C-A)
+            const normal = vec3.normalize(
+                vec3.cross(
+                    vec3.subtract(vert1, vert0),
+                    vec3.subtract(vert2, vert0)
+                )
+            )
+
+            normals[indices[i]] += normal[0] || 1
+            normals[indices[i + 1]] += normal[1] || 1
+            normals[indices[i + 2]] += normal[2] || 1
+
+            normals[indices[i + 3]] += normal[0] || 1
+            normals[indices[i + 4]] += normal[1] || 1
+            normals[indices[i + 5]] += normal[2] || 1
+
+            normals[indices[i + 6]] += normal[0] || 1
+            normals[indices[i + 7]] += normal[1] || 1
+            normals[indices[i + 8]] += normal[2] || 1
+        }
+
+        for (let i = 0; i < indices.length; i += 3) {
+            const normalizedNormal = vec3.normalize(
+                vec3.create(
+                    normals[indices[i]],
+                    normals[indices[i + 1]],
+                    normals[indices[i + 2]]
+                )
+            )
+
+            normals[indices[i]] = normalizedNormal[0]
+            normals[indices[i + 1]] = normalizedNormal[1]
+            normals[indices[i + 2]] = normalizedNormal[2]
+        }
+
+        console.log(normals)
+        console.log(vertices)
+
+        const id = generateId()
+        bufferIndexMap.set(Math.random(), id)
+        bufferMap.set(id, normals.buffer)
+
+        return {
+            bufferId: id,
+            byteStride: 12,
+            byteLength: normals.byteLength,
+            byteOffset: 0,
+            count: normals.byteLength / (4 * 3),
+            componentType: GLTFComponentType.FLOAT,
+            elementType: 'float32x3',
+            usage: GPUBufferUsage.VERTEX,
+        } as GLTFAccessor
+    }
+
     private static createTangentsBuffer = (
         meshData: IPreloadMesh,
         bufferIndexMap: IndexMap,
         bufferMap: BufferMap
     ) => {
-        //REFACTOR: move to separate function
         const positionsBuffer = meshData.positions?.bufferId
             ? bufferMap.get(meshData.positions.bufferId)
             : null
@@ -291,7 +393,7 @@ export class WheezyGLBLoader {
 
         //FIXME: add a workaround for not indexed meshes
         if (!positionsBuffer || !textureCoordinatesBuffer || !indexBuffer) {
-            return undefined
+            throw new Error('Failed to construct tangents buffer')
         }
 
         const vertices = new Float32Array(
@@ -390,7 +492,7 @@ export class WheezyGLBLoader {
             byteStride: 12,
             byteLength: tangents.byteLength,
             byteOffset: 0,
-            count: tangents.length / (4 * 3),
+            count: tangents.byteLength / (4 * 3),
             componentType: GLTFComponentType.FLOAT,
             elementType: 'float32x3',
             usage: 32,
@@ -496,6 +598,14 @@ export class WheezyGLBLoader {
                                 ? materialsIndexMap.get(primitive.material)
                                 : undefined,
                         mode: primitive.mode ?? 4,
+                    }
+
+                    if (!meshData.normals) {
+                        meshData.normals = this.createNormalsBuffer(
+                            meshData,
+                            bufferIndexMap,
+                            bufferMap
+                        )
                     }
 
                     meshData.tangents = this.createTangentsBuffer(
