@@ -180,61 +180,114 @@ export class ModelUploader {
         materialStorage: IMaterialStorage,
         device: GPUDevice
     ) {
-        modelData.materials.forEach((value, key) => {
-            const material: IMaterial = {
-                name: value.name,
-                emissiveFactor: value?.emissiveFactor ?? vec3.create(1, 1, 1),
-                metallicFactor: value?.metallicFactor ?? 1,
-                roughnessFactor: value.roughnessFactor ?? 1,
-                baseColorFactor:
-                    value?.baseColorFactor ?? vec4.create(1, 1, 1, 1),
+        let defaultMaterial = materialStorage.materials.get(
+            'default'
+        ) as IMaterial
+
+        if (!defaultMaterial) {
+            defaultMaterial = {
+                name: 'Default wheezy material',
+                emissiveFactor: vec3.create(1, 1, 1),
+                metallicFactor: 1,
+                roughnessFactor: 1,
+                baseColorFactor: vec4.create(1, 1, 1, 1),
                 baseColorTexture: this.createGPUTexture(
                     device,
                     'rgba8unorm-srgb',
                     samplerStorage,
                     imageStorage,
-                    value.baseColorTextureId
-                        ? textureStorage.textures.get(value.baseColorTextureId)
-                        : textureStorage.defaultBaseColor
+                    textureStorage.defaultBaseColor
                 ),
                 metallicRoughnessTexture: this.createGPUTexture(
                     device,
                     'rgba8unorm',
                     samplerStorage,
                     imageStorage,
-                    value.metallicRoughnessTextureId
-                        ? textureStorage.textures.get(
-                              value.metallicRoughnessTextureId
-                          )
-                        : textureStorage.defaultMetallicRoughness
+                    textureStorage.defaultMetallicRoughness
                 ),
                 normalTexture: this.createGPUTexture(
                     device,
                     'rgba8unorm',
                     samplerStorage,
                     imageStorage,
-                    value.normalTextureId
-                        ? textureStorage.textures.get(value.normalTextureId)
-                        : textureStorage.defaultNormal
+                    textureStorage.defaultNormal
                 ),
                 occlusionTexture: this.createGPUTexture(
                     device,
                     'rgba8unorm',
                     samplerStorage,
                     imageStorage,
-                    value.occlusionTextureId
-                        ? textureStorage.textures.get(value.occlusionTextureId)
-                        : textureStorage.defaultOcclusion
+                    textureStorage.defaultOcclusion
                 ),
                 emissiveTexture: this.createGPUTexture(
                     device,
                     'rgba8unorm',
                     samplerStorage,
                     imageStorage,
-                    value.emissiveTextureId
-                        ? textureStorage.textures.get(value.emissiveTextureId)
-                        : textureStorage.defaultEmission
+                    textureStorage.defaultEmission
                 ),
+            }
+            materialStorage.materials.set('default', defaultMaterial)
+        }
+
+        modelData.materials.forEach((value, key) => {
+            const material: IMaterial = {
+                name: value.name,
+                emissiveFactor:
+                    value?.emissiveFactor ?? defaultMaterial.emissiveFactor,
+                metallicFactor:
+                    value?.metallicFactor ?? defaultMaterial.metallicFactor,
+                roughnessFactor:
+                    value.roughnessFactor ?? defaultMaterial.roughnessFactor,
+                baseColorFactor:
+                    value?.baseColorFactor ?? defaultMaterial.baseColorFactor,
+                baseColorTexture: value.baseColorTextureId
+                    ? this.createGPUTexture(
+                          device,
+                          'rgba8unorm-srgb',
+                          samplerStorage,
+                          imageStorage,
+                          textureStorage.textures.get(value.baseColorTextureId)
+                      )
+                    : defaultMaterial.baseColorTexture,
+                metallicRoughnessTexture: value.metallicRoughnessTextureId
+                    ? this.createGPUTexture(
+                          device,
+                          'rgba8unorm',
+                          samplerStorage,
+                          imageStorage,
+                          textureStorage.textures.get(
+                              value.metallicRoughnessTextureId
+                          )
+                      )
+                    : defaultMaterial.metallicRoughnessTexture,
+                normalTexture: value.normalTextureId
+                    ? this.createGPUTexture(
+                          device,
+                          'rgba8unorm',
+                          samplerStorage,
+                          imageStorage,
+                          textureStorage.textures.get(value.normalTextureId)
+                      )
+                    : defaultMaterial.normalTexture,
+                occlusionTexture: value.occlusionTextureId
+                    ? this.createGPUTexture(
+                          device,
+                          'rgba8unorm',
+                          samplerStorage,
+                          imageStorage,
+                          textureStorage.textures.get(value.occlusionTextureId)
+                      )
+                    : defaultMaterial.occlusionTexture,
+                emissiveTexture: value.emissiveTextureId
+                    ? this.createGPUTexture(
+                          device,
+                          'rgba8unorm',
+                          samplerStorage,
+                          imageStorage,
+                          textureStorage.textures.get(value.emissiveTextureId)
+                      )
+                    : defaultMaterial.emissiveTexture,
             }
 
             materialStorage.materials.set(key, material)
@@ -265,9 +318,7 @@ export class ModelUploader {
                 meshData.normals,
                 meshData.textureCoordinates,
                 meshData.tangents,
-                meshData.materialId
-                    ? materialStorage.materials.get(meshData.materialId)
-                    : undefined
+                materialStorage.materials.get(meshData.materialId) as IMaterial
             )
         })
 
@@ -323,9 +374,7 @@ export class ModelUploader {
                 meshData.normals,
                 meshData.textureCoordinates,
                 meshData.tangents,
-                meshData.materialId
-                    ? materialStorage.materials.get(meshData.materialId)
-                    : undefined
+                materialStorage.materials.get(meshData.materialId) as IMaterial
             )
         })
 

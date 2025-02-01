@@ -212,6 +212,8 @@ export class Demo0 extends Scene {
     }
 
     public async init() {
+        await super.init()
+
         await this._setupSun()
         await this._setupMercury()
         await this._setupVenus()
