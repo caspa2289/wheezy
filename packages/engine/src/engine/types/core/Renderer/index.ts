@@ -15,6 +15,15 @@ export enum RENDER_OUTPUT_SOURCES {
 
 export type TRenderOutputSource = number
 
+export type TSkyboxBitmaps = [
+    ImageBitmap,
+    ImageBitmap,
+    ImageBitmap,
+    ImageBitmap,
+    ImageBitmap,
+    ImageBitmap,
+]
+
 export enum RENDER_MODES {
     USE_V_NORMAL,
     USE_F_NORMAL,
@@ -37,6 +46,8 @@ export interface IRenderer {
     init: () => Promise<void>
     render: (dt: number, scene: IScene) => void
     buildRenderPipeline: (mesh: IMesh, scene: IScene) => void
+    setSkyBoxTexture: (bitmaps: TSkyboxBitmaps) => void
+    setDefaultSkyBoxTexture: () => Promise<void>
 }
 
 export interface IRendererProps {

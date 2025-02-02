@@ -27,7 +27,7 @@ export class Scene implements IScene {
     private _objectManager: IObjectManager = new ObjectManager()
     private _bufferStorage: IBufferStorage = new BufferStorage()
     private _imageStorage: IImageStorage = new ImageStorage()
-    private _samplerStorage: ISamplerStorage = new SamplerStorage()
+    private _samplerStorage: ISamplerStorage
     private _textureStorage = new TextureStorage()
     private _materialStorage = new MaterialStorage()
     private _meshRenderDataStorage = new MeshRenderDataStorage()
@@ -52,6 +52,8 @@ export class Scene implements IScene {
             )
         }
 
+        this._samplerStorage = new SamplerStorage(this._engine.renderer.device)
+
         this._root = new GameObject()
 
         this._objectManager.addObject(this._root)
@@ -65,6 +67,10 @@ export class Scene implements IScene {
                 canvasHeight: this._engine.renderer.context.canvas.height,
                 position: vec3.create(0, 0, 5),
             })
+    }
+
+    public async init() {
+        await this.imageStorage.createDefaults()
     }
 
     get objectManager() {
