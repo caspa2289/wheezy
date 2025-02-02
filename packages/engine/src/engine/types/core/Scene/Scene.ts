@@ -28,6 +28,7 @@ export interface IScene {
     //fixme: mock
     light: DirectionalLight
 
+    init: () => Promise<void>
     uploadModel: (props: ISceneUploadModelProps) => Promise<IGameObject>
     onRender: (dt: number) => void
 }

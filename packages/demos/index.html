@@ -9,6 +9,25 @@
     </head>
     <body style="width: 100%; height: 100%; margin: 0; padding: 0">
         <div
+            id="loader"
+            style="
+                position: fixed;
+                width: 100px;
+                left: calc(50% - 50px);
+                height: 40px;
+                top: calc(50% - 20px);
+                display: none;
+                font-weight: 600;
+                color: red;
+            "
+        >
+            LOADING
+        </div>
+        <select
+            style="position: fixed; bottom: 0; left: 0; padding: 10px"
+            id="scene-selector"
+        ></select>
+        <div
             id="debug-container"
             style="
                 position: fixed;

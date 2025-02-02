@@ -19,12 +19,12 @@ export * from './core/LightSource'
 
 //FIXME: move this somewhere else
 export interface IPreloadMesh {
-    positions?: GLTFAccessor
-    indices?: GLTFAccessor
-    normals?: GLTFAccessor
-    tangents?: GLTFAccessor
-    textureCoordinates?: GLTFAccessor
-    materialId?: string
+    positions: GLTFAccessor
+    indices: GLTFAccessor
+    normals: GLTFAccessor
+    tangents: GLTFAccessor
+    textureCoordinates: GLTFAccessor
+    materialId: string
     mode: number
 }
 

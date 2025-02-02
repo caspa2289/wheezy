@@ -5,7 +5,7 @@ export interface IEngine {
     scene?: IScene
     renderer: IRenderer
 
-    render: (time: number) => void
+    render: (time?: number) => void
 }
 
 export interface IEngineProps {
