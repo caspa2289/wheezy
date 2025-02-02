@@ -8,6 +8,7 @@ import {
     RENDER_MODES,
     RENDER_OUTPUT_SOURCES,
     SceneNodeContent,
+    TSkyboxBitmaps,
 } from '../../types'
 import {
     DEFAULT_DEPTH_FORMAT,
@@ -32,6 +33,8 @@ import {
 export const alignTo = (val: number, align: number) => {
     return Math.floor((val + align - 1) / align) * align
 }
+
+const skyBoxUniformBufferSize = 4 * 16 + 4 * 16 + 4 * 16 + 4 * 4
 
 export class Renderer implements IRenderer {
     private _adapter!: GPUAdapter
@@ -241,24 +244,55 @@ export class Renderer implements IRenderer {
             },
         })
 
-        // The order of the array layers is [+X, -X, +Y, -Y, +Z, -Z]
-        const imgSrcs = [
-            'static/cubemaps/bridge/posx.jpg',
-            'static/cubemaps/bridge/negx.jpg',
-            'static/cubemaps/bridge/posy.jpg',
-            'static/cubemaps/bridge/negy.jpg',
-            'static/cubemaps/bridge/posz.jpg',
-            'static/cubemaps/bridge/negz.jpg',
-        ]
-        const promises = imgSrcs.map(async (src) => {
-            const response = await fetch(src)
-            return createImageBitmap(await response.blob())
+        this._skyboxSampler = this._device.createSampler({
+            magFilter: 'linear',
+            minFilter: 'linear',
         })
-        const imageBitmaps = await Promise.all(promises)
 
+        this._skyBoxUniformBuffer = this._device.createBuffer({
+            size: skyBoxUniformBufferSize,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+
+        this._skyBoxRenderPassDescriptor = {
+            label: 'skybox render pass',
+            colorAttachments: [
+                {
+                    view: null as unknown as GPUTextureView, // Assigned later
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                },
+            ],
+            depthStencilAttachment: {
+                view: this._depthTexture.createView(),
+                depthLoadOp: 'clear' as GPULoadOp,
+                depthClearValue: 1.0,
+                depthStoreOp: 'store' as GPUStoreOp,
+                stencilLoadOp: 'clear' as GPULoadOp,
+                stencilClearValue: 0,
+                stencilStoreOp: 'store' as GPUStoreOp,
+            },
+        }
+
+        await this.setDefaultSkyBoxTexture()
+    }
+
+    public async setDefaultSkyBoxTexture() {
+        const images = new Array(6).fill(
+            new ImageData(new Uint8ClampedArray([75, 76, 76, 255]), 1, 1)
+        )
+        const promises = images.map(async (image) => {
+            return createImageBitmap(image)
+        })
+        const imageBitmaps = (await Promise.all(promises)) as TSkyboxBitmaps
+
+        this.setSkyBoxTexture(imageBitmaps)
+    }
+
+    public setSkyBoxTexture(bitmaps: TSkyboxBitmaps) {
         this._skyboxTexture = this._device.createTexture({
             dimension: '2d',
-            size: [imageBitmaps[0].width, imageBitmaps[0].height, 6],
+            size: [bitmaps[0].width, bitmaps[0].height, 6],
             format: 'rgba8unorm',
             usage:
                 GPUTextureUsage.TEXTURE_BINDING |
@@ -266,25 +300,14 @@ export class Renderer implements IRenderer {
                 GPUTextureUsage.RENDER_ATTACHMENT,
         })
 
-        for (let i = 0; i < imageBitmaps.length; i++) {
-            const imageBitmap = imageBitmaps[i]
+        for (let i = 0; i < bitmaps.length; i++) {
+            const imageBitmap = bitmaps[i]
             this._device.queue.copyExternalImageToTexture(
                 { source: imageBitmap },
                 { texture: this._skyboxTexture, origin: [0, 0, i] },
                 [imageBitmap.width, imageBitmap.height]
             )
         }
-
-        this._skyboxSampler = this._device.createSampler({
-            magFilter: 'linear',
-            minFilter: 'linear',
-        })
-
-        const skyBoxUniformBufferSize = 4 * 16 + 4 * 16 + 4 * 16 + 4 * 4
-        this._skyBoxUniformBuffer = this._device.createBuffer({
-            size: skyBoxUniformBufferSize,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        })
 
         this._skyBoxUniformBindGroup = this._device.createBindGroup({
             label: 'skybox uniform bindgroup',
@@ -310,26 +333,6 @@ export class Renderer implements IRenderer {
                 },
             ],
         })
-
-        this._skyBoxRenderPassDescriptor = {
-            label: 'skybox render pass',
-            colorAttachments: [
-                {
-                    view: null as unknown as GPUTextureView, // Assigned later
-                    loadOp: 'clear',
-                    storeOp: 'store',
-                },
-            ],
-            depthStencilAttachment: {
-                view: this._depthTexture.createView(),
-                depthLoadOp: 'clear' as GPULoadOp,
-                depthClearValue: 1.0,
-                depthStoreOp: 'store' as GPUStoreOp,
-                stencilLoadOp: 'clear' as GPULoadOp,
-                stencilClearValue: 0,
-                stencilStoreOp: 'store' as GPUStoreOp,
-            },
-        }
     }
 
     get device() {

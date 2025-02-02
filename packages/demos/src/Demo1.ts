@@ -5,6 +5,7 @@ import {
     ITransform,
     Scene,
     Transform,
+    TSkyboxBitmaps,
     WheezyGLBLoader,
 } from '@wheezy/engine'
 import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCamera'
@@ -37,6 +38,8 @@ export class Demo1 extends Scene {
 
     public async init() {
         await super.init()
+
+        await this._setupSkyBox()
 
         const modelData = await WheezyGLBLoader.loadFromUrl(
             'static/models/DamagedHelmet.glb'
@@ -74,6 +77,25 @@ export class Demo1 extends Scene {
         this._helmet1 = modelGO1.transform
 
         this._testHook.transform.rotateDegreesEuler({ y: -40 })
+    }
+
+    private async _setupSkyBox() {
+        const imgSrcs = [
+            'static/cubemaps/bridge/posx.jpg',
+            'static/cubemaps/bridge/negx.jpg',
+            'static/cubemaps/bridge/posy.jpg',
+            'static/cubemaps/bridge/negy.jpg',
+            'static/cubemaps/bridge/posz.jpg',
+            'static/cubemaps/bridge/negz.jpg',
+        ]
+
+        const promises = imgSrcs.map(async (source) => {
+            const response = await fetch(source)
+            return createImageBitmap(await response.blob())
+        })
+        const imageBitmaps = (await Promise.all(promises)) as TSkyboxBitmaps
+
+        this._engine?.renderer.setSkyBoxTexture(imageBitmaps)
     }
 
     public onRender(dt: number): void {

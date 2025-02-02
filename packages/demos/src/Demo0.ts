@@ -6,6 +6,7 @@ import {
     GameObject,
     Transform,
     DirectionalLight,
+    TSkyboxBitmaps,
 } from '@wheezy/engine'
 import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCamera'
 import { ArcBallController } from '@wheezy/engine/src/utils/ArcBallController'
@@ -54,6 +55,27 @@ export class Demo0 extends Scene {
             parent: this.root,
             position: vec3.create(0, 0, 0),
         })
+
+        this._setupSkyBox()
+    }
+
+    private async _setupSkyBox() {
+        const imgSrcs = [
+            'static/cubemaps/space/posx.png',
+            'static/cubemaps/space/negx.png',
+            'static/cubemaps/space/posy.png',
+            'static/cubemaps/space/negy.png',
+            'static/cubemaps/space/posz.png',
+            'static/cubemaps/space/negz.png',
+        ]
+
+        const promises = imgSrcs.map(async (source) => {
+            const response = await fetch(source)
+            return createImageBitmap(await response.blob())
+        })
+        const imageBitmaps = (await Promise.all(promises)) as TSkyboxBitmaps
+
+        this._engine?.renderer.setSkyBoxTexture(imageBitmaps)
     }
 
     private _createTransformObject(): GameObject {
