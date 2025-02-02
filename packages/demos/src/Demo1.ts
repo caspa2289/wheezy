@@ -2,6 +2,7 @@ import {
     DirectionalLight,
     GameObject,
     IGameObject,
+    IScene,
     ITransform,
     Scene,
     Transform,
@@ -12,7 +13,7 @@ import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCam
 import { ArcBallController } from '@wheezy/engine/src/utils/ArcBallController'
 import { vec3 } from 'wgpu-matrix'
 
-export class Demo1 extends Scene {
+export class Demo1 extends Scene implements IScene {
     private _controller: ArcBallController
 
     private _helmet!: ITransform

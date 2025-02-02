@@ -7,12 +7,13 @@ import {
     Transform,
     DirectionalLight,
     TSkyboxBitmaps,
+    IScene,
 } from '@wheezy/engine'
 import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCamera'
 import { ArcBallController } from '@wheezy/engine/src/utils/ArcBallController'
 
 //This is supposed to demonstrate basic workflow
-export class Demo0 extends Scene {
+export class Demo0 extends Scene implements IScene {
     private sun!: IGameObject
 
     private mercury!: IGameObject
@@ -250,6 +251,7 @@ export class Demo0 extends Scene {
         wrapper.style.position = 'absolute'
         wrapper.style.top = '0'
         wrapper.style.zIndex = '10'
+        wrapper.style.padding = '10px'
 
         const button0 = document.createElement('button')
         button0.textContent = '1 год в минуту'
