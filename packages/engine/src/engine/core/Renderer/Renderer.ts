@@ -1,6 +1,7 @@
 import { mat4, Mat4, vec3, vec4 } from 'wgpu-matrix'
 import {
     EntityTypes,
+    GLTFAccessor,
     IMesh,
     IRenderer,
     IRendererProps,
@@ -426,6 +427,25 @@ export class Renderer implements IRenderer {
 
     // public buildRenderPipeline() {}
 
+    private _createMeshBuffer(accessor: GLTFAccessor, scene: IScene) {
+        const view = new Uint8Array(
+            scene.bufferStorage.buffers.get(accessor.bufferId) as ArrayBuffer,
+            accessor.byteOffset,
+            accessor.byteLength
+        )
+
+        const buffer = this.device.createBuffer({
+            size: alignTo(accessor.byteLength, 4),
+            usage: accessor.usage,
+            mappedAtCreation: true,
+        })
+
+        new Uint8Array(buffer.getMappedRange()).set(view)
+        buffer.unmap()
+
+        return buffer
+    }
+
     public buildRenderPipeline(mesh: IMesh, scene: IScene) {
         const meshDataEntry = {} as IMeshRenderData
 
@@ -454,6 +474,7 @@ export class Renderer implements IRenderer {
             entryPoint: 'vertex_main',
             buffers: [
                 {
+                    //TODO: figure out a way to make bytestrides constant
                     arrayStride: mesh.positions.byteStride,
                     attributes: [
                         {
@@ -755,103 +776,30 @@ export class Renderer implements IRenderer {
             },
         })
 
-        const positionsView = new Uint8Array(
-            scene.bufferStorage.buffers.get(
-                mesh.positions.bufferId
-            ) as ArrayBuffer,
-            mesh.positions.byteOffset,
-            mesh.positions.byteLength
+        meshDataEntry.positionsBuffer = this._createMeshBuffer(
+            mesh.positions,
+            scene
         )
 
-        meshDataEntry.positionsBuffer = this.device.createBuffer({
-            size: alignTo(mesh.positions.byteLength, 4),
-            usage: mesh.positions.usage,
-            mappedAtCreation: true,
-        })
-
-        new Uint8Array(meshDataEntry.positionsBuffer.getMappedRange()).set(
-            positionsView
-        )
-        meshDataEntry.positionsBuffer.unmap()
-
-        const textureCoordinatesBuffer = scene.bufferStorage.buffers.get(
-            mesh?.textureCoordinates.bufferId
+        meshDataEntry.textureCoordinatesBuffer = this._createMeshBuffer(
+            mesh.textureCoordinates,
+            scene
         )
 
-        const textureCoordinatesView = new Uint8Array(
-            textureCoordinatesBuffer as ArrayBuffer,
-            mesh.textureCoordinates.byteOffset,
-            mesh.textureCoordinates.byteLength
+        meshDataEntry.normalsBuffer = this._createMeshBuffer(
+            mesh.normals,
+            scene
         )
 
-        meshDataEntry.textureCoordinatesBuffer = this.device.createBuffer({
-            size: alignTo(mesh.textureCoordinates.byteLength, 4),
-            usage: mesh.textureCoordinates.usage,
-            mappedAtCreation: true,
-        })
-        new Uint8Array(
-            meshDataEntry.textureCoordinatesBuffer.getMappedRange()
-        ).set(textureCoordinatesView)
-        meshDataEntry.textureCoordinatesBuffer.unmap()
-
-        const normalsBuffer = scene.bufferStorage.buffers.get(
-            mesh.normals.bufferId
+        meshDataEntry.tangentsBuffer = this._createMeshBuffer(
+            mesh.tangents,
+            scene
         )
 
-        const normalsView = new Uint8Array(
-            normalsBuffer as ArrayBuffer,
-            mesh.normals.byteOffset,
-            mesh.normals.byteLength
+        meshDataEntry.indicesBuffer = this._createMeshBuffer(
+            mesh.indices,
+            scene
         )
-
-        meshDataEntry.normalsBuffer = this.device.createBuffer({
-            size: alignTo(mesh.normals.byteLength, 4),
-            usage: mesh.normals.usage,
-            mappedAtCreation: true,
-        })
-        new Uint8Array(meshDataEntry.normalsBuffer.getMappedRange()).set(
-            normalsView
-        )
-        meshDataEntry.normalsBuffer.unmap()
-
-        const tangentsBuffer = scene.bufferStorage.buffers.get(
-            mesh?.tangents.bufferId
-        )
-
-        const tangentsView = new Uint8Array(
-            tangentsBuffer as ArrayBuffer,
-            mesh.tangents.byteOffset,
-            mesh.tangents.byteLength
-        )
-
-        meshDataEntry.tangentsBuffer = this.device.createBuffer({
-            size: alignTo(mesh.tangents.byteLength, 4),
-            usage: mesh.tangents.usage,
-            mappedAtCreation: true,
-        })
-        new Uint8Array(meshDataEntry.tangentsBuffer.getMappedRange()).set(
-            tangentsView
-        )
-        meshDataEntry.tangentsBuffer.unmap()
-
-        const indicesBuffer = scene.bufferStorage.buffers.get(
-            mesh?.indices.bufferId
-        )
-
-        const indicesView = new Uint8Array(
-            indicesBuffer as ArrayBuffer,
-            mesh.indices.byteOffset,
-            mesh.indices.byteLength
-        )
-        meshDataEntry.indicesBuffer = this.device.createBuffer({
-            size: alignTo(mesh.indices.byteLength, 4),
-            usage: mesh.indices.usage,
-            mappedAtCreation: true,
-        })
-        new Uint8Array(meshDataEntry.indicesBuffer.getMappedRange()).set(
-            indicesView
-        )
-        meshDataEntry.indicesBuffer.unmap()
 
         scene.meshRenderDataStorage.data.set(mesh.id, meshDataEntry)
         mesh.isPipelineBuilt = true
