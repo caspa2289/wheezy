@@ -7,6 +7,7 @@ const canvas = document.getElementById('webgpu-canvas') as HTMLCanvasElement
 const initDebugControls = (engine: IEngine) => {
     const defaultOutputSource = 0
     const defaultRenderingMode = 1
+    const defaultScene = 1
 
     const debugContainer = document.getElementById(
         'debug-container'
@@ -23,7 +24,7 @@ const initDebugControls = (engine: IEngine) => {
 
     sceneOptions.forEach((item) => {
         const option = document.createElement('option')
-        if (item.value === 0) {
+        if (item.value === defaultScene) {
             option.selected = true
         }
         option.textContent = item.label
@@ -89,7 +90,7 @@ const initDebugControls = (engine: IEngine) => {
 
     engine.renderer.outputSource = defaultOutputSource
     engine.renderer.renderingMode = defaultRenderingMode
-    setScene(engine, 0)
+    setScene(engine, defaultScene)
 
     debugContainer.appendChild(outputSourceDropDown)
     debugContainer.appendChild(renderingModeDropDown)

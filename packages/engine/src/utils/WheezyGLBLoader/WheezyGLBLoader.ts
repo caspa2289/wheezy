@@ -2,6 +2,7 @@ import { load } from '@loaders.gl/core'
 import { GLB, GLBLoader } from '@loaders.gl/gltf'
 import {
     BufferMap,
+    DEFAULT_SAMPLER_IDS,
     GLTFAccessor,
     ImageMap,
     IMaterialPreloadData,
@@ -47,6 +48,10 @@ export class WheezyGLBLoader {
             ) => {
                 const bufferViewData = modelData.json.bufferViews[bufferView]
                 const bufferId = bufferIndexMap.get(bufferViewData.buffer)
+
+                if (!bufferViewData.byteOffset) {
+                    bufferViewData.byteOffset = 0
+                }
 
                 const bufferOffset =
                     modelData.binChunks[bufferViewData.buffer].byteOffset ?? 0
@@ -100,9 +105,9 @@ export class WheezyGLBLoader {
             ) => {
                 const id = generateId()
                 const texture: ITexturePreloadData = {
-                    samplerId: samplersIndexMap.get(
-                        textureData.sampler
-                    ) as string,
+                    samplerId:
+                        samplersIndexMap.get(textureData.sampler) ??
+                        DEFAULT_SAMPLER_IDS.baseColor,
                     imageId: imagesIndexMap.get(textureData.source) as string,
                 }
 
