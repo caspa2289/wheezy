@@ -37,15 +37,85 @@ export const alignTo = (val: number, align: number) => {
 
 const skyBoxUniformBufferSize = 4 * 16 + 4 * 16 + 4 * 16 + 4 * 4
 
+class GBuffer {
+    readonly _normal: GPUTextureView
+    readonly _albedo: GPUTextureView
+    readonly _depth: GPUTextureView
+    readonly _metallicRoughness: GPUTextureView
+    readonly _occlusion: GPUTextureView
+    readonly _emission: GPUTextureView
+    readonly _multiSample: GPUTextureView | undefined
+
+    constructor(
+        device: GPUDevice,
+        context: GPUCanvasContext,
+        msaaSampleCount: number,
+        swapChainFormat: GPUTextureFormat,
+        depthFormat: GPUTextureFormat
+    ) {
+        const createTextureView = (
+            sampleCount?: number,
+            format?: GPUTextureFormat
+        ) =>
+            device
+                .createTexture({
+                    size: [context.canvas.width, context.canvas.height],
+                    sampleCount,
+                    usage:
+                        GPUTextureUsage.RENDER_ATTACHMENT |
+                        GPUTextureUsage.TEXTURE_BINDING,
+                    format: format ?? swapChainFormat,
+                })
+                .createView()
+
+        this._multiSample =
+            msaaSampleCount !== 1
+                ? createTextureView(msaaSampleCount)
+                : undefined
+        this._depth = createTextureView(msaaSampleCount, depthFormat)
+        this._normal = createTextureView(undefined, 'rgba16float')
+        this._albedo = createTextureView()
+        this._emission = createTextureView()
+        this._metallicRoughness = createTextureView()
+        this._occlusion = createTextureView()
+    }
+
+    get normal() {
+        return this._normal
+    }
+
+    get albedo() {
+        return this._albedo
+    }
+
+    get depth() {
+        return this._depth
+    }
+
+    get metallicRoughness() {
+        return this._metallicRoughness
+    }
+
+    get occlusion() {
+        return this._occlusion
+    }
+
+    get emission() {
+        return this._emission
+    }
+
+    get multiSample() {
+        return this._multiSample
+    }
+}
+
 export class Renderer implements IRenderer {
     private _adapter!: GPUAdapter
     private _device!: GPUDevice
     private _context!: GPUCanvasContext
     private _canvas: HTMLCanvasElement
+    private _gBuffer!: GBuffer
 
-    private _swapChainFormat: GPUTextureFormat = DEFAULT_SWAP_CHAIN_FORMAT
-    private _depthTextureFormat: GPUTextureFormat = DEFAULT_DEPTH_FORMAT
-    private _depthTexture!: GPUTexture
     private _shadowDepthTexture!: GPUTexture
     private _shadowDepthTextureView!: GPUTextureView
     private _shadowDepthTextureSize = DEFULT_SHADOW_TEXTURE_SIZE
@@ -77,8 +147,6 @@ export class Renderer implements IRenderer {
 
     private _debugParamsBuffer!: GPUBuffer
 
-    private _multisampleTextureView?: GPUTextureView
-
     private _shaderModule!: GPUShaderModule
 
     public ambientLightColor = vec3.create(1, 1, 1)
@@ -97,19 +165,16 @@ export class Renderer implements IRenderer {
         this._context.configure({
             device: this._device,
             usage: GPUTextureUsage.RENDER_ATTACHMENT,
-            format: this._swapChainFormat,
+            format: DEFAULT_SWAP_CHAIN_FORMAT,
         })
 
-        this._depthTexture = this._device.createTexture({
-            label: 'depthTexture',
-            size: {
-                width: this._context.canvas.width,
-                height: this._context.canvas.height,
-            },
-            sampleCount: this._msaaSampleCount,
-            format: this._depthTextureFormat,
-            usage: GPUTextureUsage.RENDER_ATTACHMENT,
-        })
+        this._gBuffer = new GBuffer(
+            this._device,
+            this._context,
+            this._msaaSampleCount,
+            this.swapChainFormat,
+            this.depthTextureFormat
+        )
 
         this._shadowDepthTexture = this._device.createTexture({
             label: 'shadowDepthTexture',
@@ -140,19 +205,6 @@ export class Renderer implements IRenderer {
 
         this._initializeViewParams()
 
-        if (this._msaaSampleCount !== 1) {
-            this._multisampleTextureView = this.device
-                .createTexture({
-                    size: [this._canvas.width, this._canvas.height],
-                    sampleCount: this._msaaSampleCount,
-                    format: this.swapChainFormat,
-                    usage: GPUTextureUsage.RENDER_ATTACHMENT,
-                })
-                .createView()
-        } else {
-            this._multisampleTextureView = undefined
-        }
-
         this._renderPassDescriptor = {
             label: 'main render pass descriptor',
             colorAttachments: [
@@ -167,7 +219,7 @@ export class Renderer implements IRenderer {
                 },
             ],
             depthStencilAttachment: {
-                view: this._depthTexture.createView(),
+                view: this._gBuffer.depth,
                 depthLoadOp: 'clear' as GPULoadOp,
                 depthClearValue: 1.0,
                 depthStoreOp: 'store' as GPUStoreOp,
@@ -227,7 +279,7 @@ export class Renderer implements IRenderer {
                 }),
                 targets: [
                     {
-                        format: this._swapChainFormat,
+                        format: this.swapChainFormat,
                     },
                 ],
             },
@@ -238,7 +290,7 @@ export class Renderer implements IRenderer {
             depthStencil: {
                 depthWriteEnabled: true,
                 depthCompare: 'less',
-                format: this._depthTextureFormat,
+                format: this.depthTextureFormat,
             },
             multisample: {
                 count: this._msaaSampleCount,
@@ -265,7 +317,7 @@ export class Renderer implements IRenderer {
                 },
             ],
             depthStencilAttachment: {
-                view: this._depthTexture.createView(),
+                view: this._gBuffer.depth,
                 depthLoadOp: 'clear' as GPULoadOp,
                 depthClearValue: 1.0,
                 depthStoreOp: 'store' as GPUStoreOp,
@@ -349,11 +401,11 @@ export class Renderer implements IRenderer {
     }
 
     get swapChainFormat() {
-        return this._swapChainFormat
+        return DEFAULT_SWAP_CHAIN_FORMAT
     }
 
     get depthTextureFormat() {
-        return this._depthTextureFormat
+        return DEFAULT_DEPTH_FORMAT
     }
 
     private _initializeViewParams() {
@@ -424,8 +476,6 @@ export class Renderer implements IRenderer {
             throw new Error('Failed to acquire GpuCanvasContext')
         }
     }
-
-    // public buildRenderPipeline() {}
 
     private _createMeshBuffer(accessor: GLTFAccessor, scene: IScene) {
         const view = new Uint8Array(
@@ -520,7 +570,7 @@ export class Renderer implements IRenderer {
         const fragmentState: GPUFragmentState = {
             module: this._shaderModule,
             entryPoint: 'fragment_main',
-            targets: [{ format: this._swapChainFormat }],
+            targets: [{ format: this.swapChainFormat }],
         }
 
         const primitive: GPUPrimitiveState = {
@@ -767,7 +817,7 @@ export class Renderer implements IRenderer {
             fragment: fragmentState,
             primitive: primitive,
             depthStencil: {
-                format: this._depthTextureFormat,
+                format: this.depthTextureFormat,
                 depthWriteEnabled: true,
                 depthCompare: 'less',
             },
@@ -1045,7 +1095,7 @@ export class Renderer implements IRenderer {
             this.context.getCurrentTexture().createView()
         if (this._msaaSampleCount !== 1) {
             ;(this._renderPassDescriptor as any).colorAttachments[0].view =
-                this._multisampleTextureView
+                this._gBuffer.multiSample
             ;(
                 this._renderPassDescriptor as any
             ).colorAttachments[0].resolveTarget = this.context
@@ -1058,7 +1108,7 @@ export class Renderer implements IRenderer {
         if (this._msaaSampleCount !== 1) {
             ;(
                 this._skyBoxRenderPassDescriptor as any
-            ).colorAttachments[0].view = this._multisampleTextureView
+            ).colorAttachments[0].view = this._gBuffer.multiSample
             ;(
                 this._renderPassDescriptor as any
             ).colorAttachments[0].resolveTarget = this.context
