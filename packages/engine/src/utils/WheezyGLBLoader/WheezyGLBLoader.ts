@@ -298,62 +298,60 @@ export class WheezyGLBLoader {
         const indices = new Uint16Array(
             indexBuffer,
             meshData.indices?.byteOffset,
-            meshData.indices?.byteLength / 4
+            meshData.indices?.byteLength / 2
         )
 
         const normals = new Float32Array(vertices.length)
 
-        for (let i = 0; i < indices.length; i += 9) {
+        for (let i = 0; i < indices.length; i += 3) {
             const vert0 = vec3.create(
-                vertices[indices[i]],
-                vertices[indices[i + 1]],
-                vertices[indices[i + 2]]
+                vertices[indices[i] * 3],
+                vertices[indices[i] * 3 + 1],
+                vertices[indices[i] * 3 + 2]
             )
             const vert1 = vec3.create(
-                vertices[indices[i + 3]],
-                vertices[indices[i + 4]],
-                vertices[indices[i + 5]]
+                vertices[indices[i + 1] * 3],
+                vertices[indices[i + 1] * 3 + 1],
+                vertices[indices[i + 1] * 3 + 2]
             )
 
             const vert2 = vec3.create(
-                vertices[indices[i + 6]],
-                vertices[indices[i + 7]],
-                vertices[indices[i + 8]]
+                vertices[indices[i + 2] * 3],
+                vertices[indices[i + 2] * 3 + 1],
+                vertices[indices[i + 2] * 3 + 2]
             )
 
             // p = cross(B-A, C-A)
-            const normal = vec3.normalize(
-                vec3.cross(
-                    vec3.subtract(vert1, vert0),
-                    vec3.subtract(vert2, vert0)
-                )
+            const normal = vec3.cross(
+                vec3.subtract(vert1, vert0),
+                vec3.subtract(vert2, vert0)
             )
 
-            normals[indices[i]] += normal[0]
-            normals[indices[i + 1]] += normal[1]
-            normals[indices[i + 2]] += normal[2]
+            normals[indices[i] * 3] += normal[0]
+            normals[indices[i] * 3 + 1] += normal[1]
+            normals[indices[i] * 3 + 2] += normal[2]
 
-            normals[indices[i + 3]] += normal[0]
-            normals[indices[i + 4]] += normal[1]
-            normals[indices[i + 5]] += normal[2]
+            normals[indices[i + 1] * 3] += normal[0]
+            normals[indices[i + 1] * 3 + 1] += normal[1]
+            normals[indices[i + 1] * 3 + 2] += normal[2]
 
-            normals[indices[i + 6]] += normal[0]
-            normals[indices[i + 7]] += normal[1]
-            normals[indices[i + 8]] += normal[2]
+            normals[indices[i + 2] * 3] += normal[0]
+            normals[indices[i + 2] * 3 + 1] += normal[1]
+            normals[indices[i + 2] * 3 + 2] += normal[2]
         }
 
         for (let i = 0; i < indices.length; i += 3) {
             const normalizedNormal = vec3.normalize(
                 vec3.create(
-                    normals[indices[i]],
-                    normals[indices[i + 1]],
-                    normals[indices[i + 2]]
+                    normals[indices[i] * 3],
+                    normals[indices[i] * 3 + 1],
+                    normals[indices[i] * 3 + 2]
                 )
             )
 
-            normals[indices[i]] = normalizedNormal[0]
-            normals[indices[i + 1]] = normalizedNormal[1]
-            normals[indices[i + 2]] = normalizedNormal[2]
+            normals[indices[i] * 3] = normalizedNormal[0]
+            normals[indices[i] * 3 + 1] = normalizedNormal[1]
+            normals[indices[i] * 3 + 2] = normalizedNormal[2]
         }
 
         const id = generateId()
@@ -432,37 +430,37 @@ export class WheezyGLBLoader {
 
         const tangents = new Float32Array(vertices.length)
 
-        for (let i = 0; i < indices.length; i += 9) {
+        for (let i = 0; i < indices.length; i += 3) {
             const vert0 = vec3.create(
-                vertices[indices[i]],
-                vertices[indices[i + 1]],
-                vertices[indices[i + 2]]
+                vertices[indices[i] * 3],
+                vertices[indices[i] * 3 + 1],
+                vertices[indices[i] * 3 + 2]
             )
             const vert1 = vec3.create(
-                vertices[indices[i + 3]],
-                vertices[indices[i + 4]],
-                vertices[indices[i + 5]]
+                vertices[indices[i + 1] * 3],
+                vertices[indices[i + 1] * 3 + 1],
+                vertices[indices[i + 1] * 3 + 2]
             )
 
             const vert2 = vec3.create(
-                vertices[indices[i + 6]],
-                vertices[indices[i + 7]],
-                vertices[indices[i + 8]]
+                vertices[indices[i + 2] * 3],
+                vertices[indices[i + 2] * 3 + 1],
+                vertices[indices[i + 2] * 3 + 2]
             )
 
             const uv0 = vec2.create(
-                textureCoordinates[indices[i]],
-                textureCoordinates[indices[i + 1]]
+                textureCoordinates[indices[i] * 2],
+                textureCoordinates[indices[i] * 2 + 1]
             )
 
             const uv1 = vec2.create(
-                textureCoordinates[indices[i + 2]],
-                textureCoordinates[indices[i + 3]]
+                textureCoordinates[indices[i + 1] * 2],
+                textureCoordinates[indices[i + 1] * 2 + 1]
             )
 
             const uv2 = vec2.create(
-                textureCoordinates[indices[i + 4]],
-                textureCoordinates[indices[i + 5]]
+                textureCoordinates[indices[i + 2] * 2],
+                textureCoordinates[indices[i + 2] * 2 + 1]
             )
 
             const edge1 = vec3.subtract(vert1, vert0)
@@ -485,17 +483,17 @@ export class WheezyGLBLoader {
                 f * (deltaV2 * edge1[2] - deltaV1 * edge2[2])
             )
 
-            tangents[indices[i]] += tangent[0]
-            tangents[indices[i + 1]] += tangent[1]
-            tangents[indices[i + 2]] += tangent[2]
+            tangents[indices[i] * 3] += tangent[0]
+            tangents[indices[i] * 3 + 1] += tangent[1]
+            tangents[indices[i] * 3 + 2] += tangent[2]
 
-            tangents[indices[i + 3]] += tangent[0]
-            tangents[indices[i + 4]] += tangent[1]
-            tangents[indices[i + 5]] += tangent[2]
+            tangents[indices[i + 1] * 3] += tangent[0]
+            tangents[indices[i + 1] * 3 + 1] += tangent[1]
+            tangents[indices[i + 1] * 3 + 2] += tangent[2]
 
-            tangents[indices[i + 6]] += tangent[0]
-            tangents[indices[i + 7]] += tangent[1]
-            tangents[indices[i + 8]] += tangent[2]
+            tangents[indices[i + 2] * 3] += tangent[0]
+            tangents[indices[i + 2] * 3 + 1] += tangent[1]
+            tangents[indices[i + 2] * 3 + 2] += tangent[2]
         }
 
         const id = generateId()
