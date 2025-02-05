@@ -430,37 +430,37 @@ export class WheezyGLBLoader {
 
         const tangents = new Float32Array(vertices.length)
 
-        for (let i = 0; i < indices.length; i += 9) {
+        for (let i = 0; i < indices.length; i += 3) {
             const vert0 = vec3.create(
-                vertices[indices[i]],
-                vertices[indices[i + 1]],
-                vertices[indices[i + 2]]
+                vertices[indices[i] * 3],
+                vertices[indices[i] * 3 + 1],
+                vertices[indices[i] * 3 + 2]
             )
             const vert1 = vec3.create(
-                vertices[indices[i + 3]],
-                vertices[indices[i + 4]],
-                vertices[indices[i + 5]]
+                vertices[indices[i + 1] * 3],
+                vertices[indices[i + 1] * 3 + 1],
+                vertices[indices[i + 1] * 3 + 2]
             )
 
             const vert2 = vec3.create(
-                vertices[indices[i + 6]],
-                vertices[indices[i + 7]],
-                vertices[indices[i + 8]]
+                vertices[indices[i + 2] * 3],
+                vertices[indices[i + 2] * 3 + 1],
+                vertices[indices[i + 2] * 3 + 2]
             )
 
             const uv0 = vec2.create(
-                textureCoordinates[indices[i]],
-                textureCoordinates[indices[i + 1]]
+                textureCoordinates[indices[i] * 2],
+                textureCoordinates[indices[i] * 2 + 1]
             )
 
             const uv1 = vec2.create(
-                textureCoordinates[indices[i + 2]],
-                textureCoordinates[indices[i + 3]]
+                textureCoordinates[indices[i + 1] * 2],
+                textureCoordinates[indices[i + 1] * 2 + 1]
             )
 
             const uv2 = vec2.create(
-                textureCoordinates[indices[i + 4]],
-                textureCoordinates[indices[i + 5]]
+                textureCoordinates[indices[i + 2] * 2],
+                textureCoordinates[indices[i + 2] * 2 + 1]
             )
 
             const edge1 = vec3.subtract(vert1, vert0)
@@ -483,17 +483,17 @@ export class WheezyGLBLoader {
                 f * (deltaV2 * edge1[2] - deltaV1 * edge2[2])
             )
 
-            tangents[indices[i]] += tangent[0]
-            tangents[indices[i + 1]] += tangent[1]
-            tangents[indices[i + 2]] += tangent[2]
+            tangents[indices[i] * 3] += tangent[0]
+            tangents[indices[i] * 3 + 1] += tangent[1]
+            tangents[indices[i] * 3 + 2] += tangent[2]
 
-            tangents[indices[i + 3]] += tangent[0]
-            tangents[indices[i + 4]] += tangent[1]
-            tangents[indices[i + 5]] += tangent[2]
+            tangents[indices[i + 1] * 3] += tangent[0]
+            tangents[indices[i + 1] * 3 + 1] += tangent[1]
+            tangents[indices[i + 1] * 3 + 2] += tangent[2]
 
-            tangents[indices[i + 6]] += tangent[0]
-            tangents[indices[i + 7]] += tangent[1]
-            tangents[indices[i + 8]] += tangent[2]
+            tangents[indices[i + 2] * 3] += tangent[0]
+            tangents[indices[i + 2] * 3 + 1] += tangent[1]
+            tangents[indices[i + 2] * 3 + 2] += tangent[2]
         }
 
         const id = generateId()

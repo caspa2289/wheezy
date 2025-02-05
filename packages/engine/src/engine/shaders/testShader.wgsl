@@ -129,7 +129,7 @@ fn vertex_main(vert: VertexInput) -> VertexOutput {
     out.texcoords = vert.texcoords;
     out.vertex_normal = normalize(node_params.transform * float4(vert.vertex_normal, 0.0)).xyz;
     //FIXME: w component is tangent handedness 1 or -1, google more on that
-    out.vertex_tangent = normalize(node_params.transform * float4(vert.vertex_tangent, 1.0)).xyz;
+    out.vertex_tangent = normalize(node_params.transform * float4(vert.vertex_tangent, 0.0)).xyz;
     out.camera_position = view_params.camera_position.xyz;
 
     return out;
