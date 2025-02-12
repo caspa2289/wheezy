@@ -13,15 +13,12 @@ import {
 } from '../../types'
 import {
     DEFAULT_DEPTH_FORMAT,
-    DEFAULT_SHADOW_DEPTH_FORMAT,
     DEFAULT_SWAP_CHAIN_FORMAT,
-    DEFULT_SHADOW_TEXTURE_SIZE,
     MSAA_SAMPLE_COUNT,
     VIEW_PARAMS_BUFFER_SIZE,
 } from './constants'
 import { IMeshRenderData } from '../../types/core/MeshRenderDataStorage'
 import shaderCode from '../../shaders/testShader.wgsl'
-import shadowShaderCode from '../../shaders/vertexShadow.wgsl'
 import skyboxShaderCode from '../../shaders/skybox.wgsl'
 import {
     cubePositionOffset,
@@ -32,10 +29,6 @@ import {
 } from '../../primitives/cube'
 import { GBuffer } from './GBuffer'
 
-export const alignTo = (val: number, align: number) => {
-    return Math.floor((val + align - 1) / align) * align
-}
-
 const skyBoxUniformBufferSize = 4 * 16 + 4 * 16 + 4 * 16 + 4 * 4
 
 export class Renderer implements IRenderer {
@@ -44,11 +37,6 @@ export class Renderer implements IRenderer {
     private _context!: GPUCanvasContext
     private _canvas: HTMLCanvasElement
     private _gBuffer!: GBuffer
-
-    private _shadowDepthTexture!: GPUTexture
-    private _shadowDepthTextureView!: GPUTextureView
-    private _shadowDepthTextureSize = DEFULT_SHADOW_TEXTURE_SIZE
-    private _shadowDepthSampler!: GPUSampler
 
     private _skyBoxVerticesBuffer!: GPUBuffer
     private _skyBoxPipeline!: GPURenderPipeline
@@ -69,7 +57,6 @@ export class Renderer implements IRenderer {
     private _msaaSampleCount: number = MSAA_SAMPLE_COUNT
 
     private _renderPassDescriptor!: GPURenderPassDescriptor
-    private _shadowPassDescriptor!: GPURenderPassDescriptor
 
     private _viewParamsBuffer!: GPUBuffer
     private _viewParamsBindGroup!: GPUBindGroup
@@ -84,7 +71,6 @@ export class Renderer implements IRenderer {
     public outputSource = RENDER_OUTPUT_SOURCES.DEFAULT
     public renderingMode = RENDER_MODES.USE_F_NORMAL
 
-    private renderPipeline!: GPURenderPipeline
     private materialBindGroupLayout!: GPUBindGroupLayout
     private samplerBindGroupLayout!: GPUBindGroupLayout
 
@@ -95,46 +81,124 @@ export class Renderer implements IRenderer {
     public async init() {
         await this._initializeContext(this._canvas)
 
+        const sampleType = 'float'
+
+        this.materialBindGroupLayout = this.device.createBindGroupLayout({
+            label: 'materialBindGroupLayout',
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {
+                        type: 'uniform',
+                    },
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType,
+                    },
+                },
+                {
+                    binding: 2,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType,
+                    },
+                },
+                {
+                    binding: 3,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType,
+                    },
+                },
+                {
+                    binding: 4,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType,
+                    },
+                },
+                {
+                    binding: 5,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType,
+                        viewDimension: 'cube',
+                    },
+                },
+                {
+                    binding: 6,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType,
+                    },
+                },
+            ],
+        })
+
+        this.samplerBindGroupLayout = this.device.createBindGroupLayout({
+            label: 'samplerBindGroupLayout',
+            entries: [
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {},
+                },
+                {
+                    binding: 2,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {},
+                },
+                {
+                    binding: 3,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {},
+                },
+                {
+                    binding: 4,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {},
+                },
+                {
+                    binding: 5,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {},
+                },
+                {
+                    binding: 6,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {},
+                },
+            ],
+        })
+
         this._context.configure({
             device: this._device,
             usage: GPUTextureUsage.RENDER_ATTACHMENT,
             format: DEFAULT_SWAP_CHAIN_FORMAT,
         })
 
+        this._initializeBindGroupLayouts()
+
         this._gBuffer = new GBuffer(
             this._device,
             this._context,
             this._msaaSampleCount,
             this.swapChainFormat,
-            this.depthTextureFormat
+            this.depthTextureFormat,
+            this.materialBindGroupLayout,
+            this.samplerBindGroupLayout,
+            this._uniformsBGLayout,
+            this._nodeParamsBGLayout
         )
-
-        this._shadowDepthTexture = this._device.createTexture({
-            label: 'shadowDepthTexture',
-            size: [
-                this._shadowDepthTextureSize,
-                this._shadowDepthTextureSize,
-                1,
-            ],
-            usage:
-                GPUTextureUsage.RENDER_ATTACHMENT |
-                GPUTextureUsage.TEXTURE_BINDING,
-            format: DEFAULT_SHADOW_DEPTH_FORMAT,
-        })
-
-        this._shadowDepthSampler = this.device.createSampler({
-            compare: 'less',
-            label: 'shadow depth sampler',
-        })
-
-        this._shadowDepthTextureView = this._shadowDepthTexture.createView()
 
         this._shaderModule = this.device.createShaderModule({
             label: 'main shader',
             code: shaderCode,
         })
-
-        this._initializeBindGroupLayouts()
 
         this._initializeViewParams()
 
@@ -159,16 +223,6 @@ export class Renderer implements IRenderer {
                 stencilLoadOp: 'clear' as GPULoadOp,
                 stencilClearValue: 0,
                 stencilStoreOp: 'store' as GPUStoreOp,
-            },
-        }
-
-        this._shadowPassDescriptor = {
-            colorAttachments: [],
-            depthStencilAttachment: {
-                view: this._shadowDepthTextureView,
-                depthClearValue: 1.0,
-                depthLoadOp: 'clear',
-                depthStoreOp: 'store',
             },
         }
 
@@ -259,190 +313,6 @@ export class Renderer implements IRenderer {
                 stencilStoreOp: 'store' as GPUStoreOp,
             },
         }
-
-        const sampleType = 'float'
-
-        this.materialBindGroupLayout = this.device.createBindGroupLayout({
-            label: 'materialBindGroupLayout',
-            entries: [
-                {
-                    binding: 0,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    buffer: {
-                        type: 'uniform',
-                    },
-                },
-                {
-                    binding: 1,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    texture: {
-                        sampleType,
-                    },
-                },
-                {
-                    binding: 2,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    texture: {
-                        sampleType,
-                    },
-                },
-                {
-                    binding: 3,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    texture: {
-                        sampleType,
-                    },
-                },
-                {
-                    binding: 4,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    texture: {
-                        sampleType,
-                    },
-                },
-                {
-                    binding: 5,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    texture: {
-                        sampleType: 'depth',
-                    },
-                },
-                {
-                    binding: 6,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    texture: {
-                        sampleType,
-                        viewDimension: 'cube',
-                    },
-                },
-                {
-                    binding: 7,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    texture: {
-                        sampleType,
-                    },
-                },
-            ],
-        })
-
-        this.samplerBindGroupLayout = this.device.createBindGroupLayout({
-            label: 'samplerBindGroupLayout',
-            entries: [
-                {
-                    binding: 1,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    sampler: {},
-                },
-                {
-                    binding: 2,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    sampler: {},
-                },
-                {
-                    binding: 3,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    sampler: {},
-                },
-                {
-                    binding: 4,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    sampler: {},
-                },
-                {
-                    binding: 5,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    sampler: {
-                        type: 'comparison',
-                    },
-                },
-                {
-                    binding: 6,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    sampler: {},
-                },
-                {
-                    binding: 7,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    sampler: {},
-                },
-            ],
-        })
-
-        this.renderPipeline = this.device.createRenderPipeline({
-            label: 'main render pipeline',
-            layout: this.device.createPipelineLayout({
-                bindGroupLayouts: [
-                    this._uniformsBGLayout,
-                    this._nodeParamsBGLayout,
-                    this.materialBindGroupLayout,
-                    this.samplerBindGroupLayout,
-                ],
-            }),
-            vertex: {
-                module: this._shaderModule,
-                entryPoint: 'vertex_main',
-                buffers: [
-                    {
-                        arrayStride: 12,
-                        attributes: [
-                            {
-                                format: 'float32x3',
-                                offset: 0,
-                                shaderLocation: 0,
-                            },
-                        ],
-                    },
-                    {
-                        arrayStride: 8,
-                        attributes: [
-                            {
-                                format: 'float32x2',
-                                offset: 0,
-                                shaderLocation: 1,
-                            },
-                        ],
-                    },
-                    {
-                        arrayStride: 12,
-                        attributes: [
-                            {
-                                format: 'float32x3',
-                                offset: 0,
-                                shaderLocation: 2,
-                            },
-                        ],
-                    },
-                    {
-                        arrayStride: 12,
-                        attributes: [
-                            {
-                                format: 'float32x3',
-                                offset: 0,
-                                shaderLocation: 3,
-                            },
-                        ],
-                    },
-                ],
-            },
-            fragment: {
-                module: this._shaderModule,
-                entryPoint: 'fragment_main',
-                targets: [{ format: this.swapChainFormat }],
-            },
-            primitive: {
-                topology: 'triangle-list',
-                stripIndexFormat: undefined,
-                cullMode: 'back',
-            },
-            depthStencil: {
-                format: this.depthTextureFormat,
-                depthWriteEnabled: true,
-                depthCompare: 'less',
-            },
-            multisample: {
-                count: this._msaaSampleCount,
-            },
-        })
 
         await this.setDefaultSkyBoxTexture()
     }
@@ -579,7 +449,11 @@ export class Renderer implements IRenderer {
             throw new Error('GPU Adapter Unavailable')
         }
 
-        const device = await adapter.requestDevice()
+        const device = await adapter.requestDevice({
+            requiredLimits: {
+                maxColorAttachmentBytesPerSample: 128,
+            },
+        })
 
         this._device = device
         this._adapter = adapter
@@ -602,7 +476,7 @@ export class Renderer implements IRenderer {
         )
 
         const buffer = this.device.createBuffer({
-            size: alignTo(accessor.byteLength, 4),
+            size: Math.floor((accessor.byteLength + 4 - 1) / 4) * 4,
             usage: accessor.usage,
             mappedAtCreation: true,
         })
@@ -634,12 +508,6 @@ export class Renderer implements IRenderer {
 
         meshDataEntry.materialParamsBuffer.unmap()
 
-        const primitive: GPUPrimitiveState = {
-            topology: 'triangle-list',
-            stripIndexFormat: undefined,
-            cullMode: 'back',
-        }
-
         meshDataEntry.samplerBindGroup = this.device.createBindGroup({
             label: 'sampler bindgroup',
             layout: this.samplerBindGroupLayout,
@@ -662,14 +530,10 @@ export class Renderer implements IRenderer {
                 },
                 {
                     binding: 5,
-                    resource: this._shadowDepthSampler,
-                },
-                {
-                    binding: 6,
                     resource: this._skyboxSampler,
                 },
                 {
-                    binding: 7,
+                    binding: 6,
                     resource: mesh.material?.emissiveTexture.sampler,
                 },
             ],
@@ -677,6 +541,7 @@ export class Renderer implements IRenderer {
 
         meshDataEntry.materialBindGroup = this.device.createBindGroup({
             label: 'material bindgroup',
+            //REFACTOR: could this be auto generated?
             layout: this.materialBindGroupLayout,
             entries: [
                 {
@@ -704,55 +569,15 @@ export class Renderer implements IRenderer {
                 },
                 {
                     binding: 5,
-                    resource: this._shadowDepthTextureView,
-                },
-                {
-                    binding: 6,
                     resource: this._skyboxTexture.createView({
                         dimension: 'cube',
                     }),
                 },
                 {
-                    binding: 7,
+                    binding: 6,
                     resource: mesh.material?.emissiveTexture.view,
                 },
             ],
-        })
-
-        //FIXME: this should not be created per mesh when all stuff is stubbed
-        meshDataEntry.shadowRenderPipeline = this.device.createRenderPipeline({
-            label: 'shadow render pipeline',
-            layout: this.device.createPipelineLayout({
-                label: 'shadow render pipeline layout',
-                bindGroupLayouts: [
-                    this._uniformsBGLayout,
-                    this._nodeParamsBGLayout,
-                ],
-            }),
-            vertex: {
-                module: this.device.createShaderModule({
-                    label: 'shadow shader module',
-                    code: shadowShaderCode,
-                }),
-                buffers: [
-                    {
-                        arrayStride: mesh.positions.byteStride,
-                        attributes: [
-                            {
-                                format: mesh.positions.elementType,
-                                offset: 0,
-                                shaderLocation: 0,
-                            },
-                        ],
-                    },
-                ],
-            },
-            depthStencil: {
-                depthWriteEnabled: true,
-                depthCompare: 'less',
-                format: 'depth32float',
-            },
-            primitive,
         })
 
         meshDataEntry.positionsBuffer = this._createMeshBuffer(
@@ -832,38 +657,6 @@ export class Renderer implements IRenderer {
             tangentsBuffer as GPUBuffer,
             0,
             mesh.tangents.byteLength
-        )
-
-        renderPassEncoder.setIndexBuffer(
-            indicesBuffer as GPUBuffer,
-            mesh.indices.elementType as GPUIndexFormat,
-            0,
-            mesh.indices.byteLength
-        )
-        renderPassEncoder.drawIndexed(mesh.indices.count)
-    }
-
-    private renderMeshShadows(
-        mesh: IMesh,
-        scene: IScene,
-        renderPassEncoder: GPURenderPassEncoder
-    ) {
-        const {
-            shadowRenderPipeline,
-            positionsBuffer,
-            indicesBuffer,
-            nodeParamsBindGroup,
-        } = scene.meshRenderDataStorage.data.get(mesh.id) as IMeshRenderData
-
-        renderPassEncoder.setBindGroup(1, nodeParamsBindGroup as GPUBindGroup)
-
-        renderPassEncoder.setPipeline(shadowRenderPipeline as GPURenderPipeline)
-
-        renderPassEncoder.setVertexBuffer(
-            0,
-            positionsBuffer as GPUBuffer,
-            0,
-            mesh.positions.byteLength
         )
 
         renderPassEncoder.setIndexBuffer(
@@ -1051,24 +844,12 @@ export class Renderer implements IRenderer {
         skyBoxPass.draw(cubeVertexCount)
         skyBoxPass.end()
 
-        const shadowPass = commandEncoder.beginRenderPass(
-            this._shadowPassDescriptor
-        )
-
-        shadowPass.setBindGroup(0, this._viewParamsBindGroup)
-
-        meshesToRender.forEach((mesh) => {
-            this.renderMeshShadows(mesh, scene, shadowPass)
-        })
-
-        shadowPass.end()
-
         const renderPass = commandEncoder.beginRenderPass(
-            this._renderPassDescriptor
+            this._gBuffer.renderPassDescriptor
         )
 
         renderPass.setBindGroup(0, this._viewParamsBindGroup)
-        renderPass.setPipeline(this.renderPipeline)
+        renderPass.setPipeline(this._gBuffer.renderPipeline)
 
         //FIXME: move samplers and textures back to the same bindgroup
         meshesToRender.forEach((mesh) => {

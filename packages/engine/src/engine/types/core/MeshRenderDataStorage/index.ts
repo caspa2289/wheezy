@@ -11,6 +11,5 @@ export interface IMeshRenderData {
     materialParamsBuffer: GPUBuffer
     materialBindGroup: GPUBindGroup
     samplerBindGroup: GPUBindGroup
-    shadowRenderPipeline: GPURenderPipeline
     nodeParamsBindGroup: GPUBindGroup
 }

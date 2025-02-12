@@ -1,3 +1,5 @@
+import writeGbufferCode from '../../shaders/writeGBuffer.wgsl'
+
 export class GBuffer {
     readonly _normal: GPUTextureView
     readonly _albedo: GPUTextureView
@@ -6,14 +8,19 @@ export class GBuffer {
     readonly _occlusion: GPUTextureView
     readonly _emission: GPUTextureView
     readonly _multiSample: GPUTextureView | undefined
-    // readonly _renderPipeline: GPURenderPipeline
+    readonly _renderPipeline: GPURenderPipeline
+    readonly _renderPassDescriptor: GPURenderPassDescriptor
 
     constructor(
         device: GPUDevice,
         context: GPUCanvasContext,
         msaaSampleCount: number,
         swapChainFormat: GPUTextureFormat,
-        depthFormat: GPUTextureFormat
+        depthFormat: GPUTextureFormat,
+        materialBindGroupLayout: GPUBindGroupLayout,
+        samplerBindGroupLayout: GPUBindGroupLayout,
+        uniformsBindGroupLayout: GPUBindGroupLayout,
+        nodeParamsBindGroupLayout: GPUBindGroupLayout
     ) {
         const createTextureView = (
             sampleCount?: number,
@@ -41,32 +48,145 @@ export class GBuffer {
         this._metallicRoughness = createTextureView()
         this._occlusion = createTextureView()
 
-        //     this._renderPipeline = device.createRenderPipeline({
-        //         layout: 'auto',
-        //         vertex: {
-        //             module: device.createShaderModule({
-        //                 code: vertexWriteGBuffers,
-        //             }),
-        //             buffers: vertexBuffersLayout,
-        //         },
-        //         fragment: {
-        //             module: device.createShaderModule({
-        //                 code: fragmentWriteGBuffers,
-        //             }),
-        //             targets: [
-        //                 // normal
-        //                 { format: 'rgba16float' },
-        //                 // albedo
-        //                 { format: 'bgra8unorm' },
-        //             ],
-        //         },
-        //         depthStencil: {
-        //             depthWriteEnabled: true,
-        //             depthCompare: 'less',
-        //             format: 'depth24plus',
-        //         },
-        //         primitive,
-        //     })
+        const shader = device.createShaderModule({
+            code: writeGbufferCode,
+        })
+
+        this._renderPipeline = device.createRenderPipeline({
+            label: 'g buffer write pipeline',
+            layout: device.createPipelineLayout({
+                bindGroupLayouts: [
+                    uniformsBindGroupLayout,
+                    nodeParamsBindGroupLayout,
+                    materialBindGroupLayout,
+                    samplerBindGroupLayout,
+                ],
+            }),
+            vertex: {
+                entryPoint: 'vertex_main',
+                module: shader,
+                buffers: [
+                    {
+                        arrayStride: 12,
+                        attributes: [
+                            {
+                                format: 'float32x3',
+                                offset: 0,
+                                shaderLocation: 0,
+                            },
+                        ],
+                    },
+                    {
+                        arrayStride: 8,
+                        attributes: [
+                            {
+                                format: 'float32x2',
+                                offset: 0,
+                                shaderLocation: 1,
+                            },
+                        ],
+                    },
+                    {
+                        arrayStride: 12,
+                        attributes: [
+                            {
+                                format: 'float32x3',
+                                offset: 0,
+                                shaderLocation: 2,
+                            },
+                        ],
+                    },
+                    {
+                        arrayStride: 12,
+                        attributes: [
+                            {
+                                format: 'float32x3',
+                                offset: 0,
+                                shaderLocation: 3,
+                            },
+                        ],
+                    },
+                ],
+            },
+            fragment: {
+                entryPoint: 'fragment_main',
+                module: shader,
+                targets: [
+                    // normal
+                    { format: 'rgba16float' },
+                    // albedo
+                    { format: swapChainFormat },
+                    //emission
+                    { format: swapChainFormat },
+                    //metallicRoughness
+                    { format: swapChainFormat },
+                    //occlusion
+                    { format: swapChainFormat },
+                ],
+            },
+            primitive: {
+                topology: 'triangle-list',
+                stripIndexFormat: undefined,
+                cullMode: 'back',
+            },
+            depthStencil: {
+                format: depthFormat,
+                depthWriteEnabled: true,
+                depthCompare: 'less',
+            },
+            multisample: {
+                count: msaaSampleCount,
+            },
+        })
+
+        this._renderPassDescriptor = {
+            colorAttachments: [
+                {
+                    view: this._normal,
+
+                    clearValue: [0.0, 0.0, 1.0, 1.0],
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                },
+                {
+                    view: this._albedo,
+
+                    clearValue: [0, 0, 0, 1],
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                },
+                {
+                    view: this._emission,
+
+                    clearValue: [0, 0, 0, 1],
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                },
+                {
+                    view: this._metallicRoughness,
+
+                    clearValue: [0, 0, 0, 1],
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                },
+                {
+                    view: this._occlusion,
+
+                    clearValue: [0, 0, 0, 1],
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                },
+            ],
+            depthStencilAttachment: {
+                view: this._depth,
+                depthClearValue: 1.0,
+                depthLoadOp: 'clear',
+                depthStoreOp: 'store',
+                stencilLoadOp: 'clear' as GPULoadOp,
+                stencilClearValue: 0,
+                stencilStoreOp: 'store' as GPUStoreOp,
+            },
+        }
     }
 
     get normal() {
@@ -97,7 +217,11 @@ export class GBuffer {
         return this._multiSample
     }
 
-    // get renderPipeline() {
-    //     return this._renderPipeline
-    // }
+    get renderPipeline() {
+        return this._renderPipeline
+    }
+
+    get renderPassDescriptor() {
+        return this._renderPassDescriptor
+    }
 }
