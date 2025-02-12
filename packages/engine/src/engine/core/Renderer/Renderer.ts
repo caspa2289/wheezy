@@ -18,7 +18,7 @@ import {
     VIEW_PARAMS_BUFFER_SIZE,
 } from './constants'
 import { IMeshRenderData } from '../../types/core/MeshRenderDataStorage'
-import shaderCode from '../../shaders/testShader.wgsl'
+import shaderCode from '../../shaders/deferredShader.wgsl'
 import skyboxShaderCode from '../../shaders/skybox.wgsl'
 import {
     cubePositionOffset,
@@ -57,6 +57,7 @@ export class Renderer implements IRenderer {
     private _msaaSampleCount: number = MSAA_SAMPLE_COUNT
 
     private _renderPassDescriptor!: GPURenderPassDescriptor
+    private _renderPipeline!: GPURenderPipeline
 
     private _viewParamsBuffer!: GPUBuffer
     private _viewParamsBindGroup!: GPUBindGroup
@@ -200,30 +201,46 @@ export class Renderer implements IRenderer {
             code: shaderCode,
         })
 
+        this._renderPipeline = this.device.createRenderPipeline({
+            layout: this.device.createPipelineLayout({
+                bindGroupLayouts: [
+                    this._uniformsBGLayout,
+                    this._gBuffer.texturesBindGroupLayout,
+                ],
+            }),
+            vertex: {
+                entryPoint: 'vertex_main',
+                module: this._shaderModule,
+            },
+            fragment: {
+                entryPoint: 'fragment_main',
+                module: this._shaderModule,
+                targets: [
+                    {
+                        format: this.swapChainFormat,
+                    },
+                ],
+            },
+            primitive: {
+                topology: 'triangle-list',
+                stripIndexFormat: undefined,
+                cullMode: 'back',
+            },
+        })
+
         this._initializeViewParams()
 
         this._renderPassDescriptor = {
             label: 'main render pass descriptor',
             colorAttachments: [
                 {
-                    view: null as unknown as GPUTextureView,
-                    resolveTarget: (this._msaaSampleCount === 1
-                        ? undefined
-                        : null) as unknown as GPUTextureView,
-                    loadOp: 'load' as GPULoadOp,
-                    clearValue: [0.0, 0.0, 0.0, 0.0],
+                    view: undefined as any,
+
+                    clearValue: [0, 0, 0, 1],
+                    loadOp: 'load',
                     storeOp: 'store',
                 },
             ],
-            depthStencilAttachment: {
-                view: this._gBuffer.depth,
-                depthLoadOp: 'clear' as GPULoadOp,
-                depthClearValue: 1.0,
-                depthStoreOp: 'store' as GPUStoreOp,
-                stencilLoadOp: 'clear' as GPULoadOp,
-                stencilClearValue: 0,
-                stencilStoreOp: 'store' as GPUStoreOp,
-            },
         }
 
         this._skyBoxVerticesBuffer = this._device.createBuffer({
@@ -308,9 +325,6 @@ export class Renderer implements IRenderer {
                 depthLoadOp: 'clear' as GPULoadOp,
                 depthClearValue: 1.0,
                 depthStoreOp: 'store' as GPUStoreOp,
-                stencilLoadOp: 'clear' as GPULoadOp,
-                stencilClearValue: 0,
-                stencilStoreOp: 'store' as GPUStoreOp,
             },
         }
 
@@ -844,18 +858,33 @@ export class Renderer implements IRenderer {
         skyBoxPass.draw(cubeVertexCount)
         skyBoxPass.end()
 
-        const renderPass = commandEncoder.beginRenderPass(
+        const gBufferPass = commandEncoder.beginRenderPass(
             this._gBuffer.renderPassDescriptor
         )
 
-        renderPass.setBindGroup(0, this._viewParamsBindGroup)
-        renderPass.setPipeline(this._gBuffer.renderPipeline)
+        gBufferPass.setBindGroup(0, this._viewParamsBindGroup)
+        gBufferPass.setPipeline(this._gBuffer.renderPipeline)
 
         //FIXME: move samplers and textures back to the same bindgroup
         meshesToRender.forEach((mesh) => {
-            this.renderMesh(mesh, scene, renderPass)
+            this.renderMesh(mesh, scene, gBufferPass)
         })
 
+        gBufferPass.end()
+
+        const renderPass = commandEncoder.beginRenderPass(
+            this._renderPassDescriptor
+        )
+
+        renderPass.setBindGroup(0, this._viewParamsBindGroup)
+        renderPass.setBindGroup(1, this._gBuffer.texturesBindgroup)
+        renderPass.setPipeline(this._renderPipeline)
+
+        const count = meshesToRender.reduce((result, mesh) => {
+            return result + mesh.indices.count
+        }, 0)
+
+        renderPass.draw(count)
         renderPass.end()
 
         this.device.queue.submit([commandEncoder.finish()])

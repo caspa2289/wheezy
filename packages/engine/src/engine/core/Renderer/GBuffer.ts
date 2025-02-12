@@ -8,8 +8,12 @@ export class GBuffer {
     readonly _occlusion: GPUTextureView
     readonly _emission: GPUTextureView
     readonly _multiSample: GPUTextureView | undefined
+
     readonly _renderPipeline: GPURenderPipeline
     readonly _renderPassDescriptor: GPURenderPassDescriptor
+
+    readonly _texturesBindGroupLayout: GPUBindGroupLayout
+    readonly _texturesBindGroup: GPUBindGroup
 
     constructor(
         device: GPUDevice,
@@ -140,6 +144,7 @@ export class GBuffer {
         })
 
         this._renderPassDescriptor = {
+            label: 'g buffer render pass descriptor',
             colorAttachments: [
                 {
                     view: this._normal,
@@ -182,11 +187,87 @@ export class GBuffer {
                 depthClearValue: 1.0,
                 depthLoadOp: 'clear',
                 depthStoreOp: 'store',
-                stencilLoadOp: 'clear' as GPULoadOp,
-                stencilClearValue: 0,
-                stencilStoreOp: 'store' as GPUStoreOp,
             },
         }
+
+        this._texturesBindGroupLayout = device.createBindGroupLayout({
+            label: 'g buffer textures bind group layout',
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType: 'unfilterable-float',
+                    },
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType: 'unfilterable-float',
+                    },
+                },
+                {
+                    binding: 2,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType: 'unfilterable-float',
+                    },
+                },
+                {
+                    binding: 3,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType: 'unfilterable-float',
+                    },
+                },
+                {
+                    binding: 4,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType: 'unfilterable-float',
+                    },
+                },
+                {
+                    binding: 5,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType: 'depth',
+                    },
+                },
+            ],
+        })
+
+        this._texturesBindGroup = device.createBindGroup({
+            label: 'g buffer textures bind group',
+            layout: this.texturesBindGroupLayout,
+            entries: [
+                {
+                    binding: 0,
+                    resource: this._normal,
+                },
+                {
+                    binding: 1,
+                    resource: this._albedo,
+                },
+                {
+                    binding: 2,
+                    resource: this._emission,
+                },
+                {
+                    binding: 3,
+                    resource: this._metallicRoughness,
+                },
+                {
+                    binding: 4,
+                    resource: this._occlusion,
+                },
+                {
+                    binding: 5,
+                    resource: this._depth,
+                },
+            ],
+        })
     }
 
     get normal() {
@@ -223,5 +304,13 @@ export class GBuffer {
 
     get renderPassDescriptor() {
         return this._renderPassDescriptor
+    }
+
+    get texturesBindGroupLayout() {
+        return this._texturesBindGroupLayout
+    }
+
+    get texturesBindgroup() {
+        return this._texturesBindGroup
     }
 }
