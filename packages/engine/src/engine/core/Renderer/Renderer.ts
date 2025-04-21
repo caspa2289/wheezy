@@ -6,7 +6,6 @@ import {
     IRenderer,
     IRendererProps,
     IScene,
-    RENDER_MODES,
     RENDER_OUTPUT_SOURCES,
     SceneNodeContent,
     TSkyboxBitmaps,
@@ -82,7 +81,6 @@ export class Renderer implements IRenderer {
     public ambientLightIntensity: number = 0.03
 
     public outputSource = RENDER_OUTPUT_SOURCES.DEFAULT
-    public renderingMode = RENDER_MODES.USE_F_NORMAL
 
     private renderPipeline!: GPURenderPipeline
     private materialBindGroupLayout!: GPUBindGroupLayout
@@ -888,7 +886,6 @@ export class Renderer implements IRenderer {
         )
 
         debugInfoView.setUint32(0, this.outputSource, true)
-        debugInfoView.setUint32(4, this.renderingMode, true)
 
         const viewParamsUploadBuffer = this.device.createBuffer({
             size: this._viewParamsBufferSize,

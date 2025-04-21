@@ -12,10 +12,6 @@ const OUT_F_NORMAL = 6;
 const OUT_V_TANGENT = 7;
 const OUT_OCCLUSION = 8;
 
-const USE_V_NORMAL = 0;
-const USE_F_NORMAL = 1;
-const USE_PBR = 2;
-
 const PI = 3.14159265359;
 
 struct VertexInput {
@@ -51,7 +47,6 @@ struct NodeParams {
 
 struct DebugParams {
     output_type: u32,
-    normal_type: u32
 }
 
 struct MaterialParams {
@@ -128,7 +123,6 @@ fn vertex_main(vert: VertexInput) -> VertexOutput {
     out.world_position = (node_params.transform * float4(vert.position, 1.0)).xyz;
     out.texcoords = vert.texcoords;
     out.vertex_normal = normalize(node_params.transform * float4(vert.vertex_normal, 0.0)).xyz;
-    //FIXME: w component is tangent handedness 1 or -1, google more on that
     out.vertex_tangent = normalize(node_params.transform * float4(vert.vertex_tangent, 0.0)).xyz;
     out.camera_position = view_params.camera_position.xyz;
 
@@ -235,70 +229,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     let occlusion = textureSample(occlusion_texture, occlusion_sampler, in.texcoords).r;
     let emission = textureSample(emission_texture, emission_sampler, in.texcoords);
 
-    var fragment_normal: float3;
-    switch(debug_params.normal_type) {
-        case(USE_V_NORMAL): {
-            fragment_normal = in.vertex_normal;
-            break;
-        }
-        case(USE_PBR): {
-            albedo_color = pow(albedo_color, vec4f(2.2));
-            let N = calculateBumpedNormal(in);
-            let V = normalize(in.camera_position - in.world_position);
-            let R = reflect(-V, N);
-
-            var F0 = vec3(0.04); 
-            F0 = mix(F0, albedo_color.rgb, vec3(metallic));
-                    
-            // reflectance equation
-            var Lo = vec3(0.0);
-            
-            // calculate per-light radiance
-            let L = normalize(view_params.light_position.xyz - in.world_position);
-            let H = normalize(V + L);
-            let distance = length(view_params.light_position.xyz - in.world_position);
-            let attenuation = 1.0; //not applicable to directional light
-            //1.0 / (distance * distance);
-            let radiance = LIGHT_COLOR.rgb * attenuation;        
-            
-            // cook-torrance brdf
-            let NDF = DistributionGGX(N, H, roughness);        
-            let G = GeometrySmith(N, V, L, roughness);      
-            let F = fresnelSchlick(max(dot(H, V), 0.0), F0, roughness);       
-            
-            let numerator = NDF * G * F;
-            let denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
-            let specular = numerator / denominator;  
- 
-            let kS = F;
-            var kD = vec3(1.0) - kS;
-            kD *= 1.0 - vec3(metallic);	  
-
-            // add to outgoing radiance Lo
-            let NdotL = max(dot(N, L), 0.0);            
-            Lo += (kD * albedo_color.rgb / PI + specular) * radiance * NdotL;
-  
-            let kSl = fresnelSchlick(max(dot(N, V), 0.0), F0, roughness);
-            var kDl = 1.0 - kSl;
-            kDl *= 1.0 - metallic; 
-            let reflection_color = textureSample(skybox_texture, skybox_sampler, R).xyz;
-            //FIXME: this should be sampled from cubemap
-            let irradiance = vec3f(1, 1, 1); 
-            let diffuse = irradiance * albedo_color.rgb;
-
-            let ambient_color = (kDl * diffuse) * occlusion * vec3(0.03);
-           
-            var color = ambient_color.rgb + Lo + (F * reflection_color) + emission.rgb;
-
-            color = color / (color + vec3(1.0));
-            color = pow(color, vec3(1.0/2.2));
-        
-            return vec4(color, 1.0);
-        }
-        default: {
-            fragment_normal = calculateBumpedNormal(in);
-        }
-    }
+    let fragment_normal = calculateBumpedNormal(in);
 
     albedo_color *= occlusion;
     let ambient_color = vec4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 1.0f);
@@ -311,8 +242,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
 
     if (diffuse_factor > 0) {
         diffuse_color = vec4f(LIGHT_COLOR.xyz * LIGHT_DIFFUSE_INTENSITY * diffuse_factor, 1.0);
-    }
-    else {
+    } else {
         diffuse_color = vec4f(0, 0, 0, 0);
     }
 
