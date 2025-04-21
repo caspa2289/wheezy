@@ -6,7 +6,6 @@ export class GBuffer {
     readonly _occlusion: GPUTextureView
     readonly _emission: GPUTextureView
     readonly _multiSample: GPUTextureView | undefined
-    // readonly _renderPipeline: GPURenderPipeline
 
     constructor(
         device: GPUDevice,
@@ -40,33 +39,6 @@ export class GBuffer {
         this._emission = createTextureView()
         this._metallicRoughness = createTextureView()
         this._occlusion = createTextureView()
-
-        //     this._renderPipeline = device.createRenderPipeline({
-        //         layout: 'auto',
-        //         vertex: {
-        //             module: device.createShaderModule({
-        //                 code: vertexWriteGBuffers,
-        //             }),
-        //             buffers: vertexBuffersLayout,
-        //         },
-        //         fragment: {
-        //             module: device.createShaderModule({
-        //                 code: fragmentWriteGBuffers,
-        //             }),
-        //             targets: [
-        //                 // normal
-        //                 { format: 'rgba16float' },
-        //                 // albedo
-        //                 { format: 'bgra8unorm' },
-        //             ],
-        //         },
-        //         depthStencil: {
-        //             depthWriteEnabled: true,
-        //             depthCompare: 'less',
-        //             format: 'depth24plus',
-        //         },
-        //         primitive,
-        //     })
     }
 
     get normal() {
@@ -96,8 +68,4 @@ export class GBuffer {
     get multiSample() {
         return this._multiSample
     }
-
-    // get renderPipeline() {
-    //     return this._renderPipeline
-    // }
 }
