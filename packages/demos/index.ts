@@ -6,7 +6,6 @@ const canvas = document.getElementById('webgpu-canvas') as HTMLCanvasElement
 
 const initDebugControls = (engine: IEngine) => {
     const defaultOutputSource = 0
-    const defaultRenderingMode = 1
     const defaultScene = 1
 
     const debugContainer = document.getElementById(
@@ -43,13 +42,6 @@ const initDebugControls = (engine: IEngine) => {
         )
     })
 
-    const renderingModeDropDown = document.createElement('select')
-    renderingModeDropDown.addEventListener('change', (event) => {
-        engine.renderer.renderingMode = Number(
-            (event.target as HTMLSelectElement).value
-        )
-    })
-
     const outputOptions = [
         { label: 'Color', value: 0 },
         { label: 'Ambient color', value: 2 },
@@ -72,28 +64,10 @@ const initDebugControls = (engine: IEngine) => {
         outputSourceDropDown.appendChild(option)
     })
 
-    const renderModes = [
-        { label: 'Blinn-Phong (No bump mapping)', value: 0 },
-        { label: 'Blinn-Phong (With bump mapping)', value: 1 },
-        { label: 'Terrence-Cook (No mipmapping)', value: 2 },
-    ]
-
-    renderModes.forEach((item) => {
-        const option = document.createElement('option')
-        if (item.value === defaultRenderingMode) {
-            option.selected = true
-        }
-        option.textContent = item.label
-        option.value = String(item.value)
-        renderingModeDropDown.appendChild(option)
-    })
-
     engine.renderer.outputSource = defaultOutputSource
-    engine.renderer.renderingMode = defaultRenderingMode
     setScene(engine, defaultScene)
 
     debugContainer.appendChild(outputSourceDropDown)
-    debugContainer.appendChild(renderingModeDropDown)
 }
 
 const setScene = async (engine: IEngine, index: number) => {

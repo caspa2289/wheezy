@@ -24,13 +24,6 @@ export type TSkyboxBitmaps = [
     ImageBitmap,
 ]
 
-export enum RENDER_MODES {
-    USE_V_NORMAL,
-    USE_F_NORMAL,
-}
-
-export type TRenderMode = number
-
 export interface IRenderer {
     adapter: GPUAdapter
     device: GPUDevice
@@ -41,7 +34,6 @@ export interface IRenderer {
     ambientLightColor: Vec3
 
     outputSource: TRenderOutputSource
-    renderingMode: TRenderMode
 
     init: () => Promise<void>
     render: (dt: number, scene: IScene) => void
