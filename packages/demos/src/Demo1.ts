@@ -1,5 +1,5 @@
 import {
-    DirectionalLight,
+    DirectionalLightV2,
     GameObject,
     IGameObject,
     IScene,
@@ -17,8 +17,6 @@ export class Demo1 extends Scene implements IScene {
     private _controller: ArcBallController
 
     private _helmet!: ITransform
-
-    private _helmet1!: ITransform
 
     private _testHook!: IGameObject
 
@@ -61,10 +59,12 @@ export class Demo1 extends Scene implements IScene {
         this.objectManager.reparentObject(modelGO1, this._testHook)
         new Transform(this._testHook)
 
-        this.light = new DirectionalLight({
-            parent: this.root,
-            position: vec3.create(10, 0, -10),
-        })
+        this.directionalLights.push(
+            new DirectionalLightV2({
+                parent: this.root,
+                direction: vec3.create(-1, 0, 1),
+            })
+        )
 
         modelGO0.transform.rotateDegreesEuler({ x: 90 })
         modelGO0.transform.translate(vec3.create(0, 0, -4))
@@ -75,7 +75,6 @@ export class Demo1 extends Scene implements IScene {
         modelGO1.transform.translate(vec3.create(-1, 0, 7))
 
         this._helmet = modelGO0.transform
-        this._helmet1 = modelGO1.transform
 
         this._testHook.transform.rotateDegreesEuler({ y: -40 })
     }
@@ -103,6 +102,5 @@ export class Demo1 extends Scene implements IScene {
         this._controller.update(dt)
 
         this._helmet.rotateDegreesEuler({ z: -5 * dt })
-        // this._helmet1.rotateDegreesEuler({ z: 5 * dt })
     }
 }

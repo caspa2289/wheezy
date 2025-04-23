@@ -44,8 +44,6 @@ const initDebugControls = (engine: IEngine) => {
 
     const outputOptions = [
         { label: 'Color', value: 0 },
-        { label: 'Ambient color', value: 2 },
-        { label: 'Diffuse color', value: 3 },
         { label: 'Metallic component', value: 4 },
         { label: 'Roughness component', value: 5 },
         { label: 'Occlusion component', value: 8 },
