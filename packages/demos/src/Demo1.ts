@@ -62,7 +62,16 @@ export class Demo1 extends Scene implements IScene {
         this.directionalLights.push(
             new DirectionalLightV2({
                 parent: this.root,
-                direction: vec3.create(-1, 0, 1),
+                direction: vec3.create(-1, 0, 10),
+                color: vec3.create(1, 0.2, 0.2),
+            })
+        )
+
+        this.directionalLights.push(
+            new DirectionalLightV2({
+                parent: this.root,
+                direction: vec3.create(-1, 0, -1),
+                color: vec3.create(0.2, 1, 0.2),
             })
         )
 

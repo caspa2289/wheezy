@@ -958,7 +958,8 @@ export class Renderer implements IRenderer {
         )
 
         directionalLights.forEach((light, index) => {
-            const offset = DIRECTIONAL_LIGHT_BYTESTRIDE * index
+            const offset = 8 * index
+
             lightData.set(
                 [
                     ...light.color,
