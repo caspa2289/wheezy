@@ -221,13 +221,14 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
 
     albedo_color *= occlusion;
 
-    //fixme: make ambient a property of light
-    let ambient_color = float4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 1.0f);
-
     var total_light = float4(0.0, 0.0, 0.0, 0.0);
 
     for (var i = 0u; i < arrayLength(&directionalLightsBuffer.lights); i++) {
         total_light += calculateDirectionalLight(directionalLightsBuffer.lights[i], fragment_normal, in);
+    }
+
+    if ((total_light[0] == 0.0) & (total_light[1] == 0.0) & (total_light[2] == 0.0)) {
+        total_light = float4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 0.0f);
     }
 
     let result_color = decode_color(
@@ -237,9 +238,6 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     switch(debug_params.output_type) {
         case(OUT_V_NORMAL): {
             return vec4(in.vertex_normal, 1.0);
-        }
-        case(OUT_AMBIENT): {
-            return ambient_color;
         }
         case(OUT_METALLIC): {
             return vec4(metallic);
