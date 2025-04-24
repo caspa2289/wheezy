@@ -133,15 +133,8 @@ fn vertex_main(vert: VertexInput) -> VertexOutput {
     return out;
 };
 
-fn linear_to_srgb(x: f32) -> f32 {
-    if (x <= 0.0031308) {
-        return 12.92 * x;
-    }
-    return 1.055 * pow(x, 1.0 / 2.4) - 0.055;
-}
-
-fn decode_color(color: vec4f) -> vec4f {
-    return vec4f(linear_to_srgb(color.x), linear_to_srgb(color.y), linear_to_srgb(color.z), 1.0);
+fn gamma_correct(color: vec4f) -> vec4f {
+    return vec4f(pow(color, vec4f(1.0/2.2)));
 }
 
 fn get_visibility(shadow_position: float3) -> f32 {
@@ -181,7 +174,7 @@ fn calculateBumpedNormal(in: VertexOutput) -> float3 {
     return normalize(tbn_matrix * bump_map_normal);
 }
 
-fn calculateDirectionalLight(light: DirectionalLightData, normal: float3, in: VertexOutput) -> float4 {
+fn calculateDirectionalLight(light: DirectionalLightData, normal: float3, in: VertexOutput, metallic: f32) -> float4 {
     let diffuse_factor = dot(normal, -light.direction);
 
     var diffuse_color = float4(0, 0, 0, 0);
@@ -196,14 +189,14 @@ fn calculateDirectionalLight(light: DirectionalLightData, normal: float3, in: Ve
 
         if (specular_factor > 0.0) {
             //FIXME: calculate specular power and intensity somehow
-            let specular_power = 0.2;
-            let specular_intensity = 0.2;
+            //this is not it but looks fine from afar
+            let specular_power = metallic * 255;
+            let specular_intensity = metallic;
             specular_factor = pow(specular_factor, specular_power);
             specular_color = float4(light.color * specular_intensity * specular_factor, 1.0f);
         }
     }
 
-    //FIXME: check if specular color is contributing anything
     return (diffuse_color + specular_color);
 }
 
@@ -224,14 +217,14 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     var total_light = float4(0.0, 0.0, 0.0, 0.0);
 
     for (var i = 0u; i < arrayLength(&directionalLightsBuffer.lights); i++) {
-        total_light += calculateDirectionalLight(directionalLightsBuffer.lights[i], fragment_normal, in);
+        total_light += calculateDirectionalLight(directionalLightsBuffer.lights[i], fragment_normal, in, metallic);
     }
 
     if ((total_light[0] == 0.0) & (total_light[1] == 0.0) & (total_light[2] == 0.0)) {
         total_light = float4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 0.0f);
     }
 
-    let result_color = decode_color(
+    let result_color = gamma_correct(
         (albedo_color * total_light) + emission
     );
 
