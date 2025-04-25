@@ -56,12 +56,28 @@ struct DirectionalLightData {
   direction: vec3f,
 };
 
+struct PointLightData {
+    color: vec3f,
+    intensity: f32,
+    position: vec3f,
+    atten_constant: f32,
+    atten_linear: f32,
+    atten_exponential: f32
+}
+
 struct DirectionalLightsBuffer {
   lights: array<DirectionalLightData>,
 }
 
+struct PointLightsBuffer {
+    lights: array<PointLightData>
+}
+
 @group(3) @binding(0) 
 var<storage, read> directionalLightsBuffer: DirectionalLightsBuffer;
+
+@group(3) @binding(1) 
+var<storage, read> pointLightsBuffer: PointLightsBuffer;
 
 @group(0) @binding(0)
 var<uniform> view_params: ViewParams;
@@ -199,6 +215,33 @@ fn calculateDirectionalLight(light: DirectionalLightData, normal: float3, in: Ve
     return (diffuse_color + specular_color);
 }
 
+fn calculatePointLight(
+    light: PointLightData,
+    normal: float3,
+    in: VertexOutput,
+    metallic: f32
+) -> float4 {
+    var light_direction = in.world_position - light.position;
+    let distance = length(light_direction);
+
+    var directionalLight: DirectionalLightData;
+
+    directionalLight.color = light.color;
+    directionalLight.intensity = light.intensity;
+    directionalLight.direction = normalize(light_direction);
+
+
+    let color = calculateDirectionalLight(directionalLight, normal, in, metallic);
+
+    let attenuation = light.atten_constant +
+        light.atten_linear * distance +
+        light.atten_exponential * distance * distance;
+
+    // let attenuation = 1.0;
+
+    return color / attenuation;
+}
+
 @fragment
 fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     var albedo_color = textureSample(base_color_texture, base_color_sampler, in.texcoords) 
@@ -217,6 +260,10 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
 
     for (var i = 0u; i < arrayLength(&directionalLightsBuffer.lights); i++) {
         total_light += calculateDirectionalLight(directionalLightsBuffer.lights[i], fragment_normal, in, metallic);
+    }
+
+    for (var i = 0u; i < arrayLength(&pointLightsBuffer.lights); i++) {
+        total_light += calculatePointLight(pointLightsBuffer.lights[i], fragment_normal, in, metallic);
     }
 
     if ((total_light[0] == 0.0) & (total_light[1] == 0.0) & (total_light[2] == 0.0)) {

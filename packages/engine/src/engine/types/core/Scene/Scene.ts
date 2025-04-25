@@ -1,4 +1,5 @@
 import { IEngine, IModelPreloadData } from '../..'
+import { IPointLight } from '../../../core'
 import { IDirectionalLight } from '../../../core/lights/DirectionalLightV2'
 import { IBufferStorage } from '../BufferStorage'
 import { ICamera } from '../Camera'
@@ -26,6 +27,7 @@ export interface IScene {
     engine: IEngine
     root: IGameObject
     directionalLights: IDirectionalLight[]
+    pointLights: IPointLight[]
 
     init: () => Promise<void>
     uploadModel: (props: ISceneUploadModelProps) => Promise<IGameObject>

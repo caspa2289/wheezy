@@ -22,6 +22,7 @@ import { TextureStorage } from '../TextureStorage'
 import { GameObject } from '../GameObject'
 import { MeshRenderDataStorage } from '../MeshRenderDataStorage'
 import { IDirectionalLight } from '../lights/DirectionalLightV2'
+import { IPointLight } from '../lights'
 
 export class Scene implements IScene {
     private _objectManager: IObjectManager = new ObjectManager()
@@ -39,6 +40,7 @@ export class Scene implements IScene {
     private _root: IGameObject
 
     directionalLights: IDirectionalLight[] = []
+    pointLights: IPointLight[] = []
 
     constructor(props?: ISceneProps) {
         const { camera } = props ?? {}

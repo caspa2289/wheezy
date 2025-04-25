@@ -17,6 +17,7 @@ import {
     DEFULT_SHADOW_TEXTURE_SIZE,
     DIRECTIONAL_LIGHT_BYTESTRIDE,
     MSAA_SAMPLE_COUNT,
+    POINT_LIGHT_BYTESTRIDE,
     VIEW_PARAMS_BUFFER_SIZE,
 } from './constants'
 import { IMeshRenderData } from '../../types/core/MeshRenderDataStorage'
@@ -366,8 +367,14 @@ export class Renderer implements IRenderer {
             entries: [
                 {
                     binding: 0,
-                    visibility:
-                        GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {
+                        type: 'read-only-storage',
+                    },
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.FRAGMENT,
                     buffer: {
                         type: 'read-only-storage',
                     },
@@ -942,31 +949,56 @@ export class Renderer implements IRenderer {
             debugInfoArray
         )
 
-        const directionalLights = scene.directionalLights
-
-        const directionalLightsByteSize =
-            DIRECTIONAL_LIGHT_BYTESTRIDE * directionalLights.length
-
         const directionalLightsBuffer = this.device.createBuffer({
-            size: directionalLightsByteSize,
+            size:
+                DIRECTIONAL_LIGHT_BYTESTRIDE * scene.directionalLights.length ||
+                32,
             usage: GPUBufferUsage.STORAGE,
             mappedAtCreation: true,
         })
 
-        const lightData = new Float32Array(
+        const directionalLightData = new Float32Array(
             directionalLightsBuffer.getMappedRange()
         )
 
-        directionalLights.forEach((light, index) => {
+        scene.directionalLights.forEach((light, index) => {
             const offset = 8 * index
 
-            lightData.set(
+            directionalLightData.set(
                 [...light.color, light.intensity, ...light.direction],
                 offset
             )
         })
 
         directionalLightsBuffer.unmap()
+
+        const pointLightsBuffer = this.device.createBuffer({
+            size: POINT_LIGHT_BYTESTRIDE * scene.pointLights.length || 32,
+            usage: GPUBufferUsage.STORAGE,
+            mappedAtCreation: true,
+        })
+
+        const pointLightData = new Float32Array(
+            pointLightsBuffer.getMappedRange()
+        )
+
+        scene.pointLights.forEach((light, index) => {
+            const offset = 11 * index
+
+            pointLightData.set(
+                [
+                    ...light.color,
+                    light.intensity,
+                    ...light.position,
+                    light.attenuationConstant,
+                    light.attenuationLinear,
+                    light.attenuationExponential,
+                ],
+                offset
+            )
+        })
+
+        pointLightsBuffer.unmap()
 
         const lightsBindGroup = this.device.createBindGroup({
             layout: this.lightsBindGroupLayout,
@@ -975,6 +1007,12 @@ export class Renderer implements IRenderer {
                     binding: 0,
                     resource: {
                         buffer: directionalLightsBuffer,
+                    },
+                },
+                {
+                    binding: 1,
+                    resource: {
+                        buffer: pointLightsBuffer,
                     },
                 },
             ],
