@@ -961,12 +961,7 @@ export class Renderer implements IRenderer {
             const offset = 8 * index
 
             lightData.set(
-                [
-                    ...light.color,
-                    light.intensity,
-                    ...light.direction,
-                    light.diffuseIntensity,
-                ],
+                [...light.color, light.intensity, ...light.direction],
                 offset
             )
         })

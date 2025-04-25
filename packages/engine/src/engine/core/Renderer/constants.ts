@@ -5,4 +5,4 @@ export const DEFULT_SHADOW_TEXTURE_SIZE: number = 1024
 export const VIEW_PARAMS_BUFFER_SIZE: number =
     16 * 4 + 16 * 4 + 4 * 4 + 4 * 4 + 16 * 4 + 16 * 4 + 16 + 16 * 3 + 4 + 4
 export const MSAA_SAMPLE_COUNT: number = 4
-export const DIRECTIONAL_LIGHT_BYTESTRIDE = 16 * 4 + 16 * 4
+export const DIRECTIONAL_LIGHT_BYTESTRIDE = 16 * 4 + 16 * 3

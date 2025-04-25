@@ -13,7 +13,6 @@ export interface IDirectionalLightProps
 
 export interface IDirectionalLight extends ILightSourceV2 {
     direction: Vec3
-    diffuseIntensity: number
 }
 
 export class DirectionalLightV2
@@ -21,7 +20,6 @@ export class DirectionalLightV2
     implements IDirectionalLight
 {
     private _direction!: Vec3
-    diffuseIntensity = 1
 
     constructor(props: IDirectionalLightProps) {
         super({ ...props, lightType: LIGHT_SOURCE_TYPES.directional })

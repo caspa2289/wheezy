@@ -54,7 +54,6 @@ struct DirectionalLightData {
   color: vec3f,
   intensity: f32,
   direction: vec3f,
-  diffuse_intensity: f32
 };
 
 struct DirectionalLightsBuffer {
@@ -182,7 +181,7 @@ fn calculateDirectionalLight(light: DirectionalLightData, normal: float3, in: Ve
 
     if (diffuse_factor > 0.0) {
 
-        diffuse_color = float4(light.color * light.diffuse_intensity * diffuse_factor, 1.0);
+        diffuse_color = float4(light.color * light.intensity * diffuse_factor, 1.0);
         let vertex_to_eye = normalize(in.camera_position - in.world_position);
         let light_reflect = normalize(reflect(light.direction, normal));
         var specular_factor = dot(vertex_to_eye, light_reflect);
