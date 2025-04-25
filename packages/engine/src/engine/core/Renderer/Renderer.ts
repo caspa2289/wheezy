@@ -15,6 +15,7 @@ import {
     DEFAULT_SHADOW_DEPTH_FORMAT,
     DEFAULT_SWAP_CHAIN_FORMAT,
     DEFULT_SHADOW_TEXTURE_SIZE,
+    DIRECTIONAL_LIGHT_BYTESTRIDE,
     MSAA_SAMPLE_COUNT,
     VIEW_PARAMS_BUFFER_SIZE,
 } from './constants'
@@ -61,6 +62,8 @@ export class Renderer implements IRenderer {
     private _skyboxTexture!: GPUTexture
     private _skyboxSampler!: GPUSampler
 
+    private _lightsBindGroupLayout!: GPUBindGroupLayout
+
     private _uniformsBGLayout!: GPUBindGroupLayout
     private _nodeParamsBGLayout!: GPUBindGroupLayout
 
@@ -77,14 +80,13 @@ export class Renderer implements IRenderer {
 
     private _shaderModule!: GPUShaderModule
 
-    public ambientLightColor = vec3.create(1, 1, 1)
-    public ambientLightIntensity: number = 0.03
+    public ambientLightColor = vec3.create(0.01, 0.01, 0.01)
+    public ambientLightIntensity: number = 1
 
     public outputSource = RENDER_OUTPUT_SOURCES.DEFAULT
 
     private renderPipeline!: GPURenderPipeline
     private materialBindGroupLayout!: GPUBindGroupLayout
-    private samplerBindGroupLayout!: GPUBindGroupLayout
 
     constructor({ canvas }: IRendererProps) {
         this._canvas = canvas
@@ -320,48 +322,55 @@ export class Renderer implements IRenderer {
                         sampleType,
                     },
                 },
-            ],
-        })
-
-        this.samplerBindGroupLayout = this.device.createBindGroupLayout({
-            label: 'samplerBindGroupLayout',
-            entries: [
                 {
-                    binding: 1,
+                    binding: 8,
                     visibility: GPUShaderStage.FRAGMENT,
                     sampler: {},
                 },
                 {
-                    binding: 2,
+                    binding: 9,
                     visibility: GPUShaderStage.FRAGMENT,
                     sampler: {},
                 },
                 {
-                    binding: 3,
+                    binding: 10,
                     visibility: GPUShaderStage.FRAGMENT,
                     sampler: {},
                 },
                 {
-                    binding: 4,
+                    binding: 11,
                     visibility: GPUShaderStage.FRAGMENT,
                     sampler: {},
                 },
                 {
-                    binding: 5,
+                    binding: 12,
                     visibility: GPUShaderStage.FRAGMENT,
                     sampler: {
                         type: 'comparison',
                     },
                 },
                 {
-                    binding: 6,
+                    binding: 13,
                     visibility: GPUShaderStage.FRAGMENT,
                     sampler: {},
                 },
                 {
-                    binding: 7,
+                    binding: 14,
                     visibility: GPUShaderStage.FRAGMENT,
                     sampler: {},
+                },
+            ],
+        })
+
+        this._lightsBindGroupLayout = this.device.createBindGroupLayout({
+            entries: [
+                {
+                    binding: 0,
+                    visibility:
+                        GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
+                    buffer: {
+                        type: 'read-only-storage',
+                    },
                 },
             ],
         })
@@ -373,7 +382,7 @@ export class Renderer implements IRenderer {
                     this._uniformsBGLayout,
                     this._nodeParamsBGLayout,
                     this.materialBindGroupLayout,
-                    this.samplerBindGroupLayout,
+                    this.lightsBindGroupLayout,
                 ],
             }),
             vertex: {
@@ -523,6 +532,10 @@ export class Renderer implements IRenderer {
         return DEFAULT_DEPTH_FORMAT
     }
 
+    get lightsBindGroupLayout() {
+        return this._lightsBindGroupLayout
+    }
+
     private _initializeViewParams() {
         this._viewParamsBuffer = this.device.createBuffer({
             size: this._viewParamsBufferSize,
@@ -638,43 +651,8 @@ export class Renderer implements IRenderer {
             cullMode: 'back',
         }
 
-        meshDataEntry.samplerBindGroup = this.device.createBindGroup({
-            label: 'sampler bindgroup',
-            layout: this.samplerBindGroupLayout,
-            entries: [
-                {
-                    binding: 1,
-                    resource: mesh.material.baseColorTexture.sampler,
-                },
-                {
-                    binding: 2,
-                    resource: mesh.material.metallicRoughnessTexture.sampler,
-                },
-                {
-                    binding: 3,
-                    resource: mesh.material.normalTexture.sampler,
-                },
-                {
-                    binding: 4,
-                    resource: mesh.material.occlusionTexture.sampler,
-                },
-                {
-                    binding: 5,
-                    resource: this._shadowDepthSampler,
-                },
-                {
-                    binding: 6,
-                    resource: this._skyboxSampler,
-                },
-                {
-                    binding: 7,
-                    resource: mesh.material?.emissiveTexture.sampler,
-                },
-            ],
-        })
-
         meshDataEntry.materialBindGroup = this.device.createBindGroup({
-            label: 'material bindgroup',
+            label: 'material and sampler bindgroup',
             layout: this.materialBindGroupLayout,
             entries: [
                 {
@@ -713,6 +691,34 @@ export class Renderer implements IRenderer {
                 {
                     binding: 7,
                     resource: mesh.material?.emissiveTexture.view,
+                },
+                {
+                    binding: 8,
+                    resource: mesh.material.baseColorTexture.sampler,
+                },
+                {
+                    binding: 9,
+                    resource: mesh.material.metallicRoughnessTexture.sampler,
+                },
+                {
+                    binding: 10,
+                    resource: mesh.material.normalTexture.sampler,
+                },
+                {
+                    binding: 11,
+                    resource: mesh.material.occlusionTexture.sampler,
+                },
+                {
+                    binding: 12,
+                    resource: this._shadowDepthSampler,
+                },
+                {
+                    binding: 13,
+                    resource: this._skyboxSampler,
+                },
+                {
+                    binding: 14,
+                    resource: mesh.material?.emissiveTexture.sampler,
                 },
             ],
         })
@@ -789,7 +795,6 @@ export class Renderer implements IRenderer {
     ) {
         const {
             materialBindGroup,
-            samplerBindGroup,
             positionsBuffer,
             textureCoordinatesBuffer,
             tangentsBuffer,
@@ -801,8 +806,6 @@ export class Renderer implements IRenderer {
         renderPassEncoder.setBindGroup(1, nodeParamsBindGroup as GPUBindGroup)
 
         renderPassEncoder.setBindGroup(2, materialBindGroup)
-
-        renderPassEncoder.setBindGroup(3, samplerBindGroup)
 
         renderPassEncoder.setVertexBuffer(
             0,
@@ -900,13 +903,9 @@ export class Renderer implements IRenderer {
         viewMap.set(scene.camera.projectionMatrix)
         viewMap.set(scene.camera.view, 16)
         viewMap.set(scene.camera.position, 32)
-        //FIXME: this will be an array of lights in the scene
-        viewMap.set(scene.light.projectionMatrix, 36)
-        viewMap.set(scene.light.viewMatrix, 52)
-        viewMap.set(scene.light.position, 68)
         viewMap.set(
             vec4.create(...this.ambientLightColor, this.ambientLightIntensity),
-            72
+            36
         )
 
         viewParamsUploadBuffer.unmap()
@@ -942,6 +941,49 @@ export class Renderer implements IRenderer {
             0,
             debugInfoArray
         )
+
+        const directionalLights = scene.directionalLights
+
+        const directionalLightsByteSize =
+            DIRECTIONAL_LIGHT_BYTESTRIDE * directionalLights.length
+
+        const directionalLightsBuffer = this.device.createBuffer({
+            size: directionalLightsByteSize,
+            usage: GPUBufferUsage.STORAGE,
+            mappedAtCreation: true,
+        })
+
+        const lightData = new Float32Array(
+            directionalLightsBuffer.getMappedRange()
+        )
+
+        directionalLights.forEach((light, index) => {
+            const offset = 8 * index
+
+            lightData.set(
+                [
+                    ...light.color,
+                    light.intensity,
+                    ...light.direction,
+                    light.diffuseIntensity,
+                ],
+                offset
+            )
+        })
+
+        directionalLightsBuffer.unmap()
+
+        const lightsBindGroup = this.device.createBindGroup({
+            layout: this.lightsBindGroupLayout,
+            entries: [
+                {
+                    binding: 0,
+                    resource: {
+                        buffer: directionalLightsBuffer,
+                    },
+                },
+            ],
+        })
 
         const iterateNode = (node: SceneNodeContent, worldMatrix: Mat4) => {
             const nodeTransform = node.gameObject.transform
@@ -1065,6 +1107,7 @@ export class Renderer implements IRenderer {
         )
 
         renderPass.setBindGroup(0, this._viewParamsBindGroup)
+        renderPass.setBindGroup(3, lightsBindGroup)
         renderPass.setPipeline(this.renderPipeline)
 
         //FIXME: move samplers and textures back to the same bindgroup

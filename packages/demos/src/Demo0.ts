@@ -5,9 +5,9 @@ import {
     IGameObject,
     GameObject,
     Transform,
-    DirectionalLight,
     TSkyboxBitmaps,
     IScene,
+    DirectionalLightV2,
 } from '@wheezy/engine'
 import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCamera'
 import { ArcBallController } from '@wheezy/engine/src/utils/ArcBallController'
@@ -52,10 +52,11 @@ export class Demo0 extends Scene implements IScene {
             canvas: this._engine?.renderer.context.canvas as HTMLCanvasElement,
         })
 
-        this.light = new DirectionalLight({
-            parent: this.root,
-            position: vec3.create(0, 0, 0),
-        })
+        this.directionalLights.push(
+            new DirectionalLightV2({
+                parent: this.root,
+            })
+        )
 
         this._setupSkyBox()
     }

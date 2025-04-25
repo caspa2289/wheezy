@@ -5,7 +5,6 @@ alias float2 = vec2<f32>;
 const OUT_DEFAULT = 0;
 const OUT_V_NORMAL = 1;
 const OUT_AMBIENT = 2;
-const OUT_DIFFUSE = 3;
 const OUT_METALLIC = 4;
 const OUT_ROUGHNESS = 5;
 const OUT_F_NORMAL = 6;
@@ -28,16 +27,12 @@ struct VertexOutput {
     @location(2) vertex_normal: float3,
     @location(3) vertex_tangent: float3,
     @location(4) camera_position: float3,
-    @location(5) shadow_position: vec3f
 };
 
 struct ViewParams {
     camera_projection_matrix: mat4x4<f32>,
     camera_view_matrix: mat4x4<f32>,
     camera_position: vec4f,
-    light_projection_matrix: mat4x4<f32>,
-    light_view_matrix: mat4x4<f32>,
-    light_position: vec4f,
     ambient_light_color: vec4f
 };
 
@@ -55,6 +50,20 @@ struct MaterialParams {
     roughness_factor: f32,
 };
 
+struct DirectionalLightData {
+  color: vec3f,
+  intensity: f32,
+  direction: vec3f,
+  diffuse_intensity: f32
+};
+
+struct DirectionalLightsBuffer {
+  lights: array<DirectionalLightData>,
+}
+
+@group(3) @binding(0) 
+var<storage, read> directionalLightsBuffer: DirectionalLightsBuffer;
+
 @group(0) @binding(0)
 var<uniform> view_params: ViewParams;
 
@@ -67,43 +76,43 @@ var<uniform> node_params: NodeParams;
 @group(2) @binding(0)
 var<uniform> material_params: MaterialParams;
 
-@group(3) @binding(1)
+@group(2) @binding(8)
 var base_color_sampler: sampler;
 
 @group(2) @binding(1)
 var base_color_texture: texture_2d<f32>;
 
-@group(3) @binding(2)
+@group(2) @binding(9)
 var metallic_roughness_sampler: sampler;
 
 @group(2) @binding(2)
 var metallic_roughness_texture: texture_2d<f32>;
 
-@group(3) @binding(3)
+@group(2) @binding(10)
 var fragment_normal_sampler: sampler;
 
 @group(2) @binding(3)
 var fragment_normal_texture: texture_2d<f32>;
 
-@group(3) @binding(4)
+@group(2) @binding(11)
 var occlusion_sampler: sampler;
 
 @group(2) @binding(4)
 var occlusion_texture: texture_2d<f32>;
 
-@group(3) @binding(5)
+@group(2) @binding(12)
 var shadow_sampler: sampler_comparison;
 
 @group(2) @binding(5)
 var shadow_texture: texture_depth_2d;
 
-@group(3) @binding(6)
+@group(2) @binding(13)
 var skybox_sampler: sampler;
 
 @group(2) @binding(6)
 var skybox_texture: texture_cube<f32>;
 
-@group(3) @binding(7)
+@group(2) @binding(14)
 var emission_sampler: sampler;
 
 @group(2) @binding(7)
@@ -113,12 +122,7 @@ var emission_texture: texture_2d<f32>;
 fn vertex_main(vert: VertexInput) -> VertexOutput {
     var out: VertexOutput;
 
-    let light_view_projection_matrix = view_params.light_projection_matrix * view_params.light_view_matrix;
     let camera_view_projection_matrix = view_params.camera_projection_matrix * view_params.camera_view_matrix;
-    let light_space_position = light_view_projection_matrix * node_params.transform * float4(vert.position, 1.0);
-
-    out.shadow_position = vec3(light_space_position.xy * vec2(0.5, -0.5) + vec2(0.5, 0.5), light_space_position.z);
-
     out.position = camera_view_projection_matrix * node_params.transform * float4(vert.position, 1.0);
     out.world_position = (node_params.transform * float4(vert.position, 1.0)).xyz;
     out.texcoords = vert.texcoords;
@@ -129,15 +133,8 @@ fn vertex_main(vert: VertexInput) -> VertexOutput {
     return out;
 };
 
-fn linear_to_srgb(x: f32) -> f32 {
-    if (x <= 0.0031308) {
-        return 12.92 * x;
-    }
-    return 1.055 * pow(x, 1.0 / 2.4) - 0.055;
-}
-
-fn decode_color(color: vec4f) -> vec4f {
-    return vec4f(linear_to_srgb(color.x), linear_to_srgb(color.y), linear_to_srgb(color.z), 1.0);
+fn gamma_correct(color: vec4f) -> vec4f {
+    return vec4f(pow(color, vec4f(1.0/2.2)));
 }
 
 fn get_visibility(shadow_position: float3) -> f32 {
@@ -165,12 +162,6 @@ fn get_lighting_factor(ambient_intensity: f32, visibility: f32, lambert_factor: 
     return min(ambient_intensity + max(0.2, visibility) * lambert_factor, 1.0);
 }
 
-const LIGHT_COLOR = vec4f(1.0, 1.0, 1.0, 0.0);
-const LIGHT_DIFFUSE_INTENSITY = 1.0;
-
-//FIXME: this is not a constant
-const SPECULAR_POWER = 32.0;
-
 fn calculateBumpedNormal(in: VertexOutput) -> float3 {
     let normal = normalize(in.vertex_normal);
     var tangent = normalize(in.vertex_tangent);
@@ -183,40 +174,30 @@ fn calculateBumpedNormal(in: VertexOutput) -> float3 {
     return normalize(tbn_matrix * bump_map_normal);
 }
 
-fn DistributionGGX( N: float3, H: float3, roughness: f32) -> f32 {
-    let a = roughness*roughness;
-    let a2 = a * a;
-    let NdotH  = max(dot(N, H), 0.0);
-    let NdotH2 = NdotH*NdotH;
-	
-    let num = a2;
-    var denom = (NdotH2 * (a2 - 1.0) + 1.0);
-    denom = PI * denom * denom;
-	
-    return num / denom;
-}
+fn calculateDirectionalLight(light: DirectionalLightData, normal: float3, in: VertexOutput, metallic: f32) -> float4 {
+    let diffuse_factor = dot(normal, -light.direction);
 
-fn GeometrySchlickGGX(NdotV: f32, roughness: f32) -> f32 {
-    let r = (roughness + 1.0);
-    let k = (r*r) / 8.0;
+    var diffuse_color = float4(0, 0, 0, 0);
+    var specular_color = float4(0, 0, 0, 0);
 
-    let num = NdotV;
-    let denom = NdotV * (1.0 - k) + k;
-	
-    return num / denom;
-}
+    if (diffuse_factor > 0.0) {
 
-fn GeometrySmith( N: float3, V: float3, L: float3, roughness: f32) -> f32 {
-    let NdotV = max(dot(N, V), 0.0);
-    let NdotL = max(dot(N, L), 0.0);
-    let ggx2  = GeometrySchlickGGX(NdotV, roughness);
-    let ggx1  = GeometrySchlickGGX(NdotL, roughness);
-	
-    return ggx1 * ggx2;
-}
+        diffuse_color = float4(light.color * light.diffuse_intensity * diffuse_factor, 1.0);
+        let vertex_to_eye = normalize(in.camera_position - in.world_position);
+        let light_reflect = normalize(reflect(light.direction, normal));
+        var specular_factor = dot(vertex_to_eye, light_reflect);
 
-fn fresnelSchlick(cosTheta: f32, F0: float3, roughness: f32) -> float3 {
-    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+        if (specular_factor > 0.0) {
+            //FIXME: calculate specular power and intensity somehow
+            //this is not it but looks fine from afar
+            let specular_power = metallic * 255;
+            let specular_intensity = metallic;
+            specular_factor = pow(specular_factor, specular_power);
+            specular_color = float4(light.color * specular_intensity * specular_factor, 1.0f);
+        }
+    }
+
+    return (diffuse_color + specular_color);
 }
 
 @fragment
@@ -232,44 +213,24 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     let fragment_normal = calculateBumpedNormal(in);
 
     albedo_color *= occlusion;
-    let ambient_color = vec4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 1.0f);
 
-    let visibility = get_visibility(in.shadow_position);
-    let diffuse_factor = get_lambert_factor(view_params.light_position.xyz, in.world_position, fragment_normal);
-    var specular_color = vec4(0.0, 0.0, 0.0, 0.0);
+    var total_light = float4(0.0, 0.0, 0.0, 0.0);
 
-    var diffuse_color = vec4f();
-
-    if (diffuse_factor > 0) {
-        diffuse_color = vec4f(LIGHT_COLOR.xyz * LIGHT_DIFFUSE_INTENSITY * diffuse_factor, 1.0);
-    } else {
-        diffuse_color = vec4f(0, 0, 0, 0);
+    for (var i = 0u; i < arrayLength(&directionalLightsBuffer.lights); i++) {
+        total_light += calculateDirectionalLight(directionalLightsBuffer.lights[i], fragment_normal, in, metallic);
     }
 
-    if (visibility > 0.0) {
-        let vertex_to_eye_vec = normalize(in.camera_position - in.world_position);
-
-        let light_reflection = normalize(reflect(in.shadow_position, fragment_normal));
-
-        var specular_factor = dot(vertex_to_eye_vec, light_reflection);
-
-        if (specular_factor > 0.0) {
-            specular_factor = pow(specular_factor, SPECULAR_POWER);
-            specular_color = vec4f(LIGHT_COLOR.xyz * metallic * specular_factor, 1.0f);
-        }
+    if ((total_light[0] == 0.0) & (total_light[1] == 0.0) & (total_light[2] == 0.0)) {
+        total_light = float4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 0.0f);
     }
 
-    let lighting_factor = get_lighting_factor(view_params.ambient_light_color.w, visibility, diffuse_factor);
+    let result_color = gamma_correct(
+        (albedo_color * total_light) + emission
+    );
 
     switch(debug_params.output_type) {
         case(OUT_V_NORMAL): {
             return vec4(in.vertex_normal, 1.0);
-        }
-        case(OUT_AMBIENT): {
-            return ambient_color;
-        }
-        case(OUT_DIFFUSE): {
-            return diffuse_color;
         }
         case(OUT_METALLIC): {
             return vec4(metallic);
@@ -287,11 +248,7 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
             return vec4(occlusion);
         }
         default: {
-            return decode_color(vec4(
-                (ambient_color.xyz + lighting_factor *
-                (specular_color.xyz + diffuse_color.xyz)) * albedo_color.xyz + emission.xyz,
-                1.0
-            ));
+            return result_color;
         }
     }
 };

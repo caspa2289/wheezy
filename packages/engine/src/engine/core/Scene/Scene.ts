@@ -21,7 +21,7 @@ import { SamplerStorage } from '../SamplerStorage'
 import { TextureStorage } from '../TextureStorage'
 import { GameObject } from '../GameObject'
 import { MeshRenderDataStorage } from '../MeshRenderDataStorage'
-import { DirectionalLight } from '../lights'
+import { IDirectionalLight } from '../lights/DirectionalLightV2'
 
 export class Scene implements IScene {
     private _objectManager: IObjectManager = new ObjectManager()
@@ -38,8 +38,7 @@ export class Scene implements IScene {
 
     private _root: IGameObject
 
-    //fixme: mock
-    light!: DirectionalLight
+    directionalLights: IDirectionalLight[] = []
 
     constructor(props?: ISceneProps) {
         const { camera } = props ?? {}

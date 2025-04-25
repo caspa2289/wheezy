@@ -32,6 +32,7 @@ export interface IRenderer {
     depthTextureFormat: GPUTextureFormat
     ambientLightIntensity: number
     ambientLightColor: Vec3
+    lightsBindGroupLayout: GPUBindGroupLayout
 
     outputSource: TRenderOutputSource
 
