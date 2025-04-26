@@ -60,23 +60,23 @@ export class Demo1 extends Scene implements IScene {
         this.objectManager.reparentObject(modelGO1, this._testHook)
         new Transform(this._testHook)
 
-        // this.directionalLights.push(
-        //     new DirectionalLightV2({
-        //         parent: this.root,
-        //         direction: vec3.create(-1, 0, 10),
-        //         color: vec3.create(1, 0.2, 0.2),
-        //     })
-        // )
-
-        this.pointLights.push(
-            new PointLight({
+        this.directionalLights.push(
+            new DirectionalLightV2({
                 parent: this.root,
-                position: vec3.create(0, -5, 0),
-                attenuationConstant: 1,
-                attenuationExponential: 0.0001,
-                attenuationLinear: 0.0001,
+                direction: vec3.create(-1, 0, 10),
+                color: vec3.create(1, 0.2, 0.2),
             })
         )
+
+        // this.pointLights.push(
+        //     new PointLight({
+        //         parent: this.root,
+        //         position: vec3.create(0, -5, 0),
+        //         attenuationConstant: 1,
+        //         attenuationExponential: 0.0001,
+        //         attenuationLinear: 0.0001,
+        //     })
+        // )
 
         // this.directionalLights.push(
         //     new DirectionalLightV2({

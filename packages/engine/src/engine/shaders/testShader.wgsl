@@ -233,11 +233,9 @@ fn calculatePointLight(
 
     let color = calculateDirectionalLight(directionalLight, normal, in, metallic);
 
-    let attenuation = light.atten_constant +
+    let attenuation = max(0.00000001, light.atten_constant +
         light.atten_linear * distance +
-        light.atten_exponential * distance * distance;
-
-    // let attenuation = 1.0;
+        light.atten_exponential * distance * distance);
 
     return color / attenuation;
 }

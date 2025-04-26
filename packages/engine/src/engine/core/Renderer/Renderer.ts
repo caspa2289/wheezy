@@ -370,6 +370,7 @@ export class Renderer implements IRenderer {
                     visibility: GPUShaderStage.FRAGMENT,
                     buffer: {
                         type: 'read-only-storage',
+                        minBindingSize: 0,
                     },
                 },
                 {
@@ -377,6 +378,7 @@ export class Renderer implements IRenderer {
                     visibility: GPUShaderStage.FRAGMENT,
                     buffer: {
                         type: 'read-only-storage',
+                        minBindingSize: 0,
                     },
                 },
             ],
@@ -972,33 +974,37 @@ export class Renderer implements IRenderer {
 
         directionalLightsBuffer.unmap()
 
+        //FIXME: there is always 1 light of each type in the scene right now
+        //move all this logic to a separate function
         const pointLightsBuffer = this.device.createBuffer({
-            size: POINT_LIGHT_BYTESTRIDE * scene.pointLights.length || 32,
+            size: POINT_LIGHT_BYTESTRIDE * scene.pointLights.length || 48,
             usage: GPUBufferUsage.STORAGE,
-            mappedAtCreation: true,
+            mappedAtCreation: !!scene.pointLights.length,
         })
 
-        const pointLightData = new Float32Array(
-            pointLightsBuffer.getMappedRange()
-        )
-
-        scene.pointLights.forEach((light, index) => {
-            const offset = 11 * index
-
-            pointLightData.set(
-                [
-                    ...light.color,
-                    light.intensity,
-                    ...light.position,
-                    light.attenuationConstant,
-                    light.attenuationLinear,
-                    light.attenuationExponential,
-                ],
-                offset
+        if (scene.pointLights.length) {
+            const pointLightData = new Float32Array(
+                pointLightsBuffer.getMappedRange()
             )
-        })
 
-        pointLightsBuffer.unmap()
+            scene.pointLights.forEach((light, index) => {
+                const offset = 11 * index
+
+                pointLightData.set(
+                    [
+                        ...light.color,
+                        light.intensity,
+                        ...light.position,
+                        light.attenuationConstant,
+                        light.attenuationLinear,
+                        light.attenuationExponential,
+                    ],
+                    offset
+                )
+            })
+
+            pointLightsBuffer.unmap()
+        }
 
         const lightsBindGroup = this.device.createBindGroup({
             layout: this.lightsBindGroupLayout,
