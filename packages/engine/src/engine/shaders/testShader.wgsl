@@ -65,6 +65,17 @@ struct PointLightData {
     atten_exponential: f32
 }
 
+struct SpotLightData {
+    color: vec3f,
+    position: vec3f,
+    direction: vec3f,
+    cutoff: f32,
+    intensity: f32,
+    atten_constant: f32,
+    atten_linear: f32,
+    atten_exponential: f32
+}
+
 struct DirectionalLightsBuffer {
   lights: array<DirectionalLightData>,
 }
@@ -73,11 +84,18 @@ struct PointLightsBuffer {
     lights: array<PointLightData>
 }
 
+struct SpotLightsBuffer {
+    lights: array<SpotLightData>
+}
+
 @group(3) @binding(0) 
 var<storage, read> directionalLightsBuffer: DirectionalLightsBuffer;
 
 @group(3) @binding(1) 
 var<storage, read> pointLightsBuffer: PointLightsBuffer;
+
+@group(3) @binding(2) 
+var<storage, read> spotLightsBuffer: SpotLightsBuffer;
 
 @group(0) @binding(0)
 var<uniform> view_params: ViewParams;
@@ -152,31 +170,6 @@ fn gamma_correct(color: vec4f) -> vec4f {
     return vec4f(pow(color, vec4f(1.0/2.2)));
 }
 
-fn get_visibility(shadow_position: float3) -> f32 {
-    var visibility = 0.0;
-    let shadow_texel_size = 1.0 / f32(textureDimensions(shadow_texture).x);
-    for (var y = -1; y <= 1; y++) {
-        for (var x = -1; x <= 1; x++) {
-            let offset = vec2f(vec2(x, y)) * shadow_texel_size;
-
-            visibility += textureSampleCompare(
-                shadow_texture, shadow_sampler,
-                shadow_position.xy + offset, shadow_position.z - 0.005
-            );
-        }
-    }
-    
-    return visibility / 9.0;
-}
-
-fn get_lambert_factor(light_position: float3, world_position: float3, normal: float3) -> f32 {
-    return max(dot(normalize(light_position - world_position), normalize(normal)), 0.0);
-}
-
-fn get_lighting_factor(ambient_intensity: f32, visibility: f32, lambert_factor: f32) -> f32 {
-    return min(ambient_intensity + max(0.2, visibility) * lambert_factor, 1.0);
-}
-
 fn calculateBumpedNormal(in: VertexOutput) -> float3 {
     let normal = normalize(in.vertex_normal);
     var tangent = normalize(in.vertex_tangent);
@@ -189,7 +182,12 @@ fn calculateBumpedNormal(in: VertexOutput) -> float3 {
     return normalize(tbn_matrix * bump_map_normal);
 }
 
-fn calculateDirectionalLight(light: DirectionalLightData, normal: float3, in: VertexOutput, metallic: f32) -> float4 {
+fn calculateDirectionalLight(
+    light: DirectionalLightData,
+    normal: float3,
+    in: VertexOutput,
+    metallic: f32
+) -> float4 {
     let diffuse_factor = dot(normal, -light.direction);
 
     var diffuse_color = float4(0, 0, 0, 0);
@@ -240,6 +238,33 @@ fn calculatePointLight(
     return color / attenuation;
 }
 
+fn calculateSpotLight(
+    light: SpotLightData,
+    normal: float3,
+    in: VertexOutput,
+    metallic: f32
+) -> float4 {
+    let light_to_pixel = normalize(in.world_position - light.position);
+    let spot_factor = dot(light_to_pixel, light.direction);
+
+    if (spot_factor > light.cutoff) {
+        var point_light: PointLightData;
+
+        point_light.color = light.color;
+        point_light.intensity = light.intensity;
+        point_light.position = light.position;
+        point_light.atten_constant = light.atten_constant;
+        point_light.atten_linear = light.atten_linear;
+        point_light.atten_exponential = light.atten_exponential;
+
+        let color = calculatePointLight(point_light, normal, in, metallic);
+
+        return color * (1.0 - (1.0 - spot_factor) * 1.0 / (1.0 - light.cutoff));
+    } else {
+        return vec4(0, 0, 0, 0);
+    }
+}
+
 @fragment
 fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     var albedo_color = textureSample(base_color_texture, base_color_sampler, in.texcoords) 
@@ -262,6 +287,10 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
 
     for (var i = 0u; i < arrayLength(&pointLightsBuffer.lights); i++) {
         total_light += calculatePointLight(pointLightsBuffer.lights[i], fragment_normal, in, metallic);
+    }
+
+    for (var i = 0u; i < arrayLength(&spotLightsBuffer.lights); i++) {
+        total_light += calculateSpotLight(spotLightsBuffer.lights[i], fragment_normal, in, metallic);
     }
 
     if ((total_light[0] == 0.0) & (total_light[1] == 0.0) & (total_light[2] == 0.0)) {

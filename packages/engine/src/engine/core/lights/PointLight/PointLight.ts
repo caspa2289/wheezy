@@ -21,7 +21,7 @@ export interface IPointLight extends ILightSourceV2 {
     attenuationExponential: number
 }
 
-export class PointLight extends LightSourceV2 implements ILightSourceV2 {
+export class PointLight extends LightSourceV2 implements IPointLight {
     position: Vec3
     attenuationConstant: number
     attenuationLinear: number
@@ -33,5 +33,18 @@ export class PointLight extends LightSourceV2 implements ILightSourceV2 {
         this.attenuationConstant = props?.attenuationConstant ?? 1.0
         this.attenuationLinear = props?.attenuationLinear ?? 0.25
         this.attenuationExponential = props?.attenuationExponential ?? 0.25
+    }
+
+    getLightData() {
+        return [
+            ...this.color,
+            this.intensity,
+            ...this.position,
+            this.attenuationConstant,
+            this.attenuationLinear,
+            this.attenuationExponential,
+            0,
+            0,
+        ]
     }
 }

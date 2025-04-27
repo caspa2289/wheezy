@@ -34,4 +34,8 @@ export class DirectionalLightV2
     get direction() {
         return this._direction
     }
+
+    getLightData() {
+        return [...this.color, this.intensity, ...this.direction, 0]
+    }
 }
