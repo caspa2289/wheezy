@@ -1156,7 +1156,6 @@ export class Renderer implements IRenderer {
         renderPass.setBindGroup(3, lightsBindGroup)
         renderPass.setPipeline(this.renderPipeline)
 
-        //FIXME: move samplers and textures back to the same bindgroup
         meshesToRender.forEach((mesh) => {
             this.renderMesh(mesh, scene, renderPass)
         })
