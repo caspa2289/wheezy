@@ -14,6 +14,8 @@ export interface ILightSourceV2 {
     color: Vec3
     intensity: number
     lightType: TLightSourceType
+
+    getLightData(): number[]
 }
 
 export interface ILightSourceV2Props {
@@ -43,4 +45,6 @@ export abstract class LightSourceV2
     get lightType() {
         return this._lightType
     }
+
+    abstract getLightData(): number[]
 }

@@ -16,7 +16,12 @@ import {
     DEFAULT_SWAP_CHAIN_FORMAT,
     DEFULT_SHADOW_TEXTURE_SIZE,
     DIRECTIONAL_LIGHT_BYTESTRIDE,
+    DIRECTIONAL_LIGHT_ELEMENT_COUNT,
     MSAA_SAMPLE_COUNT,
+    POINT_LIGHT_BYTESTRIDE,
+    POINT_LIGHT_ELEMENT_COUNT,
+    SPOT_LIGHT_BYTESTRIDE,
+    SPOT_LIGHT_ELEMENT_COUNT,
     VIEW_PARAMS_BUFFER_SIZE,
 } from './constants'
 import { IMeshRenderData } from '../../types/core/MeshRenderDataStorage'
@@ -31,6 +36,7 @@ import {
     cubeVertexSize,
 } from '../../primitives/cube'
 import { GBuffer } from './GBuffer'
+import { ILightSourceV2 } from '../lights/LightSourceV2'
 
 export const alignTo = (val: number, align: number) => {
     return Math.floor((val + align - 1) / align) * align
@@ -366,10 +372,26 @@ export class Renderer implements IRenderer {
             entries: [
                 {
                     binding: 0,
-                    visibility:
-                        GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
+                    visibility: GPUShaderStage.FRAGMENT,
                     buffer: {
                         type: 'read-only-storage',
+                        minBindingSize: 0,
+                    },
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {
+                        type: 'read-only-storage',
+                        minBindingSize: 0,
+                    },
+                },
+                {
+                    binding: 2,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {
+                        type: 'read-only-storage',
+                        minBindingSize: 0,
                     },
                 },
             ],
@@ -844,6 +866,32 @@ export class Renderer implements IRenderer {
         renderPassEncoder.drawIndexed(mesh.indices.count)
     }
 
+    private _createLightsBuffer = (
+        byteStride: number,
+        elementCount: number,
+        lights: ILightSourceV2[]
+    ) => {
+        const lightsBuffer = this.device.createBuffer({
+            size: byteStride * lights.length || byteStride,
+            usage: GPUBufferUsage.STORAGE,
+            mappedAtCreation: !!lights.length,
+        })
+
+        if (lights.length) {
+            const lightData = new Float32Array(lightsBuffer.getMappedRange())
+
+            lights.forEach((light, index) => {
+                const offset = elementCount * index
+
+                lightData.set(light.getLightData(), offset)
+            })
+
+            lightsBuffer.unmap()
+        }
+
+        return lightsBuffer
+    }
+
     private renderMeshShadows(
         mesh: IMesh,
         scene: IScene,
@@ -942,36 +990,22 @@ export class Renderer implements IRenderer {
             debugInfoArray
         )
 
-        const directionalLights = scene.directionalLights
-
-        const directionalLightsByteSize =
-            DIRECTIONAL_LIGHT_BYTESTRIDE * directionalLights.length
-
-        const directionalLightsBuffer = this.device.createBuffer({
-            size: directionalLightsByteSize,
-            usage: GPUBufferUsage.STORAGE,
-            mappedAtCreation: true,
-        })
-
-        const lightData = new Float32Array(
-            directionalLightsBuffer.getMappedRange()
+        //FIXME: there is always 1 light of each type in the scene right now
+        const directionalLightsBuffer = this._createLightsBuffer(
+            DIRECTIONAL_LIGHT_BYTESTRIDE,
+            DIRECTIONAL_LIGHT_ELEMENT_COUNT + 1,
+            scene.directionalLights
         )
-
-        directionalLights.forEach((light, index) => {
-            const offset = 8 * index
-
-            lightData.set(
-                [
-                    ...light.color,
-                    light.intensity,
-                    ...light.direction,
-                    light.diffuseIntensity,
-                ],
-                offset
-            )
-        })
-
-        directionalLightsBuffer.unmap()
+        const pointLightsBuffer = this._createLightsBuffer(
+            POINT_LIGHT_BYTESTRIDE,
+            POINT_LIGHT_ELEMENT_COUNT + 1,
+            scene.pointLights
+        )
+        const spotLightsBuffer = this._createLightsBuffer(
+            SPOT_LIGHT_BYTESTRIDE,
+            SPOT_LIGHT_ELEMENT_COUNT + 1,
+            scene.spotLights
+        )
 
         const lightsBindGroup = this.device.createBindGroup({
             layout: this.lightsBindGroupLayout,
@@ -980,6 +1014,18 @@ export class Renderer implements IRenderer {
                     binding: 0,
                     resource: {
                         buffer: directionalLightsBuffer,
+                    },
+                },
+                {
+                    binding: 1,
+                    resource: {
+                        buffer: pointLightsBuffer,
+                    },
+                },
+                {
+                    binding: 2,
+                    resource: {
+                        buffer: spotLightsBuffer,
                     },
                 },
             ],

@@ -8,6 +8,7 @@ import {
     TSkyboxBitmaps,
     IScene,
     DirectionalLightV2,
+    PointLight,
 } from '@wheezy/engine'
 import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCamera'
 import { ArcBallController } from '@wheezy/engine/src/utils/ArcBallController'
@@ -52,9 +53,18 @@ export class Demo0 extends Scene implements IScene {
             canvas: this._engine?.renderer.context.canvas as HTMLCanvasElement,
         })
 
-        this.directionalLights.push(
-            new DirectionalLightV2({
+        // this.directionalLights.push(
+        //     new DirectionalLightV2({
+        //         parent: this.root,
+        //     })
+        // )
+
+        this.pointLights.push(
+            new PointLight({
                 parent: this.root,
+                attenuationConstant: 1,
+                attenuationExponential: 0.0001,
+                attenuationLinear: 0.0001,
             })
         )
 
