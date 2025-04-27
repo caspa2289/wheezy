@@ -1,4 +1,10 @@
-import { EntityID, EntityTypes, IComponent, IGameObject } from '../../types'
+import {
+    EntityID,
+    EntityTypes,
+    IComponent,
+    IGameObject,
+    ITransform,
+} from '../../types'
 import { Entity } from '../Entity'
 
 export class GameObject
@@ -7,6 +13,7 @@ export class GameObject
 {
     _name: string
     _components = new Map() as Map<EntityID, IComponent<EntityTypes>>
+    _transform?: ITransform
 
     constructor() {
         super(EntityTypes.gameObject)
@@ -23,6 +30,17 @@ export class GameObject
 
     get components() {
         return this._components
+    }
+
+    get transform() {
+        //FIXME: find a less dumb way to do it
+        if (this._transform) {
+            return this._transform
+        }
+
+        return [...this.components.values()].find(
+            (component) => component.type === EntityTypes.transform
+        ) as ITransform
     }
 
     public addComponent(component: IComponent<EntityTypes>) {

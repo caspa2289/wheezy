@@ -131,9 +131,7 @@ export class ModelUploader {
         let textureSampler: GPUSampler | undefined
 
         if (!texturePreloadData) {
-            console.warn('No texture data')
-
-            return
+            throw new Error('No texture data')
         }
 
         if (!texturePreloadData.imageId) {
@@ -182,46 +180,114 @@ export class ModelUploader {
         materialStorage: IMaterialStorage,
         device: GPUDevice
     ) {
-        modelData.materials.forEach((value, key) => {
-            const material: IMaterial = {
-                name: value.name,
-                emissiveFactor: value?.emissiveFactor ?? vec3.create(1, 1, 1),
-                metallicFactor: value?.metallicFactor ?? 1,
-                roughnessFactor: value.roughnessFactor ?? 1,
-                baseColorFactor:
-                    value?.baseColorFactor ?? vec4.create(1, 1, 1, 1),
-            }
+        let defaultMaterial = materialStorage.materials.get(
+            'default'
+        ) as IMaterial
 
-            if (value.baseColorTextureId) {
-                material.baseColorTexture = this.createGPUTexture(
+        if (!defaultMaterial) {
+            defaultMaterial = {
+                name: 'Default wheezy material',
+                emissiveFactor: vec3.create(1, 1, 1),
+                metallicFactor: 1,
+                roughnessFactor: 1,
+                baseColorFactor: vec4.create(1, 1, 1, 1),
+                baseColorTexture: this.createGPUTexture(
                     device,
                     'rgba8unorm-srgb',
                     samplerStorage,
                     imageStorage,
-                    textureStorage.textures.get(value.baseColorTextureId)
-                )
-            }
-
-            if (value.metallicRoughnessTextureId) {
-                material.metallicRoughnessTexture = this.createGPUTexture(
+                    textureStorage.defaultBaseColor
+                ),
+                metallicRoughnessTexture: this.createGPUTexture(
                     device,
                     'rgba8unorm',
                     samplerStorage,
                     imageStorage,
-                    textureStorage.textures.get(
-                        value.metallicRoughnessTextureId
-                    )
-                )
-            }
-
-            if (value.normalTextureId) {
-                material.normalTexture = this.createGPUTexture(
+                    textureStorage.defaultMetallicRoughness
+                ),
+                normalTexture: this.createGPUTexture(
                     device,
-                    'rgba8unorm-srgb',
+                    'rgba8unorm',
                     samplerStorage,
                     imageStorage,
-                    textureStorage.textures.get(value.normalTextureId)
-                )
+                    textureStorage.defaultNormal
+                ),
+                occlusionTexture: this.createGPUTexture(
+                    device,
+                    'rgba8unorm',
+                    samplerStorage,
+                    imageStorage,
+                    textureStorage.defaultOcclusion
+                ),
+                emissiveTexture: this.createGPUTexture(
+                    device,
+                    'rgba8unorm',
+                    samplerStorage,
+                    imageStorage,
+                    textureStorage.defaultEmission
+                ),
+            }
+            materialStorage.materials.set('default', defaultMaterial)
+        }
+
+        modelData.materials.forEach((value, key) => {
+            const material: IMaterial = {
+                name: value.name,
+                emissiveFactor:
+                    value?.emissiveFactor ?? defaultMaterial.emissiveFactor,
+                metallicFactor:
+                    value?.metallicFactor ?? defaultMaterial.metallicFactor,
+                roughnessFactor:
+                    value.roughnessFactor ?? defaultMaterial.roughnessFactor,
+                baseColorFactor:
+                    value?.baseColorFactor ?? defaultMaterial.baseColorFactor,
+                baseColorTexture: value.baseColorTextureId
+                    ? this.createGPUTexture(
+                          device,
+                          'rgba8unorm-srgb',
+                          samplerStorage,
+                          imageStorage,
+                          textureStorage.textures.get(value.baseColorTextureId)
+                      )
+                    : defaultMaterial.baseColorTexture,
+                metallicRoughnessTexture: value.metallicRoughnessTextureId
+                    ? this.createGPUTexture(
+                          device,
+                          'rgba8unorm',
+                          samplerStorage,
+                          imageStorage,
+                          textureStorage.textures.get(
+                              value.metallicRoughnessTextureId
+                          )
+                      )
+                    : defaultMaterial.metallicRoughnessTexture,
+                normalTexture: value.normalTextureId
+                    ? this.createGPUTexture(
+                          device,
+                          'rgba8unorm',
+                          samplerStorage,
+                          imageStorage,
+                          textureStorage.textures.get(value.normalTextureId)
+                      )
+                    : defaultMaterial.normalTexture,
+                occlusionTexture: value.occlusionTextureId
+                    ? this.createGPUTexture(
+                          device,
+                          'rgba8unorm',
+                          samplerStorage,
+                          imageStorage,
+                          textureStorage.textures.get(value.occlusionTextureId)
+                      )
+                    : defaultMaterial.occlusionTexture,
+                emissiveTexture: value.emissiveTextureId
+                    ? this.createGPUTexture(
+                          device,
+                          'rgba8unorm',
+                          samplerStorage,
+                          imageStorage,
+                          textureStorage.textures.get(value.emissiveTextureId)
+                      )
+                    : defaultMaterial.emissiveTexture,
             }
 
             materialStorage.materials.set(key, material)
@@ -232,17 +298,9 @@ export class ModelUploader {
         node: IPreloadEntity,
         parentGameObject: IGameObject,
         objectManager: IObjectManager,
-        pipelineParams: {
-            device: GPUDevice
-            shaderModule: GPUShaderModule
-            colorFormat: GPUTextureFormat
-            depthFormat: GPUTextureFormat
-            msaaSampleCount: number | undefined
-            uniformsBGLayout: GPUBindGroupLayout
-            nodeParamsBGLayout: GPUBindGroupLayout
-        },
         bufferStorage: IBufferStorage,
-        materialStorage: IMaterialStorage
+        materialStorage: IMaterialStorage,
+        device: GPUDevice
     ) {
         const { trsMatrix, meshes, children } = node
 
@@ -252,37 +310,15 @@ export class ModelUploader {
 
         new Transform(gameObject, trsMatrix)
 
-        const {
-            device,
-            shaderModule,
-            colorFormat: swapChainFormat,
-            depthFormat,
-            msaaSampleCount,
-            uniformsBGLayout: viewParamsBindGroupLayout,
-            nodeParamsBGLayout: nodeParamsBindGroupLayout,
-        } = pipelineParams
-
         meshes.forEach((meshData) => {
-            const mesh = new Mesh(
+            new Mesh(
                 gameObject,
                 meshData.positions as GLTFAccessor,
                 meshData.indices,
                 meshData.normals,
                 meshData.textureCoordinates,
-                meshData.materialId
-                    ? materialStorage.materials.get(meshData.materialId)
-                    : undefined
-            )
-
-            mesh.buildRenderPipeline(
-                device,
-                shaderModule,
-                swapChainFormat,
-                depthFormat,
-                msaaSampleCount,
-                viewParamsBindGroupLayout,
-                nodeParamsBindGroupLayout,
-                bufferStorage
+                meshData.tangents,
+                materialStorage.materials.get(meshData.materialId) as IMaterial
             )
         })
 
@@ -291,9 +327,9 @@ export class ModelUploader {
                 child,
                 gameObject,
                 objectManager,
-                pipelineParams,
                 bufferStorage,
-                materialStorage
+                materialStorage,
+                device
             )
         })
     }
@@ -301,35 +337,17 @@ export class ModelUploader {
     public static async uploadModel(
         modelData: IModelPreloadData,
         objectManager: IObjectManager,
-        pipelineParams: {
-            device: GPUDevice
-            shaderModule: GPUShaderModule
-            colorFormat: GPUTextureFormat
-            depthFormat: GPUTextureFormat
-            uniformsBGLayout: GPUBindGroupLayout
-            nodeParamsBGLayout: GPUBindGroupLayout
-            msaaSampleCount: number | undefined
-        },
         bufferStorage: IBufferStorage,
         imageStorage: IImageStorage,
         samplerStorage: ISamplerStorage,
         materialStorage: IMaterialStorage,
         textureStorage: ITextureStorage,
-        sceneObject: IGameObject
+        sceneObject: IGameObject,
+        device: GPUDevice
     ) {
-        const {
-            device,
-            shaderModule,
-            colorFormat: swapChainFormat,
-            depthFormat,
-            uniformsBGLayout: viewParamsBindGroupLayout,
-            nodeParamsBGLayout: nodeParamsBindGroupLayout,
-            msaaSampleCount,
-        } = pipelineParams
-
         this.uploadBuffers(modelData, bufferStorage)
         await this.uploadImages(modelData, bufferStorage, imageStorage)
-        this.uploadSamplers(modelData, samplerStorage, pipelineParams.device)
+        this.uploadSamplers(modelData, samplerStorage, device)
         this.uploadTextures(modelData, textureStorage)
         this.uploadMaterials(
             modelData,
@@ -337,7 +355,7 @@ export class ModelUploader {
             samplerStorage,
             imageStorage,
             materialStorage,
-            pipelineParams.device
+            device
         )
 
         const { trsMatrix, meshes, children } = modelData.model
@@ -349,26 +367,14 @@ export class ModelUploader {
         new Transform(meshObject, trsMatrix)
 
         meshes.forEach((meshData) => {
-            const mesh = new Mesh(
+            new Mesh(
                 meshObject,
                 meshData.positions as GLTFAccessor,
                 meshData.indices,
                 meshData.normals,
                 meshData.textureCoordinates,
-                meshData.materialId
-                    ? materialStorage.materials.get(meshData.materialId)
-                    : undefined
-            )
-
-            mesh.buildRenderPipeline(
-                device,
-                shaderModule,
-                swapChainFormat,
-                depthFormat,
-                msaaSampleCount,
-                viewParamsBindGroupLayout,
-                nodeParamsBindGroupLayout,
-                bufferStorage
+                meshData.tangents,
+                materialStorage.materials.get(meshData.materialId) as IMaterial
             )
         })
 
@@ -377,9 +383,9 @@ export class ModelUploader {
                 child,
                 meshObject,
                 objectManager,
-                pipelineParams,
                 bufferStorage,
-                materialStorage
+                materialStorage,
+                device
             )
         })
 

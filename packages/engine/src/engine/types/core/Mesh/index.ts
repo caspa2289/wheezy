@@ -15,16 +15,16 @@ export interface IMaterialTexture {
 export interface IMaterial {
     name?: string
 
-    baseColorTexture?: IMaterialTexture
-    metallicRoughnessTexture?: IMaterialTexture
-    normalTexture?: IMaterialTexture
-    emissiveTexture?: IMaterialTexture
-    occlusionTexture?: IMaterialTexture
+    baseColorTexture: IMaterialTexture
+    metallicRoughnessTexture: IMaterialTexture
+    normalTexture: IMaterialTexture
+    emissiveTexture: IMaterialTexture
+    occlusionTexture: IMaterialTexture
 
     metallicFactor: number
     roughnessFactor: number
 
-    emissiveFactor?: Vec3
+    emissiveFactor: Vec3
     baseColorFactor: Vec4
 }
 
@@ -43,11 +43,13 @@ export interface GLTFAccessor {
 
 export interface IMesh extends IComponent<EntityTypes.mesh> {
     //https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-mesh-primitive
-    normals?: GLTFAccessor
-    tangent?: GLTFAccessor
-    indices?: GLTFAccessor
+    normals: GLTFAccessor
+    tangents: GLTFAccessor
+    indices: GLTFAccessor
+    textureCoordinates: GLTFAccessor
     //FIXME: implement default material according to defaults https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-material
-    material?: IMaterial //if not present in the file, a default material should be used
+    material: IMaterial //if not present in the file, a default material should be used
     positions: GLTFAccessor
     mode: number //gpu topology - default is 4 (triangles)
+    isPipelineBuilt: boolean
 }

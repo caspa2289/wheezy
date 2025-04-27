@@ -4,8 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
 
 jobs:
   build:
@@ -38,6 +36,7 @@ jobs:
 
     - name: Push to deployment branch
       run: |
+        rm -rf docs
         mkdir docs
         cp -r packages/demos/dist/* docs
         git add .
