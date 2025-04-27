@@ -131,7 +131,6 @@ export class WheezyGLBLoader {
 
         modelData.json?.materials?.forEach(
             (
-                //FIXME: check types
                 materialData: {
                     pbrMetallicRoughness?: {
                         baseColorTexture?: {
@@ -580,7 +579,7 @@ export class WheezyGLBLoader {
                     mode: number
                     material?: number
                 }) => {
-                    //FIXME: generate all of it
+                    //FIXME: generate indices for non-indexed geometry
                     const meshData: Partial<IPreloadMesh> = {
                         positions: WheezyGLBLoader.parseAccessor(
                             modelData,

@@ -97,11 +97,6 @@ export class ArcBallController {
             this.camera.recalculateUp()
         }
 
-        //TODO
-        // if (this.analogZoom !== 0) {
-        //     this.distance *= 1 + analogZoom * this.zoomSpeed
-        // }
-
         this.camera.position = vec3.scale(
             this.camera.back,
             this.camera.distance

@@ -47,7 +47,6 @@ export interface IMesh extends IComponent<EntityTypes.mesh> {
     tangents: GLTFAccessor
     indices: GLTFAccessor
     textureCoordinates: GLTFAccessor
-    //FIXME: implement default material according to defaults https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-material
     material: IMaterial //if not present in the file, a default material should be used
     positions: GLTFAccessor
     mode: number //gpu topology - default is 4 (triangles)
