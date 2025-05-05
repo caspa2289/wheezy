@@ -1,4 +1,4 @@
-import { vec3, Vec3 } from 'wgpu-matrix'
+import { mat4, Mat4, vec3, Vec3 } from 'wgpu-matrix'
 import {
     ILightSourceV2,
     ILightSourceV2Props,
@@ -19,6 +19,8 @@ export interface IPointLight extends ILightSourceV2 {
     attenuationConstant: number
     attenuationLinear: number
     attenuationExponential: number
+    projectionMatrix: Mat4
+    viewMatrix: Mat4
 }
 
 export class PointLight extends LightSourceV2 implements IPointLight {
@@ -26,6 +28,8 @@ export class PointLight extends LightSourceV2 implements IPointLight {
     attenuationConstant: number
     attenuationLinear: number
     attenuationExponential: number
+    projectionMatrix: Mat4
+    viewMatrix: Mat4
 
     constructor(props: IPointLightProps) {
         super({ ...props, lightType: LIGHT_SOURCE_TYPES.point })
@@ -33,6 +37,8 @@ export class PointLight extends LightSourceV2 implements IPointLight {
         this.attenuationConstant = props?.attenuationConstant ?? 1.0
         this.attenuationLinear = props?.attenuationLinear ?? 0.25
         this.attenuationExponential = props?.attenuationExponential ?? 0.25
+        this.projectionMatrix = mat4.create()
+        this.viewMatrix = mat4.create()
     }
 
     getLightData() {
@@ -45,6 +51,8 @@ export class PointLight extends LightSourceV2 implements IPointLight {
             this.attenuationExponential,
             0,
             0,
+            ...this.projectionMatrix,
+            ...this.viewMatrix,
         ]
     }
 }

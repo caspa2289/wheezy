@@ -13,6 +13,7 @@ import {
 import {
     DEFAULT_DEPTH_FORMAT,
     DEFAULT_SHADOW_DEPTH_FORMAT,
+    DEFAULT_STORAGE_TEXTURE_FORMAT,
     DEFAULT_SWAP_CHAIN_FORMAT,
     DEFULT_SHADOW_TEXTURE_SIZE,
     DIRECTIONAL_LIGHT_BYTESTRIDE,
@@ -51,10 +52,10 @@ export class Renderer implements IRenderer {
     private _canvas: HTMLCanvasElement
     private _gBuffer!: GBuffer
 
-    private _shadowDepthTexture!: GPUTexture
-    private _shadowDepthTextureView!: GPUTextureView
-    private _shadowDepthTextureSize = DEFULT_SHADOW_TEXTURE_SIZE
-    private _shadowDepthSampler!: GPUSampler
+    // private _shadowDepthTexture!: GPUTexture
+    // private _shadowDepthTextureView!: GPUTextureView
+    // private _shadowDepthTextureSize = DEFULT_SHADOW_TEXTURE_SIZE
+    // private _shadowDepthSampler!: GPUSampler
 
     private _skyBoxVerticesBuffer!: GPUBuffer
     private _skyBoxPipeline!: GPURenderPipeline
@@ -77,7 +78,7 @@ export class Renderer implements IRenderer {
     private _msaaSampleCount: number = MSAA_SAMPLE_COUNT
 
     private _renderPassDescriptor!: GPURenderPassDescriptor
-    private _shadowPassDescriptor!: GPURenderPassDescriptor
+    // private _shadowPassDescriptor!: GPURenderPassDescriptor
 
     private _viewParamsBuffer!: GPUBuffer
     private _viewParamsBindGroup!: GPUBindGroup
@@ -115,25 +116,25 @@ export class Renderer implements IRenderer {
             this.depthTextureFormat
         )
 
-        this._shadowDepthTexture = this._device.createTexture({
-            label: 'shadowDepthTexture',
-            size: [
-                this._shadowDepthTextureSize,
-                this._shadowDepthTextureSize,
-                1,
-            ],
-            usage:
-                GPUTextureUsage.RENDER_ATTACHMENT |
-                GPUTextureUsage.TEXTURE_BINDING,
-            format: DEFAULT_SHADOW_DEPTH_FORMAT,
-        })
+        // this._shadowDepthTexture = this._device.createTexture({
+        //     label: 'shadowDepthTexture',
+        //     size: [
+        //         this._shadowDepthTextureSize,
+        //         this._shadowDepthTextureSize,
+        //         1,
+        //     ],
+        //     usage:
+        //         GPUTextureUsage.RENDER_ATTACHMENT |
+        //         GPUTextureUsage.TEXTURE_BINDING,
+        //     format: DEFAULT_SHADOW_DEPTH_FORMAT,
+        // })
 
-        this._shadowDepthSampler = this.device.createSampler({
-            compare: 'less',
-            label: 'shadow depth sampler',
-        })
+        // this._shadowDepthSampler = this.device.createSampler({
+        //     compare: 'less',
+        //     label: 'shadow depth sampler',
+        // })
 
-        this._shadowDepthTextureView = this._shadowDepthTexture.createView()
+        // this._shadowDepthTextureView = this._shadowDepthTexture.createView()
 
         this._shaderModule = this.device.createShaderModule({
             label: 'main shader',
@@ -168,15 +169,15 @@ export class Renderer implements IRenderer {
             },
         }
 
-        this._shadowPassDescriptor = {
-            colorAttachments: [],
-            depthStencilAttachment: {
-                view: this._shadowDepthTextureView,
-                depthClearValue: 1.0,
-                depthLoadOp: 'clear',
-                depthStoreOp: 'store',
-            },
-        }
+        // this._shadowPassDescriptor = {
+        //     colorAttachments: [],
+        //     depthStencilAttachment: {
+        //         view: this._shadowDepthTextureView,
+        //         depthClearValue: 1.0,
+        //         depthLoadOp: 'clear',
+        //         depthStoreOp: 'store',
+        //     },
+        // }
 
         this._skyBoxVerticesBuffer = this._device.createBuffer({
             size: cubeVertexArray.byteLength,
@@ -306,13 +307,13 @@ export class Renderer implements IRenderer {
                         sampleType,
                     },
                 },
-                {
-                    binding: 5,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    texture: {
-                        sampleType: 'depth',
-                    },
-                },
+                // {
+                //     binding: 5,
+                //     visibility: GPUShaderStage.FRAGMENT,
+                //     texture: {
+                //         sampleType: 'depth',
+                //     },
+                // },
                 {
                     binding: 6,
                     visibility: GPUShaderStage.FRAGMENT,
@@ -348,13 +349,13 @@ export class Renderer implements IRenderer {
                     visibility: GPUShaderStage.FRAGMENT,
                     sampler: {},
                 },
-                {
-                    binding: 12,
-                    visibility: GPUShaderStage.FRAGMENT,
-                    sampler: {
-                        type: 'comparison',
-                    },
-                },
+                // {
+                //     binding: 12,
+                //     visibility: GPUShaderStage.FRAGMENT,
+                //     sampler: {
+                //         type: 'comparison',
+                //     },
+                // },
                 {
                     binding: 13,
                     visibility: GPUShaderStage.FRAGMENT,
@@ -369,6 +370,7 @@ export class Renderer implements IRenderer {
         })
 
         this._lightsBindGroupLayout = this.device.createBindGroupLayout({
+            label: 'lights bind group layout',
             entries: [
                 {
                     binding: 0,
@@ -394,6 +396,22 @@ export class Renderer implements IRenderer {
                         minBindingSize: 0,
                     },
                 },
+                {
+                    binding: 3,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    storageTexture: {
+                        access: 'read-write',
+                        format: DEFAULT_STORAGE_TEXTURE_FORMAT,
+                        viewDimension: '2d-array',
+                    },
+                },
+                // {
+                //     binding: 6,
+                //     visibility: GPUShaderStage.FRAGMENT,
+                //     sampler: {
+                //         type: 'comparison',
+                //     },
+                // },
             ],
         })
 
@@ -700,10 +718,10 @@ export class Renderer implements IRenderer {
                     binding: 4,
                     resource: mesh.material?.occlusionTexture.view,
                 },
-                {
-                    binding: 5,
-                    resource: this._shadowDepthTextureView,
-                },
+                // {
+                //     binding: 5,
+                //     resource: this._shadowDepthTextureView,
+                // },
                 {
                     binding: 6,
                     resource: this._skyboxTexture.createView({
@@ -730,10 +748,10 @@ export class Renderer implements IRenderer {
                     binding: 11,
                     resource: mesh.material.occlusionTexture.sampler,
                 },
-                {
-                    binding: 12,
-                    resource: this._shadowDepthSampler,
-                },
+                // {
+                //     binding: 12,
+                //     resource: this._shadowDepthSampler,
+                // },
                 {
                     binding: 13,
                     resource: this._skyboxSampler,
@@ -746,40 +764,41 @@ export class Renderer implements IRenderer {
         })
 
         //FIXME: this should not be created per mesh when all stuff is stubbed
-        meshDataEntry.shadowRenderPipeline = this.device.createRenderPipeline({
-            label: 'shadow render pipeline',
-            layout: this.device.createPipelineLayout({
-                label: 'shadow render pipeline layout',
-                bindGroupLayouts: [
-                    this._uniformsBGLayout,
-                    this._nodeParamsBGLayout,
-                ],
-            }),
-            vertex: {
-                module: this.device.createShaderModule({
-                    label: 'shadow shader module',
-                    code: shadowShaderCode,
-                }),
-                buffers: [
-                    {
-                        arrayStride: mesh.positions.byteStride,
-                        attributes: [
-                            {
-                                format: mesh.positions.elementType,
-                                offset: 0,
-                                shaderLocation: 0,
-                            },
-                        ],
-                    },
-                ],
-            },
-            depthStencil: {
-                depthWriteEnabled: true,
-                depthCompare: 'less',
-                format: 'depth32float',
-            },
-            primitive,
-        })
+        // meshDataEntry.shadowPointRenderPipeline =
+        //     this.device.createRenderPipeline({
+        //         label: 'point light shadow render pipeline',
+        //         layout: this.device.createPipelineLayout({
+        //             label: 'point light shadow render pipeline layout',
+        //             bindGroupLayouts: [
+        //                 this._uniformsBGLayout,
+        //                 this._nodeParamsBGLayout,
+        //             ],
+        //         }),
+        //         vertex: {
+        //             module: this.device.createShaderModule({
+        //                 label: 'shadow shader module',
+        //                 code: shadowShaderCode,
+        //             }),
+        //             buffers: [
+        //                 {
+        //                     arrayStride: mesh.positions.byteStride,
+        //                     attributes: [
+        //                         {
+        //                             format: mesh.positions.elementType,
+        //                             offset: 0,
+        //                             shaderLocation: 0,
+        //                         },
+        //                     ],
+        //                 },
+        //             ],
+        //         },
+        //         depthStencil: {
+        //             depthWriteEnabled: true,
+        //             depthCompare: 'less',
+        //             format: DEFAULT_SHADOW_DEPTH_FORMAT,
+        //         },
+        //         primitive,
+        //     })
 
         meshDataEntry.positionsBuffer = this._createMeshBuffer(
             mesh.positions,
@@ -895,10 +914,12 @@ export class Renderer implements IRenderer {
     private renderMeshShadows(
         mesh: IMesh,
         scene: IScene,
-        renderPassEncoder: GPURenderPassEncoder
+        renderPassEncoder: GPURenderPassEncoder,
+        shadowSpotRenderPipeline: GPURenderPipeline
     ) {
         const {
-            shadowRenderPipeline,
+            // shadowRenderPipeline,
+            // shadowPointRenderPipeline,
             positionsBuffer,
             indicesBuffer,
             nodeParamsBindGroup,
@@ -906,7 +927,9 @@ export class Renderer implements IRenderer {
 
         renderPassEncoder.setBindGroup(1, nodeParamsBindGroup as GPUBindGroup)
 
-        renderPassEncoder.setPipeline(shadowRenderPipeline as GPURenderPipeline)
+        renderPassEncoder.setPipeline(
+            shadowSpotRenderPipeline as GPURenderPipeline
+        )
 
         renderPassEncoder.setVertexBuffer(
             0,
@@ -921,6 +944,7 @@ export class Renderer implements IRenderer {
             0,
             mesh.indices.byteLength
         )
+
         renderPassEncoder.drawIndexed(mesh.indices.count)
     }
 
@@ -996,11 +1020,26 @@ export class Renderer implements IRenderer {
             DIRECTIONAL_LIGHT_ELEMENT_COUNT + 1,
             scene.directionalLights
         )
+
         const pointLightsBuffer = this._createLightsBuffer(
             POINT_LIGHT_BYTESTRIDE,
             POINT_LIGHT_ELEMENT_COUNT + 1,
             scene.pointLights
         )
+
+        const depthTextureSpot = this._device.createTexture({
+            dimension: '2d',
+            size: [512, 512, scene.spotLights.length || 1],
+            format: DEFAULT_STORAGE_TEXTURE_FORMAT,
+            usage: GPUTextureUsage.STORAGE_BINDING,
+        })
+
+        const depthTextureSpotView = depthTextureSpot.createView({
+            arrayLayerCount: scene.spotLights.length || 1,
+            dimension: '2d-array',
+            format: DEFAULT_STORAGE_TEXTURE_FORMAT,
+        })
+
         const spotLightsBuffer = this._createLightsBuffer(
             SPOT_LIGHT_BYTESTRIDE,
             SPOT_LIGHT_ELEMENT_COUNT + 1,
@@ -1008,6 +1047,7 @@ export class Renderer implements IRenderer {
         )
 
         const lightsBindGroup = this.device.createBindGroup({
+            label: 'light bind group',
             layout: this.lightsBindGroupLayout,
             entries: [
                 {
@@ -1028,6 +1068,14 @@ export class Renderer implements IRenderer {
                         buffer: spotLightsBuffer,
                     },
                 },
+                {
+                    binding: 3,
+                    resource: depthTextureSpotView,
+                },
+                // {
+                //     binding: 6,
+                //     resource: this._shadowDepthSampler,
+                // },
             ],
         })
 
@@ -1136,17 +1184,86 @@ export class Renderer implements IRenderer {
         skyBoxPass.draw(cubeVertexCount)
         skyBoxPass.end()
 
-        const shadowPass = commandEncoder.beginRenderPass(
-            this._shadowPassDescriptor
+        // const shadowPass = commandEncoder.beginRenderPass(
+        //     this._shadowPassDescriptor
+        // )
+
+        // const spotLightShadowPass = commandEncoder.beginRenderPass({
+        //     colorAttachments: [],
+        //     depthStencilAttachment: {
+        //         view: this._gBuffer._depth,
+        //         depthClearValue: 1.0,
+        //         depthLoadOp: 'clear',
+        //         depthStoreOp: 'store',
+        //         stencilLoadOp: 'clear' as GPULoadOp,
+        //         stencilClearValue: 0,
+        //         stencilStoreOp: 'store' as GPUStoreOp,
+        //     },
+        // })
+        const spotLightShadowPass = commandEncoder.beginRenderPass(
+            this._renderPassDescriptor
         )
 
-        shadowPass.setBindGroup(0, this._viewParamsBindGroup)
+        spotLightShadowPass.setBindGroup(0, this._viewParamsBindGroup)
+        spotLightShadowPass.setBindGroup(2, lightsBindGroup)
 
         meshesToRender.forEach((mesh) => {
-            this.renderMeshShadows(mesh, scene, shadowPass)
+            const pipeline = this.device.createRenderPipeline({
+                label: 'spot light shadow render pipeline',
+                layout: this.device.createPipelineLayout({
+                    label: 'spot light shadow render pipeline layout',
+                    bindGroupLayouts: [
+                        this._uniformsBGLayout,
+                        this._nodeParamsBGLayout,
+                        this._lightsBindGroupLayout,
+                    ],
+                }),
+                vertex: {
+                    entryPoint: 'vertex_main',
+                    module: this.device.createShaderModule({
+                        label: 'shadow shader module',
+                        code: shadowShaderCode,
+                    }),
+                    buffers: [
+                        {
+                            arrayStride: mesh.positions.byteStride,
+                            attributes: [
+                                {
+                                    format: mesh.positions.elementType,
+                                    offset: 0,
+                                    shaderLocation: 0,
+                                },
+                            ],
+                        },
+                    ],
+                },
+                fragment: {
+                    module: this.device.createShaderModule({
+                        label: 'shadow shader module',
+                        code: shadowShaderCode,
+                    }),
+                    entryPoint: 'fragment_main',
+                    targets: [{ format: this.swapChainFormat }],
+                },
+                depthStencil: {
+                    depthWriteEnabled: true,
+                    depthCompare: 'less',
+                    format: DEFAULT_DEPTH_FORMAT,
+                },
+                primitive: {
+                    topology: 'triangle-list',
+                    stripIndexFormat: undefined,
+                    cullMode: 'back',
+                },
+                multisample: {
+                    count: this._msaaSampleCount,
+                },
+            })
+
+            this.renderMeshShadows(mesh, scene, spotLightShadowPass, pipeline)
         })
 
-        shadowPass.end()
+        spotLightShadowPass.end()
 
         const renderPass = commandEncoder.beginRenderPass(
             this._renderPassDescriptor

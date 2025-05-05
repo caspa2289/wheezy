@@ -97,6 +97,12 @@ var<storage, read> pointLightsBuffer: PointLightsBuffer;
 @group(3) @binding(2) 
 var<storage, read> spotLightsBuffer: SpotLightsBuffer;
 
+@group(3) @binding(3)
+var spotLightTextures: texture_storage_2d_array<r32float, read_write>;
+
+// @group(3) @binding(6)
+// var shadow_sampler: sampler_comparison;
+
 @group(0) @binding(0)
 var<uniform> view_params: ViewParams;
 
@@ -133,11 +139,11 @@ var occlusion_sampler: sampler;
 @group(2) @binding(4)
 var occlusion_texture: texture_2d<f32>;
 
-@group(2) @binding(12)
-var shadow_sampler: sampler_comparison;
+// @group(2) @binding(12)
+// var shadow_sampler: sampler_comparison;
 
-@group(2) @binding(5)
-var shadow_texture: texture_depth_2d;
+// @group(2) @binding(5)
+// var shadow_texture: texture_depth_2d;
 
 @group(2) @binding(13)
 var skybox_sampler: sampler;
@@ -301,27 +307,31 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
         (albedo_color * total_light) + emission
     );
 
-    switch(debug_params.output_type) {
-        case(OUT_V_NORMAL): {
-            return vec4(in.vertex_normal, 1.0);
-        }
-        case(OUT_METALLIC): {
-            return vec4(metallic);
-        }
-        case(OUT_ROUGHNESS): {
-            return vec4(roughness);
-        }
-        case(OUT_F_NORMAL): {
-            return vec4(fragment_normal, 1.0);
-        }
-        case(OUT_V_TANGENT): {
-            return vec4(in.vertex_tangent, 1.0);
-        }
-        case(OUT_OCCLUSION) : {
-            return vec4(occlusion);
-        }
-        default: {
-            return result_color;
-        }
-    }
+    let a = textureLoad(spotLightTextures, vec2(0, 0), 0);
+
+    return vec4(a.r, 0, 0, 1);
+
+    // switch(debug_params.output_type) {
+    //     case(OUT_V_NORMAL): {
+    //         return vec4(in.vertex_normal, 1.0);
+    //     }
+    //     case(OUT_METALLIC): {
+    //         return vec4(metallic);
+    //     }
+    //     case(OUT_ROUGHNESS): {
+    //         return vec4(roughness);
+    //     }
+    //     case(OUT_F_NORMAL): {
+    //         return vec4(fragment_normal, 1.0);
+    //     }
+    //     case(OUT_V_TANGENT): {
+    //         return vec4(in.vertex_tangent, 1.0);
+    //     }
+    //     case(OUT_OCCLUSION) : {
+    //         return vec4(occlusion);
+    //     }
+    //     default: {
+    //         return result_color;
+    //     }
+    // }
 };
