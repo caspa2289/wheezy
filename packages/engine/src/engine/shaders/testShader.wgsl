@@ -307,9 +307,9 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
         (albedo_color * total_light) + emission
     );
 
-    let a = textureLoad(spotLightTextures, vec2(0, 0), 0);
+    let depth = textureLoad(spotLightTextures, vec2(0, 0), 0).r;
 
-    return vec4(a.r, 0, 0, 1);
+    return vec4(depth, depth, depth, 0);
 
     // switch(debug_params.output_type) {
     //     case(OUT_V_NORMAL): {

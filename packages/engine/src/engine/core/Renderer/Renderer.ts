@@ -1029,7 +1029,11 @@ export class Renderer implements IRenderer {
 
         const depthTextureSpot = this._device.createTexture({
             dimension: '2d',
-            size: [512, 512, scene.spotLights.length || 1],
+            size: [
+                this._canvas.width,
+                this._canvas.height,
+                scene.spotLights.length || 1,
+            ],
             format: DEFAULT_STORAGE_TEXTURE_FORMAT,
             usage: GPUTextureUsage.STORAGE_BINDING,
         })
@@ -1072,10 +1076,6 @@ export class Renderer implements IRenderer {
                     binding: 3,
                     resource: depthTextureSpotView,
                 },
-                // {
-                //     binding: 6,
-                //     resource: this._shadowDepthSampler,
-                // },
             ],
         })
 
@@ -1184,30 +1184,30 @@ export class Renderer implements IRenderer {
         skyBoxPass.draw(cubeVertexCount)
         skyBoxPass.end()
 
-        // const shadowPass = commandEncoder.beginRenderPass(
-        //     this._shadowPassDescriptor
-        // )
-
-        // const spotLightShadowPass = commandEncoder.beginRenderPass({
-        //     colorAttachments: [],
-        //     depthStencilAttachment: {
-        //         view: this._gBuffer._depth,
-        //         depthClearValue: 1.0,
-        //         depthLoadOp: 'clear',
-        //         depthStoreOp: 'store',
-        //         stencilLoadOp: 'clear' as GPULoadOp,
-        //         stencilClearValue: 0,
-        //         stencilStoreOp: 'store' as GPUStoreOp,
-        //     },
-        // })
-        const spotLightShadowPass = commandEncoder.beginRenderPass(
-            this._renderPassDescriptor
-        )
+        const spotLightShadowPass = commandEncoder.beginRenderPass({
+            colorAttachments: [
+                {
+                    view: this._device
+                        .createTexture({
+                            format: 'rgba8unorm',
+                            size: [
+                                this.context.canvas.width,
+                                this.context.canvas.height,
+                            ],
+                            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+                        })
+                        .createView(),
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                },
+            ],
+        })
 
         spotLightShadowPass.setBindGroup(0, this._viewParamsBindGroup)
         spotLightShadowPass.setBindGroup(2, lightsBindGroup)
 
         meshesToRender.forEach((mesh) => {
+            //FIXME: this could be created beforehand
             const pipeline = this.device.createRenderPipeline({
                 label: 'spot light shadow render pipeline',
                 layout: this.device.createPipelineLayout({
@@ -1245,18 +1245,10 @@ export class Renderer implements IRenderer {
                     entryPoint: 'fragment_main',
                     targets: [{ format: this.swapChainFormat }],
                 },
-                depthStencil: {
-                    depthWriteEnabled: true,
-                    depthCompare: 'less',
-                    format: DEFAULT_DEPTH_FORMAT,
-                },
                 primitive: {
                     topology: 'triangle-list',
                     stripIndexFormat: undefined,
                     cullMode: 'back',
-                },
-                multisample: {
-                    count: this._msaaSampleCount,
                 },
             })
 
@@ -1280,6 +1272,11 @@ export class Renderer implements IRenderer {
         renderPass.end()
 
         this.device.queue.submit([commandEncoder.finish()])
+
+        depthTextureSpot.destroy()
+        spotLightsBuffer.destroy()
+        directionalLightsBuffer.destroy()
+        pointLightsBuffer.destroy()
         viewParamsUploadBuffer.destroy()
         skyBoxViewParamsUploadBuffer.destroy()
     }
