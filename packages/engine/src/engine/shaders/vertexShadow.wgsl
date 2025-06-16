@@ -31,14 +31,16 @@ struct NodeParams {
 
 struct SpotLightData {
     color: vec3f,
-    intensity: f32,
     position: vec3f,
+    direction: vec3f,
+    cutoff: f32,
+    intensity: f32,
     atten_constant: f32,
     atten_linear: f32,
     atten_exponential: f32,
     light_projection_matrix: mat4x4<f32>,
     light_view_matrix: mat4x4<f32>,
-};
+}
 
 struct SpotLightsBuffer {
     lights: array<SpotLightData>
@@ -75,19 +77,27 @@ fn vertex_main(vert: VertexInput) -> VertexOutput {
 fn fragment_main(in: VertexOutput) -> @location(0) float4 {
 
     //TODO: figure this shit out
-    // for (var i = 0u; i < arrayLength(&spotLightsBuffer.lights); i++) {
-    //     let light = spotLightsBuffer.lights[i];
-    //     let light_view_projection_matrix = light.light_projection_matrix * light.light_view_matrix;
+    for (var i = 0u; i < arrayLength(&spotLightsBuffer.lights); i++) {
+        // let light = spotLightsBuffer.lights[i];
+        // let light_view_projection_matrix = light.light_projection_matrix * light.light_view_matrix;
 
-    //     let position = light_view_projection_matrix * node_params.transform * in.position;
-    //     // vec4 camera_space_position = glModelViewMatrix * gl_Vertex;
-    //     let distToCamera = -position.z;
-    //     // gl_Position = gl_ProjectionMatrix * cs_position;
-    //     textureStore(spotLightTextures, vec2u(u32(in.position.x), u32(in.position.y)), i, vec4f(distToCamera));
-    //     // total_light += calculateDirectionalLight(spotLightsBuffer.lights[i], fragment_normal, in, metallic);
-    // }
+        // let position = light_view_projection_matrix * node_params.transform * in.position;
+        // // vec4 camera_space_position = glModelViewMatrix * gl_Vertex;
+        // let distToCamera = -position.z;
+        // // gl_Position = gl_ProjectionMatrix * cs_position;
+        // textureStore(spotLightTextures, vec2u(u32(in.position.x), u32(in.position.y)), i, vec4f(distToCamera));
+        // total_light += calculateDirectionalLight(spotLightsBuffer.lights[i], fragment_normal, in, metallic);
+        let light = spotLightsBuffer.lights[i];
+        let light_view_projection_matrix = light.light_projection_matrix * light.light_view_matrix;
+
+        let light_space_position = light_view_projection_matrix * node_params.transform * in.position;
+
+        let shadow_position = vec3(light_space_position.xy * vec2(0.5, -0.5) + vec2(0.5, 0.5), light_space_position.z);
+       
+        textureStore(spotLightTextures, vec2u(shadow_position.xy), i, vec4f(light_space_position.z));
+    }
     
-    textureStore(spotLightTextures, vec2u(0, 0), 0, vec4f(1));
+    
 
     return in.position;
 } 

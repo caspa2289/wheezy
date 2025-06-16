@@ -38,6 +38,7 @@ import {
 } from '../../primitives/cube'
 import { GBuffer } from './GBuffer'
 import { ILightSourceV2 } from '../lights/LightSourceV2'
+import { ICamera } from '../../types/core/Camera'
 
 export const alignTo = (val: number, align: number) => {
     return Math.floor((val + align - 1) / align) * align
@@ -888,7 +889,9 @@ export class Renderer implements IRenderer {
     private _createLightsBuffer = (
         byteStride: number,
         elementCount: number,
-        lights: ILightSourceV2[]
+        lights: ILightSourceV2[],
+        //FIXME: mock
+        camera: ICamera
     ) => {
         const lightsBuffer = this.device.createBuffer({
             size: byteStride * lights.length || byteStride,
@@ -902,7 +905,14 @@ export class Renderer implements IRenderer {
             lights.forEach((light, index) => {
                 const offset = elementCount * index
 
-                lightData.set(light.getLightData(), offset)
+                lightData.set(
+                    [
+                        ...light.getLightData(),
+                        ...camera.projectionMatrix,
+                        ...camera.view,
+                    ],
+                    offset
+                )
             })
 
             lightsBuffer.unmap()
@@ -1018,13 +1028,15 @@ export class Renderer implements IRenderer {
         const directionalLightsBuffer = this._createLightsBuffer(
             DIRECTIONAL_LIGHT_BYTESTRIDE,
             DIRECTIONAL_LIGHT_ELEMENT_COUNT + 1,
-            scene.directionalLights
+            scene.directionalLights,
+            scene.camera
         )
 
         const pointLightsBuffer = this._createLightsBuffer(
             POINT_LIGHT_BYTESTRIDE,
             POINT_LIGHT_ELEMENT_COUNT + 1,
-            scene.pointLights
+            scene.pointLights,
+            scene.camera
         )
 
         const depthTextureSpot = this._device.createTexture({
@@ -1047,7 +1059,8 @@ export class Renderer implements IRenderer {
         const spotLightsBuffer = this._createLightsBuffer(
             SPOT_LIGHT_BYTESTRIDE,
             SPOT_LIGHT_ELEMENT_COUNT + 1,
-            scene.spotLights
+            scene.spotLights,
+            scene.camera
         )
 
         const lightsBindGroup = this.device.createBindGroup({
@@ -1184,78 +1197,78 @@ export class Renderer implements IRenderer {
         skyBoxPass.draw(cubeVertexCount)
         skyBoxPass.end()
 
-        const spotLightShadowPass = commandEncoder.beginRenderPass({
-            colorAttachments: [
-                {
-                    view: this._device
-                        .createTexture({
-                            format: 'rgba8unorm',
-                            size: [
-                                this.context.canvas.width,
-                                this.context.canvas.height,
-                            ],
-                            usage: GPUTextureUsage.RENDER_ATTACHMENT,
-                        })
-                        .createView(),
-                    loadOp: 'clear',
-                    storeOp: 'store',
-                },
-            ],
-        })
+        // const spotLightShadowPass = commandEncoder.beginRenderPass({
+        //     colorAttachments: [
+        //         {
+        //             view: this._device
+        //                 .createTexture({
+        //                     format: 'rgba8unorm',
+        //                     size: [
+        //                         this.context.canvas.width,
+        //                         this.context.canvas.height,
+        //                     ],
+        //                     usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        //                 })
+        //                 .createView(),
+        //             loadOp: 'clear',
+        //             storeOp: 'store',
+        //         },
+        //     ],
+        // })
 
-        spotLightShadowPass.setBindGroup(0, this._viewParamsBindGroup)
-        spotLightShadowPass.setBindGroup(2, lightsBindGroup)
+        // spotLightShadowPass.setBindGroup(0, this._viewParamsBindGroup)
+        // spotLightShadowPass.setBindGroup(2, lightsBindGroup)
 
-        meshesToRender.forEach((mesh) => {
-            //FIXME: this could be created beforehand
-            const pipeline = this.device.createRenderPipeline({
-                label: 'spot light shadow render pipeline',
-                layout: this.device.createPipelineLayout({
-                    label: 'spot light shadow render pipeline layout',
-                    bindGroupLayouts: [
-                        this._uniformsBGLayout,
-                        this._nodeParamsBGLayout,
-                        this._lightsBindGroupLayout,
-                    ],
-                }),
-                vertex: {
-                    entryPoint: 'vertex_main',
-                    module: this.device.createShaderModule({
-                        label: 'shadow shader module',
-                        code: shadowShaderCode,
-                    }),
-                    buffers: [
-                        {
-                            arrayStride: mesh.positions.byteStride,
-                            attributes: [
-                                {
-                                    format: mesh.positions.elementType,
-                                    offset: 0,
-                                    shaderLocation: 0,
-                                },
-                            ],
-                        },
-                    ],
-                },
-                fragment: {
-                    module: this.device.createShaderModule({
-                        label: 'shadow shader module',
-                        code: shadowShaderCode,
-                    }),
-                    entryPoint: 'fragment_main',
-                    targets: [{ format: this.swapChainFormat }],
-                },
-                primitive: {
-                    topology: 'triangle-list',
-                    stripIndexFormat: undefined,
-                    cullMode: 'back',
-                },
-            })
+        // meshesToRender.forEach((mesh) => {
+        //     //FIXME: this could be created beforehand
+        //     const pipeline = this.device.createRenderPipeline({
+        //         label: 'spot light shadow render pipeline',
+        //         layout: this.device.createPipelineLayout({
+        //             label: 'spot light shadow render pipeline layout',
+        //             bindGroupLayouts: [
+        //                 this._uniformsBGLayout,
+        //                 this._nodeParamsBGLayout,
+        //                 this._lightsBindGroupLayout,
+        //             ],
+        //         }),
+        //         vertex: {
+        //             entryPoint: 'vertex_main',
+        //             module: this.device.createShaderModule({
+        //                 label: 'shadow shader module',
+        //                 code: shadowShaderCode,
+        //             }),
+        //             buffers: [
+        //                 {
+        //                     arrayStride: mesh.positions.byteStride,
+        //                     attributes: [
+        //                         {
+        //                             format: mesh.positions.elementType,
+        //                             offset: 0,
+        //                             shaderLocation: 0,
+        //                         },
+        //                     ],
+        //                 },
+        //             ],
+        //         },
+        //         fragment: {
+        //             module: this.device.createShaderModule({
+        //                 label: 'shadow shader module',
+        //                 code: shadowShaderCode,
+        //             }),
+        //             entryPoint: 'fragment_main',
+        //             targets: [{ format: this.swapChainFormat }],
+        //         },
+        //         primitive: {
+        //             topology: 'triangle-list',
+        //             stripIndexFormat: undefined,
+        //             cullMode: 'back',
+        //         },
+        //     })
 
-            this.renderMeshShadows(mesh, scene, spotLightShadowPass, pipeline)
-        })
+        //     this.renderMeshShadows(mesh, scene, spotLightShadowPass, pipeline)
+        // })
 
-        spotLightShadowPass.end()
+        // spotLightShadowPass.end()
 
         const renderPass = commandEncoder.beginRenderPass(
             this._renderPassDescriptor

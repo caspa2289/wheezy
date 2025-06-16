@@ -1,4 +1,4 @@
-import { vec3, Vec3 } from 'wgpu-matrix'
+import { mat4, Mat4, vec3, Vec3 } from 'wgpu-matrix'
 import {
     ILightSourceV2,
     ILightSourceV2Props,
@@ -23,6 +23,8 @@ export interface ISpotLight extends ILightSourceV2 {
     attenuationConstant: number
     attenuationLinear: number
     attenuationExponential: number
+    projectionMatrix: Mat4
+    viewMatrix: Mat4
 }
 
 export class SpotLight extends LightSourceV2 implements ISpotLight {
@@ -32,6 +34,8 @@ export class SpotLight extends LightSourceV2 implements ISpotLight {
     attenuationConstant: number
     attenuationLinear: number
     attenuationExponential: number
+    projectionMatrix: Mat4
+    viewMatrix: Mat4
 
     constructor(props: ISpotLightProps) {
         super({ ...props, lightType: LIGHT_SOURCE_TYPES.spot })
@@ -41,6 +45,8 @@ export class SpotLight extends LightSourceV2 implements ISpotLight {
         this.attenuationExponential = props?.attenuationExponential ?? 0.002
         this.direction = props?.direction ?? vec3.create(-1, 0, 0)
         this.cutoff = props?.cutoff ?? 15
+        this.projectionMatrix = mat4.create()
+        this.viewMatrix = mat4.create()
     }
 
     get cutoff() {
@@ -63,6 +69,8 @@ export class SpotLight extends LightSourceV2 implements ISpotLight {
             this.attenuationConstant,
             this.attenuationLinear,
             this.attenuationExponential,
+            // ...this.projectionMatrix,
+            // ...this.viewMatrix,
         ]
     }
 }
