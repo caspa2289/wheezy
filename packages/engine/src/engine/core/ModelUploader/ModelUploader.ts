@@ -3,6 +3,7 @@ import {
     GLTFAccessor,
     GLTFTextureFilter,
     GLTFTextureWrap,
+    IAnimator,
     IBufferStorage,
     IGameObject,
     IImageStorage,
@@ -318,7 +319,8 @@ export class ModelUploader {
                 meshData.normals,
                 meshData.textureCoordinates,
                 meshData.tangents,
-                materialStorage.materials.get(meshData.materialId) as IMaterial
+                materialStorage.materials.get(meshData.materialId) as IMaterial,
+                node?.skin
             )
         })
 
@@ -343,7 +345,8 @@ export class ModelUploader {
         materialStorage: IMaterialStorage,
         textureStorage: ITextureStorage,
         sceneObject: IGameObject,
-        device: GPUDevice
+        device: GPUDevice,
+        animator: IAnimator
     ) {
         this.uploadBuffers(modelData, bufferStorage)
         await this.uploadImages(modelData, bufferStorage, imageStorage)
@@ -360,6 +363,13 @@ export class ModelUploader {
 
         const { trsMatrix, meshes, children } = modelData.model
 
+        modelData?.animations?.forEach((animation) => {
+            animator.animations.set(
+                animation.name ?? String(Math.random()),
+                animation
+            )
+        })
+
         const meshObject = new GameObject()
 
         objectManager.addObject(meshObject, sceneObject)
@@ -374,7 +384,8 @@ export class ModelUploader {
                 meshData.normals,
                 meshData.textureCoordinates,
                 meshData.tangents,
-                materialStorage.materials.get(meshData.materialId) as IMaterial
+                materialStorage.materials.get(meshData.materialId) as IMaterial,
+                modelData.model?.skin
             )
         })
 

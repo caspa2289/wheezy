@@ -1,4 +1,5 @@
 import { IScene, IEngine, IEngineProps, IRenderer } from '../../types'
+import { Animator } from '../Animator'
 import { Renderer } from '../Renderer'
 
 export class Engine implements IEngine {
@@ -7,6 +8,8 @@ export class Engine implements IEngine {
     private _prevFrameTime: number = 0
 
     private _scene?: IScene
+
+    private _animator = new Animator()
 
     public async initRenderer(canvas: HTMLCanvasElement) {
         this._renderer = new Renderer({ canvas })
@@ -31,6 +34,10 @@ export class Engine implements IEngine {
         } catch (err) {
             alert(err)
         }
+    }
+
+    get animator() {
+        return this._animator
     }
 
     get renderer() {

@@ -4,6 +4,7 @@ import {
     IGameObject,
     IMaterial,
     IMesh,
+    IMeshAnimationSkin,
 } from '../../types'
 import { Component } from '../Component'
 
@@ -16,6 +17,7 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
     normals: GLTFAccessor
     material: IMaterial
     isPipelineBuilt: boolean = false
+    skin?: IMeshAnimationSkin
 
     constructor(
         parent: IGameObject,
@@ -24,7 +26,8 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
         normals: GLTFAccessor,
         textureCoordinates: GLTFAccessor,
         tangents: GLTFAccessor,
-        material: IMaterial
+        material: IMaterial,
+        skin?: IMeshAnimationSkin
     ) {
         super(parent, EntityTypes.mesh)
 
@@ -34,5 +37,6 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
         this.material = material
         this.normals = normals
         this.tangents = tangents
+        this.skin = skin
     }
 }

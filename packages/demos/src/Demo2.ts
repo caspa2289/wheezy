@@ -33,8 +33,6 @@ export class Demo2 extends Scene implements IScene {
             'static/models/Whale.glb'
         )
 
-        console.log(modelData1)
-
         const modelGO1 = await this.uploadModel({
             modelData: modelData1,
         })

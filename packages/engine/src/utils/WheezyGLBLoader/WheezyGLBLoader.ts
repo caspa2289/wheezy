@@ -654,8 +654,6 @@ export class WheezyGLBLoader {
         }
 
         if (nodeJsonData.skin !== undefined) {
-            console.log(nodeJsonData)
-
             const skinRawData = modelData?.json?.skins?.[nodeJsonData.skin]
 
             if (skinRawData) {

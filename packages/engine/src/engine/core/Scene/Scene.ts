@@ -137,7 +137,8 @@ export class Scene implements IScene {
             this._materialStorage,
             this._textureStorage,
             this._root,
-            this._engine.renderer.device
+            this._engine.renderer.device,
+            this._engine.animator
         )
     }
 

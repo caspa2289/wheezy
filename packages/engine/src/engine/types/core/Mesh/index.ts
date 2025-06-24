@@ -87,4 +87,5 @@ export interface IMesh extends IComponent<EntityTypes.mesh> {
     positions: GLTFAccessor
     mode: number //gpu topology - default is 4 (triangles)
     isPipelineBuilt: boolean
+    skin?: IMeshAnimationSkin
 }
