@@ -41,6 +41,42 @@ export interface GLTFAccessor {
     usage: GPUBufferUsageFlags
 }
 
+export interface IAnimationChannelTarget {
+    node: number
+    path: 'translation' | 'rotation' | 'scale' | 'weights' //FIXME: wtf is weights?
+}
+
+export interface IAnimationChannel {
+    sampler: number
+    target: IAnimationChannelTarget
+}
+
+export interface IAnimationSampler {
+    input: number //input is array of timestamps
+    output: number //output is array of values in corresponding timestamps
+    interpolation: 'LINEAR' | 'STEP' | 'CUBICSPLINE' //FIXME: considered LINEAR for now
+}
+
+export interface IAnimation {
+    name?: string
+    channels?: IAnimationChannel[]
+    samplers?: IAnimationSampler[]
+}
+
+export interface IMeshAnimationJoint {
+    name?: string
+    children?: number[] //child bones indices
+    rotation: Vec3
+    scale: Vec3
+    translation: Vec3
+}
+
+export interface IMeshAnimationSkin {
+    inverseBindMatrices: Float32Array //FIXME: this should be a buffer
+    joints: IMeshAnimationJoint[]
+    name?: string
+}
+
 export interface IMesh extends IComponent<EntityTypes.mesh> {
     //https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-mesh-primitive
     normals: GLTFAccessor

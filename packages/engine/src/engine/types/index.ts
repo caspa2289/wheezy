@@ -1,5 +1,5 @@
 import { Mat4, Vec3, Vec4 } from 'wgpu-matrix'
-import { GLTFAccessor } from './core/Mesh'
+import { GLTFAccessor, IAnimation, IMeshAnimationSkin } from './core/Mesh'
 
 export * from './core/Entity'
 export * from './core/GameObject'
@@ -23,6 +23,7 @@ export interface IPreloadMesh {
     normals: GLTFAccessor
     tangents: GLTFAccessor
     textureCoordinates: GLTFAccessor
+    skin?: IMeshAnimationSkin
     materialId: string
     mode: number
 }
@@ -31,6 +32,7 @@ export interface IPreloadEntity {
     trsMatrix: Mat4
     meshes: IPreloadMesh[]
     name?: string
+    skin?: IMeshAnimationSkin
     children: IPreloadEntity[]
 }
 
@@ -41,6 +43,7 @@ export interface IModelPreloadData {
     textures: TextureMap
     materials: MaterialMap
     model: IPreloadEntity
+    animations?: IAnimation[]
 }
 
 export interface IMaterialPreloadData {

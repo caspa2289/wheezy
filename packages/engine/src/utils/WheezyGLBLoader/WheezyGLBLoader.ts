@@ -4,8 +4,11 @@ import {
     BufferMap,
     DEFAULT_SAMPLER_IDS,
     GLTFAccessor,
+    IAnimation,
+    IAnimationSampler,
     ImageMap,
     IMaterialPreloadData,
+    IMeshAnimationJoint,
     IModelPreloadData,
     IPreloadEntity,
     IPreloadMesh,
@@ -205,6 +208,84 @@ export class WheezyGLBLoader {
         return { materialsIndexMap, materialsMap }
     }
 
+    private static parseAnimationSamplerIOAccessors = (
+        modelData: GLB,
+        samplerRawData: IAnimationSampler,
+        bufferMap: BufferMap,
+        bufferIndexMap: IndexMap
+    ) => {
+        const io = [samplerRawData.input, samplerRawData.output].map(
+            (index) => {
+                const accessor = modelData.json.accessors[index]
+
+                const bufferView = {
+                    ...modelData.json.bufferViews[accessor.bufferView],
+                }
+
+                const bufferId = bufferIndexMap.get(bufferView.buffer) as string
+
+                if (!bufferView.byteOffset) {
+                    bufferView.byteOffset = 0
+                }
+
+                const bufferOffset =
+                    modelData.binChunks[bufferView.buffer].byteOffset ?? 0
+                bufferView.buffer = bufferId
+                bufferView.byteOffset += bufferOffset
+
+                //FIXME: for now values are considered to be f32, though it depends on componentType
+                const data = new Float32Array(
+                    bufferMap.get(bufferId) as ArrayBuffer,
+                    bufferView?.byteOffset,
+                    bufferView?.byteLength / 4
+                )
+
+                return {
+                    data,
+                    componentType: accessor.componentType,
+                    max: accessor.max,
+                    min: accessor.min,
+                    type: accessor.type,
+                }
+            }
+        )
+
+        return {
+            input: io[0],
+            output: io[1],
+            interpolation: samplerRawData.interpolation,
+        }
+    }
+
+    private static loadAnimations = (
+        modelData: GLB,
+        bufferMap: BufferMap,
+        bufferIndexMap: IndexMap
+    ): IAnimation[] | undefined => {
+        const animationsRawData = modelData.json.animations
+
+        if (!animationsRawData) return
+
+        // console.log(animationsRawData)
+        return animationsRawData.map((animationData: IAnimation) => {
+            const samplers = animationData?.samplers?.map(
+                (samplerRawData: IAnimationSampler) => {
+                    return this.parseAnimationSamplerIOAccessors(
+                        modelData,
+                        samplerRawData,
+                        bufferMap,
+                        bufferIndexMap
+                    )
+                }
+            )
+
+            return {
+                ...animationData,
+                samplers,
+            }
+        })
+    }
+
     private static loadBuffers = (modelData: GLB) => {
         const bufferIndexMap: IndexMap = new Map()
         const bufferMap: BufferMap = new Map()
@@ -245,6 +326,12 @@ export class WheezyGLBLoader {
             texturesIndexMap
         )
 
+        const animations = this.loadAnimations(
+            modelData,
+            bufferMap,
+            bufferIndexMap
+        )
+
         const modelPreload: IPreloadEntity = {
             trsMatrix: mat4.identity(),
             meshes: [],
@@ -272,6 +359,7 @@ export class WheezyGLBLoader {
             samplers: samplersMap,
             textures: texturesMap,
             materials: materialsMap,
+            animations: animations,
         }
     }
 
@@ -563,6 +651,47 @@ export class WheezyGLBLoader {
             trsMatrix: nodeJsonData.matrix ?? mat4.identity(),
             meshes: [],
             children: [],
+        }
+
+        if (nodeJsonData.skin !== undefined) {
+            console.log(nodeJsonData)
+
+            const skinRawData = modelData?.json?.skins?.[nodeJsonData.skin]
+
+            if (skinRawData) {
+                const bones = skinRawData.joints.map((index: number) => {
+                    const bone = modelData.json.nodes[
+                        index
+                    ] as IMeshAnimationJoint
+                    return bone
+                })
+
+                skinRawData.joints = bones
+
+                const inverseBindMatricesAccessor =
+                    modelData.json.accessors[skinRawData.inverseBindMatrices]
+
+                const inverseBindMatricesAccessorBufferView =
+                    modelData.json.bufferViews[
+                        inverseBindMatricesAccessor.bufferView
+                    ]
+
+                const bufferId = bufferIndexMap.get(
+                    inverseBindMatricesAccessorBufferView.buffer
+                ) as string
+
+                const buffer = bufferMap.get(bufferId) as ArrayBuffer
+
+                const matricesData = new Float32Array(
+                    buffer,
+                    inverseBindMatricesAccessorBufferView?.byteOffset,
+                    inverseBindMatricesAccessorBufferView?.byteLength / 4
+                )
+
+                skinRawData.inverseBindMatrices = matricesData
+
+                dataStructEntry.skin = skinRawData
+            }
         }
 
         if (nodeJsonData.mesh !== undefined) {
