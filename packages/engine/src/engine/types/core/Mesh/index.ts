@@ -77,6 +77,12 @@ export interface IMeshAnimationSkin {
     name?: string
 }
 
+export interface IMeshAnimationState {
+    name: string
+    isPlaying: boolean
+    speed: number
+}
+
 export interface IMesh extends IComponent<EntityTypes.mesh> {
     //https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-mesh-primitive
     normals: GLTFAccessor
@@ -88,4 +94,7 @@ export interface IMesh extends IComponent<EntityTypes.mesh> {
     mode: number //gpu topology - default is 4 (triangles)
     isPipelineBuilt: boolean
     skin?: IMeshAnimationSkin
+    animations: Map<string, IMeshAnimationState>
+
+    attachAnimation: (name: string) => void
 }

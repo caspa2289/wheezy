@@ -363,12 +363,7 @@ export class ModelUploader {
 
         const { trsMatrix, meshes, children } = modelData.model
 
-        modelData?.animations?.forEach((animation) => {
-            animator.animations.set(
-                animation.name ?? String(Math.random()),
-                animation
-            )
-        })
+        modelData?.animations && animator.addAnimations(modelData?.animations)
 
         const meshObject = new GameObject()
 

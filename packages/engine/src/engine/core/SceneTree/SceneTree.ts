@@ -70,7 +70,7 @@ export class SceneTree implements ISceneTree {
         return childrenIds
     }
 
-    private traverseNode(
+    public traverseNode(
         node: SceneNode | null | undefined,
         callback: (nodeId: EntityID, nodeContent: SceneNodeContent) => void
     ) {

@@ -1,4 +1,10 @@
-import { IScene, IEngine, IEngineProps, IRenderer } from '../../types'
+import {
+    IScene,
+    IEngine,
+    IEngineProps,
+    IRenderer,
+    IAnimator,
+} from '../../types'
 import { Animator } from '../Animator'
 import { Renderer } from '../Renderer'
 
@@ -9,11 +15,15 @@ export class Engine implements IEngine {
 
     private _scene?: IScene
 
-    private _animator = new Animator()
+    private _animator!: IAnimator
 
-    public async initRenderer(canvas: HTMLCanvasElement) {
+    protected async initRenderer(canvas: HTMLCanvasElement) {
         this._renderer = new Renderer({ canvas })
         await this._renderer.init()
+    }
+
+    protected initAnimator(device: GPUDevice) {
+        this._animator = new Animator(device)
     }
 
     public static async getOrInit({
@@ -27,7 +37,10 @@ export class Engine implements IEngine {
             }
 
             const engineInstance = new Engine()
+
             await engineInstance.initRenderer(canvas)
+
+            engineInstance.initAnimator(engineInstance.renderer.device)
             ;(window as any).WheezyEngine = engineInstance
 
             return engineInstance

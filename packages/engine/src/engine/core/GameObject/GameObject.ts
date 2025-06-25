@@ -1,5 +1,6 @@
 import {
     EntityID,
+    EntityType,
     EntityTypes,
     IComponent,
     IGameObject,
@@ -41,6 +42,18 @@ export class GameObject
         return [...this.components.values()].find(
             (component) => component.type === EntityTypes.transform
         ) as ITransform
+    }
+
+    public getComponentOfType(type: EntityType) {
+        let result: any = null
+
+        this._components.forEach((component) => {
+            if (!result && component.type === type) {
+                result = component
+            }
+        })
+
+        return result
     }
 
     public addComponent(component: IComponent<EntityTypes>) {

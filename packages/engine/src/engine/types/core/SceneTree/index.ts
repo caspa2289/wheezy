@@ -20,6 +20,10 @@ export interface ISceneTree {
         target: SceneTreePosition | null,
         child: SceneTreePosition
     ) => SceneTreePosition
+    traverseNode: (
+        node: SceneNode | null | undefined,
+        callback: (nodeId: EntityID, nodeContent: SceneNodeContent) => void
+    ) => void
     //returns an array of gameObject ids to be cleared from ObjectManager
     removeNode: (targetPosition: SceneTreePosition) => EntityID[]
     getNodeContentAt: (position: SceneTreePosition) => SceneNodeContent | null

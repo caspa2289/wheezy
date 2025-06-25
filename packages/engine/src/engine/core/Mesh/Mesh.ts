@@ -18,6 +18,7 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
     material: IMaterial
     isPipelineBuilt: boolean = false
     skin?: IMeshAnimationSkin
+    animations = new Map()
 
     constructor(
         parent: IGameObject,
@@ -38,5 +39,13 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
         this.normals = normals
         this.tangents = tangents
         this.skin = skin
+    }
+
+    public attachAnimation = (name: string) => {
+        this.animations.set(name, {
+            name,
+            isPlaying: false,
+            speed: 1,
+        })
     }
 }

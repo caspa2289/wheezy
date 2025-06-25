@@ -1,5 +1,7 @@
 import {
     DirectionalLightV2,
+    EntityTypes,
+    IMesh,
     IScene,
     Scene,
     WheezyGLBLoader,
@@ -36,6 +38,13 @@ export class Demo2 extends Scene implements IScene {
         const modelGO1 = await this.uploadModel({
             modelData: modelData1,
         })
+
+        const sharkMesh = this.objectManager.getFirstChildOfType(
+            modelGO1,
+            EntityTypes.mesh
+        ) as IMesh
+
+        sharkMesh.attachAnimation('swim')
 
         modelGO1.transform.translate(vec3.create(0, 0, 0))
         modelGO1.transform.rotateDegreesEuler({ y: -100 })

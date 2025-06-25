@@ -1,8 +1,10 @@
 import {
     EntityID,
+    EntityType,
     IGameObject,
     IObjectManager,
     ISceneTree,
+    SceneNode,
     SceneTreePosition,
 } from '../../types'
 import { SceneTree } from '../SceneTree'
@@ -62,5 +64,30 @@ export class ObjectManager implements IObjectManager {
         idsToRemove.forEach((id) => {
             this._objectPositions.delete(id)
         })
+    }
+
+    private _traverseChildNodes = () => {}
+
+    public getFirstChildOfType(gameObject: IGameObject, type: EntityType) {
+        const position = this.getObjectPosition(gameObject)
+
+        if (!position) return null
+
+        let result: any = null
+
+        const node = this.sceneTree.getNodeContentAt(position)
+
+        if (!node) return null
+
+        this.sceneTree.traverseNode(
+            new Map([['1', node]]),
+            (_, nodeContent) => {
+                if (!result) {
+                    result = nodeContent.gameObject.getComponentOfType(type)
+                }
+            }
+        )
+
+        return result
     }
 }
