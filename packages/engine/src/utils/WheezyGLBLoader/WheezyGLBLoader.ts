@@ -5,7 +5,8 @@ import {
     DEFAULT_SAMPLER_IDS,
     GLTFAccessor,
     IAnimation,
-    IAnimationSampler,
+    IAnimationRawData,
+    IAnimationSamplerRawData,
     ImageMap,
     IMaterialPreloadData,
     IMeshAnimationJoint,
@@ -210,7 +211,7 @@ export class WheezyGLBLoader {
 
     private static parseAnimationSamplerIOAccessors = (
         modelData: GLB,
-        samplerRawData: IAnimationSampler,
+        samplerRawData: IAnimationSamplerRawData,
         bufferMap: BufferMap,
         bufferIndexMap: IndexMap
     ) => {
@@ -267,9 +268,9 @@ export class WheezyGLBLoader {
         if (!animationsRawData) return
 
         // console.log(animationsRawData)
-        return animationsRawData.map((animationData: IAnimation) => {
+        return animationsRawData.map((animationData: IAnimationRawData) => {
             const samplers = animationData?.samplers?.map(
-                (samplerRawData: IAnimationSampler) => {
+                (samplerRawData: IAnimationSamplerRawData) => {
                     return this.parseAnimationSamplerIOAccessors(
                         modelData,
                         samplerRawData,

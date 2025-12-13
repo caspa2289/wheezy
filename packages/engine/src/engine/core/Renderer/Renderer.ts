@@ -2,6 +2,7 @@ import { mat4, Mat4, vec3, vec4 } from 'wgpu-matrix'
 import {
     EntityTypes,
     GLTFAccessor,
+    IEngine,
     IMesh,
     IRenderer,
     IRendererProps,
@@ -928,6 +929,7 @@ export class Renderer implements IRenderer {
         scene.onRender(deltaTime)
 
         const meshesToRender: IMesh[] = []
+        const meshesToAnimate: IMesh[] = []
 
         const debugInfoArray = new ArrayBuffer(4 + 4)
         const debugInfoView = new DataView(
@@ -1066,6 +1068,10 @@ export class Renderer implements IRenderer {
                     //FIXME: transform calculations are not performed for the light transform as of now
                     meshesToRender.push(component)
 
+                    if ((component as IMesh).hasAnimation) {
+                        meshesToAnimate.push(component)
+                    }
+
                     if (!(component as IMesh).isPipelineBuilt) {
                         this.buildRenderPipeline(component, scene)
                     }
@@ -1084,6 +1090,15 @@ export class Renderer implements IRenderer {
         scene.objectManager.sceneTree.nodes.forEach((node) => {
             iterateNode(node, mat4.identity())
         })
+
+        {
+            //FIXME: that sucks ass
+            const engine = (window as any).WheezyEngine as IEngine
+
+            meshesToAnimate.forEach((mesh) => {
+                engine.animator.animate(mesh, deltaTime)
+            })
+        }
 
         const commandEncoder = this.device.createCommandEncoder()
 

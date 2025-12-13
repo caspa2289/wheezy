@@ -52,9 +52,31 @@ export interface IAnimationChannel {
 }
 
 export interface IAnimationSampler {
-    input: number //input is array of timestamps
-    output: number //output is array of values in corresponding timestamps
+    input: {
+        componentType: number
+        data: Float32Array
+        max: [number]
+        min: [number]
+        type: string
+    }
+    output: {
+        componentType: number
+        data: Float32Array
+        type: string
+    }
     interpolation: 'LINEAR' | 'STEP' | 'CUBICSPLINE' //FIXME: considered LINEAR for now
+}
+
+export interface IAnimationSamplerRawData {
+    input: number
+    output: number
+    interpolation: 'LINEAR' | 'STEP' | 'CUBICSPLINE' //FIXME: considered LINEAR for now
+}
+
+export interface IAnimationRawData {
+    name?: string
+    channels?: IAnimationChannel[]
+    samplers?: IAnimationSamplerRawData[]
 }
 
 export interface IAnimation {
@@ -95,6 +117,7 @@ export interface IMesh extends IComponent<EntityTypes.mesh> {
     isPipelineBuilt: boolean
     skin?: IMeshAnimationSkin
     animations: Map<string, IMeshAnimationState>
+    hasAnimation: boolean
 
-    attachAnimation: (name: string) => void
+    attachAnimation: (name: string) => IMeshAnimationState
 }

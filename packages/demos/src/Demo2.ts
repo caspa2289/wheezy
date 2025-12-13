@@ -44,7 +44,9 @@ export class Demo2 extends Scene implements IScene {
             EntityTypes.mesh
         ) as IMesh
 
-        sharkMesh.attachAnimation('swim')
+        const swimAnimationState = sharkMesh.attachAnimation('swim')
+
+        swimAnimationState.isPlaying = true
 
         modelGO1.transform.translate(vec3.create(0, 0, 0))
         modelGO1.transform.rotateDegreesEuler({ y: -100 })

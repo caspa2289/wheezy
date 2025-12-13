@@ -42,10 +42,18 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
     }
 
     public attachAnimation = (name: string) => {
-        this.animations.set(name, {
+        const value = {
             name,
             isPlaying: false,
             speed: 1,
-        })
+        }
+
+        this.animations.set(name, value)
+
+        return value
+    }
+
+    get hasAnimation() {
+        return !!this.animations.size
     }
 }
