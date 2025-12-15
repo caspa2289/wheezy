@@ -1,4 +1,5 @@
 import {
+    DirectionalLightV2,
     IGameObject,
     IScene,
     Scene,
@@ -6,7 +7,7 @@ import {
     WheezyGLBLoader,
 } from '@wheezy/engine'
 import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCamera'
-import { vec3 } from 'wgpu-matrix'
+import { mat4, vec3 } from 'wgpu-matrix'
 
 export class DemoRTC extends Scene implements IScene {
     private _gameObject!: IGameObject
@@ -20,7 +21,7 @@ export class DemoRTC extends Scene implements IScene {
         this.camera = new ArcBallCamera({
             canvasHeight: this.engine.renderer.context.canvas.height,
             canvasWidth: this.engine.renderer.context.canvas.width,
-            position: vec3.create(-4, 0, 0),
+            position: vec3.create(0, 4, 1),
         })
     }
 
@@ -35,13 +36,10 @@ export class DemoRTC extends Scene implements IScene {
             modelData: modelData1,
         })
 
-        this._gameObject.transform.rotateDegreesEuler({ x: 90, z: 90 })
-
-        this.spotLights.push(
-            new SpotLight({
+        this.directionalLights.push(
+            new DirectionalLightV2({
                 parent: this.root,
-                position: vec3.create(-2, 0, 0),
-                direction: vec3.create(1, 0, 0),
+                direction: vec3.create(0, -1, 0),
             })
         )
 
@@ -62,7 +60,6 @@ export class DemoRTC extends Scene implements IScene {
         }
 
         this._connection.onicecandidate = (event) => {
-            console.log(event.candidate)
             if (event.candidate && !this._candidateDescription) {
                 if (this._connection.remoteDescription) {
                     this._connection.addIceCandidate(event.candidate)
@@ -99,8 +96,17 @@ export class DemoRTC extends Scene implements IScene {
 
     public onRender(dt: number): void {}
 
-    private _handleMessage = (event: MessageEvent) => {
-        console.log(new Float64Array(event.data))
+    private _handleMessage = (event: MessageEvent<ArrayBuffer>) => {
+        const quaternion = new Float32Array(event.data)
+        const rotationMatrix = new Float32Array(
+            16 * Float32Array.BYTES_PER_ELEMENT
+        )
+        mat4.fromQuat(
+            [quaternion[0], quaternion[1], quaternion[2], quaternion[3]],
+            rotationMatrix
+        )
+
+        this._gameObject.transform.matrix = rotationMatrix
     }
 
     private _handleInput = async () => {
