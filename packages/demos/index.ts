@@ -1,12 +1,13 @@
 import { Engine, IEngine } from '@wheezy/engine'
 import { Demo0 } from './src/Demo0'
 import { Demo1 } from './src/Demo1'
+import { DemoRTC } from './src/DemoRTC'
 
 const canvas = document.getElementById('webgpu-canvas') as HTMLCanvasElement
 
 const initDebugControls = (engine: IEngine) => {
     const defaultOutputSource = 0
-    const defaultScene = 1
+    const defaultScene = 2
 
     const debugContainer = document.getElementById(
         'debug-container'
@@ -19,6 +20,7 @@ const initDebugControls = (engine: IEngine) => {
     const sceneOptions = [
         { label: 'Scene 1', value: 0 },
         { label: 'Scene 2', value: 1 },
+        { label: 'RTC control demo', value: 2 },
     ]
 
     sceneOptions.forEach((item) => {
@@ -88,6 +90,17 @@ const setScene = async (engine: IEngine, index: number) => {
             loader.style.display = 'block'
             engine.scene = undefined
             const scene = new Demo1()
+            await scene.init()
+
+            engine.scene = scene
+            loader.style.display = 'none'
+            engine.render()
+            break
+        }
+        case 2: {
+            loader.style.display = 'block'
+            engine.scene = undefined
+            const scene = new DemoRTC()
             await scene.init()
 
             engine.scene = scene
