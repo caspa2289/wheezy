@@ -46,12 +46,13 @@ const initDebugControls = (engine: IEngine) => {
 
     const outputOptions = [
         { label: 'Color', value: 0 },
-        { label: 'Metallic component', value: 4 },
-        { label: 'Roughness component', value: 5 },
-        { label: 'Occlusion component', value: 8 },
-        { label: 'Surface normal', value: 1 },
-        { label: 'Fragment normal', value: 6 },
-        { label: 'Vertex tangent', value: 7 },
+        { label: 'Albedo', value: 1 },
+        { label: 'Normal', value: 2 },
+        { label: 'Metallic component', value: 3 },
+        { label: 'Roughness component', value: 4 },
+        { label: 'Occlusion component', value: 5 },
+        { label: 'Emission', value: 6 },
+        { label: 'Depth', value: 7 },
     ]
 
     outputOptions.forEach((item) => {

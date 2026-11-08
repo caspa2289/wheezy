@@ -24,6 +24,10 @@ fn vertex_main(
     let camera_view_projection_matrix = uniforms.camera_projection_matrix * uniforms.camera_view_matrix;
 
     output.Position = camera_view_projection_matrix * uniforms.transform * position;
+    // force depth to 1.0 — the skybox pass renders last with depthCompare 'less-equal'
+    // against the G-buffer depth, so it only covers pixels no geometry wrote to
+    // (depth still at the 1.0 clear value)
+    output.Position.z = output.Position.w;
     output.texture_coordinates = uv;
     output.world_position = 0.5 * (position + vec4(1.0, 1.0, 1.0, 1.0));
     return output;

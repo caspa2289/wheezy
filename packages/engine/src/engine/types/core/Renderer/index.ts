@@ -2,15 +2,16 @@ import { type Vec3 } from 'wgpu-matrix'
 import { type IMesh } from '../Mesh'
 import { type IScene } from '../Scene'
 
+// must stay in sync with the OUT_* constants in lighting.wgsl
 export enum RENDER_OUTPUT_SOURCES {
     DEFAULT,
-    V_NORMAL,
-    AMBIENT,
-    DIFFUSE,
+    ALBEDO,
+    NORMAL,
     METALLIC,
     ROUGHNESS,
-    F_NORMAL,
-    V_TANGENT,
+    OCCLUSION,
+    EMISSION,
+    DEPTH,
 }
 
 export type TRenderOutputSource = number

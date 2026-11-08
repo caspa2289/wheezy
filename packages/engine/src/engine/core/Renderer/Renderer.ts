@@ -17,7 +17,6 @@ import {
     DEFULT_SHADOW_TEXTURE_SIZE,
     DIRECTIONAL_LIGHT_BYTESTRIDE,
     DIRECTIONAL_LIGHT_ELEMENT_COUNT,
-    MSAA_SAMPLE_COUNT,
     POINT_LIGHT_BYTESTRIDE,
     POINT_LIGHT_ELEMENT_COUNT,
     SPOT_LIGHT_BYTESTRIDE,
@@ -26,6 +25,7 @@ import {
 } from './constants'
 import { type IMeshRenderData } from '../../types/core/MeshRenderDataStorage'
 import shaderCode from '../../shaders/testShader.wgsl'
+import lightingShaderCode from '../../shaders/lighting.wgsl'
 import shadowShaderCode from '../../shaders/vertexShadow.wgsl'
 import skyboxShaderCode from '../../shaders/skybox.wgsl'
 import {
@@ -70,14 +70,16 @@ export class Renderer implements IRenderer {
     private _skyboxSampler!: GPUSampler
 
     private _lightsBindGroupLayout!: GPUBindGroupLayout
+    private _gBufferBindGroupLayout!: GPUBindGroupLayout
+    private _gBufferBindGroup!: GPUBindGroup
 
     private _uniformsBGLayout!: GPUBindGroupLayout
     private _nodeParamsBGLayout!: GPUBindGroupLayout
 
     private _viewParamsBufferSize: number = VIEW_PARAMS_BUFFER_SIZE
-    private _msaaSampleCount: number = MSAA_SAMPLE_COUNT
 
-    private _renderPassDescriptor!: GPURenderPassDescriptor
+    private _geometryPassDescriptor!: GPURenderPassDescriptor
+    private _lightingPassDescriptor!: GPURenderPassDescriptor
     private _shadowPassDescriptor!: GPURenderPassDescriptor
 
     private _viewParamsBuffer!: GPUBuffer
@@ -86,6 +88,7 @@ export class Renderer implements IRenderer {
     private _debugParamsBuffer!: GPUBuffer
 
     private _shaderModule!: GPUShaderModule
+    private _lightingShaderModule!: GPUShaderModule
 
     private _gpuTimingSupported = false
     private _timestampQuerySet?: GPUQuerySet
@@ -98,7 +101,8 @@ export class Renderer implements IRenderer {
 
     public outputSource = RENDER_OUTPUT_SOURCES.DEFAULT
 
-    private renderPipeline!: GPURenderPipeline
+    private geometryPipeline!: GPURenderPipeline
+    private lightingPipeline!: GPURenderPipeline
     private materialBindGroupLayout!: GPUBindGroupLayout
 
     constructor({ canvas }: IRendererProps) {
@@ -117,7 +121,6 @@ export class Renderer implements IRenderer {
         this._gBuffer = new GBuffer(
             this._device,
             this._context,
-            this._msaaSampleCount,
             this.swapChainFormat,
             this.depthTextureFormat
         )
@@ -143,25 +146,48 @@ export class Renderer implements IRenderer {
         this._shadowDepthTextureView = this._shadowDepthTexture.createView()
 
         this._shaderModule = this.device.createShaderModule({
-            label: 'main shader',
+            label: 'geometry shader',
             code: shaderCode,
+        })
+
+        this._lightingShaderModule = this.device.createShaderModule({
+            label: 'lighting shader',
+            code: lightingShaderCode,
         })
 
         this._initializeBindGroupLayouts()
 
         this._initializeViewParams()
 
-        this._renderPassDescriptor = {
-            label: 'main render pass descriptor',
+        // attachment order must match GBufferOutput @location order in testShader.wgsl.
+        // 4 targets: WebGPU's default maxColorAttachmentBytesPerSample is 32 and counts
+        // each attachment 8-byte-aligned — occlusion is packed into metallicRoughness .r
+        this._geometryPassDescriptor = {
+            label: 'geometry pass descriptor',
             colorAttachments: [
                 {
-                    view: null as unknown as GPUTextureView,
-                    resolveTarget: (this._msaaSampleCount === 1
-                        ? undefined
-                        : null) as unknown as GPUTextureView,
-                    loadOp: 'load' as GPULoadOp,
+                    view: this._gBuffer.albedo,
+                    loadOp: 'clear' as GPULoadOp,
                     clearValue: [0.0, 0.0, 0.0, 0.0],
-                    storeOp: 'store',
+                    storeOp: 'store' as GPUStoreOp,
+                },
+                {
+                    view: this._gBuffer.normal,
+                    loadOp: 'clear' as GPULoadOp,
+                    clearValue: [0.0, 0.0, 0.0, 0.0],
+                    storeOp: 'store' as GPUStoreOp,
+                },
+                {
+                    view: this._gBuffer.metallicRoughness,
+                    loadOp: 'clear' as GPULoadOp,
+                    clearValue: [0.0, 0.0, 0.0, 0.0],
+                    storeOp: 'store' as GPUStoreOp,
+                },
+                {
+                    view: this._gBuffer.emission,
+                    loadOp: 'clear' as GPULoadOp,
+                    clearValue: [0.0, 0.0, 0.0, 0.0],
+                    storeOp: 'store' as GPUStoreOp,
                 },
             ],
             depthStencilAttachment: {
@@ -169,10 +195,19 @@ export class Renderer implements IRenderer {
                 depthLoadOp: 'clear' as GPULoadOp,
                 depthClearValue: 1.0,
                 depthStoreOp: 'store' as GPUStoreOp,
-                stencilLoadOp: 'clear' as GPULoadOp,
-                stencilClearValue: 0,
-                stencilStoreOp: 'store' as GPUStoreOp,
             },
+        }
+
+        this._lightingPassDescriptor = {
+            label: 'lighting pass descriptor',
+            colorAttachments: [
+                {
+                    view: null as unknown as GPUTextureView, // swap chain, assigned per frame
+                    loadOp: 'clear' as GPULoadOp,
+                    clearValue: [0.0, 0.0, 0.0, 1.0],
+                    storeOp: 'store' as GPUStoreOp,
+                },
+            ],
         }
 
         this._shadowPassDescriptor = {
@@ -234,12 +269,12 @@ export class Renderer implements IRenderer {
                 cullMode: 'front',
             },
             depthStencil: {
-                depthWriteEnabled: true,
-                depthCompare: 'less',
+                // skybox renders last: its fragments are forced to depth 1.0 in
+                // skybox.wgsl, so 'less-equal' against the G-buffer depth passes
+                // only where the depth is still the 1.0 clear value (no geometry)
+                depthWriteEnabled: false,
+                depthCompare: 'less-equal',
                 format: this.depthTextureFormat,
-            },
-            multisample: {
-                count: this._msaaSampleCount,
             },
         })
 
@@ -257,25 +292,21 @@ export class Renderer implements IRenderer {
             label: 'skybox render pass',
             colorAttachments: [
                 {
-                    view: null as unknown as GPUTextureView, // Assigned later
-                    loadOp: 'clear',
+                    view: null as unknown as GPUTextureView, // swap chain, assigned per frame
+                    loadOp: 'load', // lighting result is already on the target
                     storeOp: 'store',
                 },
             ],
             depthStencilAttachment: {
                 view: this._gBuffer.depth,
-                depthLoadOp: 'clear' as GPULoadOp,
-                depthClearValue: 1.0,
+                depthLoadOp: 'load' as GPULoadOp,
                 depthStoreOp: 'store' as GPUStoreOp,
-                stencilLoadOp: 'clear' as GPULoadOp,
-                stencilClearValue: 0,
-                stencilStoreOp: 'store' as GPUStoreOp,
             },
         }
 
         if (this._gpuTimingSupported) {
             const querySet = this._timestampQuerySet!
-            this._skyBoxRenderPassDescriptor.timestampWrites = {
+            this._geometryPassDescriptor.timestampWrites = {
                 querySet,
                 beginningOfPassWriteIndex: 0,
                 endOfPassWriteIndex: 1,
@@ -285,10 +316,15 @@ export class Renderer implements IRenderer {
                 beginningOfPassWriteIndex: 2,
                 endOfPassWriteIndex: 3,
             }
-            this._renderPassDescriptor.timestampWrites = {
+            this._lightingPassDescriptor.timestampWrites = {
                 querySet,
                 beginningOfPassWriteIndex: 4,
                 endOfPassWriteIndex: 5,
+            }
+            this._skyBoxRenderPassDescriptor.timestampWrites = {
+                querySet,
+                beginningOfPassWriteIndex: 6,
+                endOfPassWriteIndex: 7,
             }
         }
 
@@ -423,14 +459,57 @@ export class Renderer implements IRenderer {
             ],
         })
 
-        this.renderPipeline = this.device.createRenderPipeline({
-            label: 'main render pipeline',
+        this._gBufferBindGroupLayout = this.device.createBindGroupLayout({
+            label: 'gBufferBindGroupLayout',
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: { sampleType },
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: { sampleType },
+                },
+                {
+                    binding: 2,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: { sampleType },
+                },
+                {
+                    binding: 3,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: { sampleType },
+                },
+                {
+                    binding: 4,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: { sampleType: 'depth' },
+                },
+            ],
+        })
+
+        // static — G-buffer views never change (no resize support)
+        this._gBufferBindGroup = this.device.createBindGroup({
+            label: 'gBuffer bindgroup',
+            layout: this._gBufferBindGroupLayout,
+            entries: [
+                { binding: 0, resource: this._gBuffer.albedo },
+                { binding: 1, resource: this._gBuffer.normal },
+                { binding: 2, resource: this._gBuffer.metallicRoughness },
+                { binding: 3, resource: this._gBuffer.emission },
+                { binding: 4, resource: this._gBuffer.depth },
+            ],
+        })
+
+        this.geometryPipeline = this.device.createRenderPipeline({
+            label: 'geometry render pipeline',
             layout: this.device.createPipelineLayout({
                 bindGroupLayouts: [
                     this._uniformsBGLayout,
                     this._nodeParamsBGLayout,
                     this.materialBindGroupLayout,
-                    this.lightsBindGroupLayout,
                 ],
             }),
             vertex: {
@@ -482,7 +561,13 @@ export class Renderer implements IRenderer {
             fragment: {
                 module: this._shaderModule,
                 entryPoint: 'fragment_main',
-                targets: [{ format: this.swapChainFormat }],
+                // order must match the geometry pass descriptor attachments
+                targets: [
+                    { format: this.swapChainFormat }, // albedo
+                    { format: 'rgba16float' }, // normal
+                    { format: this.swapChainFormat }, // metallicRoughness (+ occlusion in .r)
+                    { format: this.swapChainFormat }, // emission
+                ],
             },
             primitive: {
                 topology: 'triangle-list',
@@ -494,8 +579,29 @@ export class Renderer implements IRenderer {
                 depthWriteEnabled: true,
                 depthCompare: 'less',
             },
-            multisample: {
-                count: this._msaaSampleCount,
+        })
+
+        this.lightingPipeline = this.device.createRenderPipeline({
+            label: 'lighting render pipeline',
+            layout: this.device.createPipelineLayout({
+                bindGroupLayouts: [
+                    this._uniformsBGLayout,
+                    this._gBufferBindGroupLayout,
+                    this._lightsBindGroupLayout,
+                ],
+            }),
+            vertex: {
+                module: this._lightingShaderModule,
+                entryPoint: 'vertex_main',
+                buffers: [],
+            },
+            fragment: {
+                module: this._lightingShaderModule,
+                entryPoint: 'fragment_main',
+                targets: [{ format: this.swapChainFormat }],
+            },
+            primitive: {
+                topology: 'triangle-list',
             },
         })
 
@@ -665,22 +771,22 @@ export class Renderer implements IRenderer {
     }
 
     private _initializeGpuTiming() {
-        // 3 passes (skybox, shadow, main) x begin/end timestamps
+        // 4 passes (geometry, shadow, lighting, skybox) x begin/end timestamps
         this._timestampQuerySet = this._device.createQuerySet({
             label: 'profiler timestamp query set',
             type: 'timestamp',
-            count: 6,
+            count: 8,
         })
 
         this._timestampResolveBuffer = this._device.createBuffer({
             label: 'profiler timestamp resolve buffer',
-            size: 6 * 8,
+            size: 8 * 8,
             usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
         })
 
         this._timestampReadbackBuffer = this._device.createBuffer({
             label: 'profiler timestamp readback buffer',
-            size: 6 * 8,
+            size: 8 * 8,
             usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
         })
     }
@@ -1016,6 +1122,14 @@ export class Renderer implements IRenderer {
             vec4.create(...this.ambientLightColor, this.ambientLightIntensity),
             36
         )
+        // inverse view-projection for world-position reconstruction in the
+        // deferred lighting pass (float offset 40 — see ViewParams in lighting.wgsl)
+        viewMap.set(
+            mat4.inverse(
+                mat4.mul(scene.camera.projectionMatrix, scene.camera.view)
+            ),
+            40
+        )
 
         viewParamsUploadBuffer.unmap()
 
@@ -1169,42 +1283,29 @@ export class Renderer implements IRenderer {
             0,
             this._skyBoxUniformBufferSize
         )
-        ;(this._renderPassDescriptor as any).colorAttachments[0].view =
-            this.context.getCurrentTexture().createView()
-        if (this._msaaSampleCount !== 1) {
-            ;(this._renderPassDescriptor as any).colorAttachments[0].view =
-                this._gBuffer.multiSample
-            ;(
-                this._renderPassDescriptor as any
-            ).colorAttachments[0].resolveTarget = this.context
-                .getCurrentTexture()
-                .createView()
-        }
-
+        const currentTextureView = this.context.getCurrentTexture().createView()
+        ;(this._lightingPassDescriptor as any).colorAttachments[0].view =
+            currentTextureView
         ;(this._skyBoxRenderPassDescriptor as any).colorAttachments[0].view =
-            this.context.getCurrentTexture().createView()
-        if (this._msaaSampleCount !== 1) {
-            ;(
-                this._skyBoxRenderPassDescriptor as any
-            ).colorAttachments[0].view = this._gBuffer.multiSample
-            ;(
-                this._renderPassDescriptor as any
-            ).colorAttachments[0].resolveTarget = this.context
-                .getCurrentTexture()
-                .createView()
-        }
+            currentTextureView
 
         const gpuTimingThisFrame =
             this._gpuTimingSupported && !this._timestampReadbackPending
 
-        const skyBoxPass = commandEncoder.beginRenderPass(
-            this._skyBoxRenderPassDescriptor
+        // pass order: geometry (G-buffer) → shadow (vestigial) → lighting → skybox
+
+        const geometryPass = commandEncoder.beginRenderPass(
+            this._geometryPassDescriptor
         )
-        skyBoxPass.setPipeline(this._skyBoxPipeline)
-        skyBoxPass.setVertexBuffer(0, this._skyBoxVerticesBuffer)
-        skyBoxPass.setBindGroup(0, this._skyBoxUniformBindGroup)
-        skyBoxPass.draw(cubeVertexCount)
-        skyBoxPass.end()
+
+        geometryPass.setBindGroup(0, this._viewParamsBindGroup)
+        geometryPass.setPipeline(this.geometryPipeline)
+
+        meshesToRender.forEach((mesh) => {
+            this.renderMesh(mesh, scene, geometryPass)
+        })
+
+        geometryPass.end()
 
         const shadowPass = commandEncoder.beginRenderPass(
             this._shadowPassDescriptor
@@ -1218,25 +1319,32 @@ export class Renderer implements IRenderer {
 
         shadowPass.end()
 
-        const renderPass = commandEncoder.beginRenderPass(
-            this._renderPassDescriptor
+        const lightingPass = commandEncoder.beginRenderPass(
+            this._lightingPassDescriptor
         )
 
-        renderPass.setBindGroup(0, this._viewParamsBindGroup)
-        renderPass.setBindGroup(3, lightsBindGroup)
-        renderPass.setPipeline(this.renderPipeline)
+        lightingPass.setBindGroup(0, this._viewParamsBindGroup)
+        lightingPass.setBindGroup(1, this._gBufferBindGroup)
+        lightingPass.setBindGroup(2, lightsBindGroup)
+        lightingPass.setPipeline(this.lightingPipeline)
+        lightingPass.draw(3) // fullscreen triangle
 
-        meshesToRender.forEach((mesh) => {
-            this.renderMesh(mesh, scene, renderPass)
-        })
+        lightingPass.end()
 
-        renderPass.end()
+        const skyBoxPass = commandEncoder.beginRenderPass(
+            this._skyBoxRenderPassDescriptor
+        )
+        skyBoxPass.setPipeline(this._skyBoxPipeline)
+        skyBoxPass.setVertexBuffer(0, this._skyBoxVerticesBuffer)
+        skyBoxPass.setBindGroup(0, this._skyBoxUniformBindGroup)
+        skyBoxPass.draw(cubeVertexCount)
+        skyBoxPass.end()
 
         if (gpuTimingThisFrame) {
             commandEncoder.resolveQuerySet(
                 this._timestampQuerySet!,
                 0,
-                6,
+                8,
                 this._timestampResolveBuffer!,
                 0
             )
@@ -1245,7 +1353,7 @@ export class Renderer implements IRenderer {
                 0,
                 this._timestampReadbackBuffer!,
                 0,
-                6 * 8
+                8 * 8
             )
             this._timestampReadbackPending = true
         }
@@ -1277,9 +1385,10 @@ export class Renderer implements IRenderer {
                 const durationMs = (begin: number, end: number) =>
                     Number(timestamps[end]! - timestamps[begin]!) / 1e6
 
-                Profiler.sample('gpu skybox', durationMs(0, 1))
+                Profiler.sample('gpu geometry', durationMs(0, 1))
                 Profiler.sample('gpu shadow', durationMs(2, 3))
-                Profiler.sample('gpu main', durationMs(4, 5))
+                Profiler.sample('gpu lighting', durationMs(4, 5))
+                Profiler.sample('gpu skybox', durationMs(6, 7))
 
                 readbackBuffer.unmap()
                 this._timestampReadbackPending = false

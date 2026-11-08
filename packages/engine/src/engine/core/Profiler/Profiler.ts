@@ -6,9 +6,10 @@ export const PROFILER_METRICS = [
     'traverse',
     'encode',
     'submit',
-    'gpu skybox',
+    'gpu geometry',
     'gpu shadow',
-    'gpu main',
+    'gpu lighting',
+    'gpu skybox',
 ] as const
 
 export type ProfilerMetric = (typeof PROFILER_METRICS)[number]
