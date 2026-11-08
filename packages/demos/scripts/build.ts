@@ -7,6 +7,9 @@ const result = await Bun.build({
     entrypoints: ['./index.html'],
     outdir: './dist',
     sourcemap: 'inline',
+    define: {
+        'process.env.NODE_ENV': '"production"',
+    },
     naming: {
         entry: '[name].[ext]',
         chunk: '[name]-[hash].[ext]',

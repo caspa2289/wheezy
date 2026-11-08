@@ -5,6 +5,7 @@ import {
     type IRenderer,
 } from '../../types'
 import { Renderer } from '../Renderer'
+import { Profiler } from '../Profiler'
 
 export class Engine implements IEngine {
     private _renderer!: IRenderer
@@ -16,6 +17,7 @@ export class Engine implements IEngine {
     public async initRenderer(canvas: HTMLCanvasElement) {
         this._renderer = new Renderer({ canvas })
         await this._renderer.init()
+        Profiler.start()
     }
 
     public static async getOrInit({
@@ -53,7 +55,12 @@ export class Engine implements IEngine {
     public render(time: number = 0) {
         if (!this.scene) return
 
-        const dt = (time - this._prevFrameTime) / 100
+        const frameDelta = time - this._prevFrameTime
+        const dt = frameDelta / 100
+        if (this._prevFrameTime && frameDelta > 0) {
+            Profiler.sample('frame', frameDelta)
+            Profiler.sample('fps', 1000 / frameDelta)
+        }
         this._prevFrameTime = time
 
         this._renderer.render(dt, this.scene)

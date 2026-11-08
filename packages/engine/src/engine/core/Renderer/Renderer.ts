@@ -37,6 +37,7 @@ import {
 } from '../../primitives/cube'
 import { GBuffer } from './GBuffer'
 import { type ILightSourceV2 } from '../lights/LightSourceV2'
+import { Profiler } from '../Profiler'
 
 export const alignTo = (val: number, align: number) => {
     return Math.floor((val + align - 1) / align) * align
@@ -85,6 +86,12 @@ export class Renderer implements IRenderer {
     private _debugParamsBuffer!: GPUBuffer
 
     private _shaderModule!: GPUShaderModule
+
+    private _gpuTimingSupported = false
+    private _timestampQuerySet?: GPUQuerySet
+    private _timestampResolveBuffer?: GPUBuffer
+    private _timestampReadbackBuffer?: GPUBuffer
+    private _timestampReadbackPending = false
 
     public ambientLightColor = vec3.create(0.01, 0.01, 0.01)
     public ambientLightIntensity: number = 1
@@ -264,6 +271,25 @@ export class Renderer implements IRenderer {
                 stencilClearValue: 0,
                 stencilStoreOp: 'store' as GPUStoreOp,
             },
+        }
+
+        if (this._gpuTimingSupported) {
+            const querySet = this._timestampQuerySet!
+            this._skyBoxRenderPassDescriptor.timestampWrites = {
+                querySet,
+                beginningOfPassWriteIndex: 0,
+                endOfPassWriteIndex: 1,
+            }
+            this._shadowPassDescriptor.timestampWrites = {
+                querySet,
+                beginningOfPassWriteIndex: 2,
+                endOfPassWriteIndex: 3,
+            }
+            this._renderPassDescriptor.timestampWrites = {
+                querySet,
+                beginningOfPassWriteIndex: 4,
+                endOfPassWriteIndex: 5,
+            }
         }
 
         const sampleType = 'float'
@@ -612,10 +638,21 @@ export class Renderer implements IRenderer {
             throw new Error('GPU Adapter Unavailable')
         }
 
-        const device = await adapter.requestDevice()
+        this._gpuTimingSupported =
+            Profiler.enabled && adapter.features.has('timestamp-query')
+
+        const device = await adapter.requestDevice({
+            requiredFeatures: this._gpuTimingSupported
+                ? ['timestamp-query']
+                : [],
+        })
 
         this._device = device
         this._adapter = adapter
+
+        if (this._gpuTimingSupported) {
+            this._initializeGpuTiming()
+        }
 
         canvas.width = document.body.clientWidth * window.devicePixelRatio
         canvas.height = document.body.clientHeight * window.devicePixelRatio
@@ -625,6 +662,27 @@ export class Renderer implements IRenderer {
         if (!this._context) {
             throw new Error('Failed to acquire GpuCanvasContext')
         }
+    }
+
+    private _initializeGpuTiming() {
+        // 3 passes (skybox, shadow, main) x begin/end timestamps
+        this._timestampQuerySet = this._device.createQuerySet({
+            label: 'profiler timestamp query set',
+            type: 'timestamp',
+            count: 6,
+        })
+
+        this._timestampResolveBuffer = this._device.createBuffer({
+            label: 'profiler timestamp resolve buffer',
+            size: 6 * 8,
+            usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
+        })
+
+        this._timestampReadbackBuffer = this._device.createBuffer({
+            label: 'profiler timestamp readback buffer',
+            size: 6 * 8,
+            usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+        })
     }
 
     private _createMeshBuffer(accessor: GLTFAccessor, scene: IScene) {
@@ -925,7 +983,10 @@ export class Renderer implements IRenderer {
     }
 
     public render(deltaTime: number, scene: IScene) {
+        const frameStart = performance.now()
         scene.onRender(deltaTime)
+        const afterSceneUpdate = performance.now()
+        Profiler.sample('sceneUpdate', afterSceneUpdate - frameStart)
 
         const meshesToRender: IMesh[] = []
 
@@ -1031,6 +1092,9 @@ export class Renderer implements IRenderer {
             ],
         })
 
+        const afterUploads = performance.now()
+        Profiler.sample('uploads', afterUploads - afterSceneUpdate)
+
         const iterateNode = (node: SceneNodeContent, worldMatrix: Mat4) => {
             const nodeTransform = node.gameObject.transform
 
@@ -1085,6 +1149,9 @@ export class Renderer implements IRenderer {
             iterateNode(node, mat4.identity())
         })
 
+        const afterTraverse = performance.now()
+        Profiler.sample('traverse', afterTraverse - afterUploads)
+
         const commandEncoder = this.device.createCommandEncoder()
 
         commandEncoder.copyBufferToBuffer(
@@ -1127,6 +1194,9 @@ export class Renderer implements IRenderer {
                 .createView()
         }
 
+        const gpuTimingThisFrame =
+            this._gpuTimingSupported && !this._timestampReadbackPending
+
         const skyBoxPass = commandEncoder.beginRenderPass(
             this._skyBoxRenderPassDescriptor
         )
@@ -1162,8 +1232,60 @@ export class Renderer implements IRenderer {
 
         renderPass.end()
 
+        if (gpuTimingThisFrame) {
+            commandEncoder.resolveQuerySet(
+                this._timestampQuerySet!,
+                0,
+                6,
+                this._timestampResolveBuffer!,
+                0
+            )
+            commandEncoder.copyBufferToBuffer(
+                this._timestampResolveBuffer!,
+                0,
+                this._timestampReadbackBuffer!,
+                0,
+                6 * 8
+            )
+            this._timestampReadbackPending = true
+        }
+
+        const afterEncode = performance.now()
+        Profiler.sample('encode', afterEncode - afterTraverse)
+
         this.device.queue.submit([commandEncoder.finish()])
+        Profiler.sample('submit', performance.now() - afterEncode)
+
+        if (gpuTimingThisFrame) {
+            this._readTimestamps()
+        }
+
         viewParamsUploadBuffer.destroy()
         skyBoxViewParamsUploadBuffer.destroy()
+    }
+
+    private _readTimestamps() {
+        const readbackBuffer = this._timestampReadbackBuffer!
+
+        readbackBuffer
+            .mapAsync(GPUMapMode.READ)
+            .then(() => {
+                const timestamps = new BigUint64Array(
+                    readbackBuffer.getMappedRange()
+                )
+
+                const durationMs = (begin: number, end: number) =>
+                    Number(timestamps[end]! - timestamps[begin]!) / 1e6
+
+                Profiler.sample('gpu skybox', durationMs(0, 1))
+                Profiler.sample('gpu shadow', durationMs(2, 3))
+                Profiler.sample('gpu main', durationMs(4, 5))
+
+                readbackBuffer.unmap()
+                this._timestampReadbackPending = false
+            })
+            .catch(() => {
+                this._timestampReadbackPending = false
+            })
     }
 }
