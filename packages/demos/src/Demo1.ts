@@ -1,8 +1,8 @@
 import {
     DirectionalLightV2,
     GameObject,
-    IGameObject,
-    IScene,
+    type IGameObject,
+    type IScene,
     PointLight,
     Scene,
     SpotLight,
@@ -32,7 +32,7 @@ export class Demo1 extends Scene implements IScene {
         })
     }
 
-    public async init() {
+    public override async init() {
         await super.init()
 
         const modelData = await WheezyGLBLoader.loadFromUrl(
@@ -86,7 +86,7 @@ export class Demo1 extends Scene implements IScene {
         // )
     }
 
-    public onRender(dt: number): void {
+    public override onRender(dt: number): void {
         this._controller.update(dt)
     }
 }

@@ -1,7 +1,7 @@
-import { vec3, Vec3 } from 'wgpu-matrix'
+import { vec3, type Vec3 } from 'wgpu-matrix'
 import { Component } from '../../engine/core'
-import { EntityTypes, IGameObject } from '../../engine/types'
-import { IPhysicsObject } from '../../engine/types/physics/PhysicsObject'
+import { EntityTypes, type IGameObject } from '../../engine/types'
+import { type IPhysicsObject } from '../../engine/types/physics/PhysicsObject'
 
 export class PhysicsObject
     extends Component<EntityTypes.physicsObject>

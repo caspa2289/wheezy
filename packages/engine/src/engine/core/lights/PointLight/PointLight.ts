@@ -1,13 +1,15 @@
-import { vec3, Vec3 } from 'wgpu-matrix'
+import { vec3, type Vec3 } from 'wgpu-matrix'
 import {
-    ILightSourceV2,
-    ILightSourceV2Props,
+    type ILightSourceV2,
+    type ILightSourceV2Props,
     LIGHT_SOURCE_TYPES,
     LightSourceV2,
 } from '../LightSourceV2'
 
-export interface IPointLightProps
-    extends Omit<ILightSourceV2Props, 'lightType'> {
+export interface IPointLightProps extends Omit<
+    ILightSourceV2Props,
+    'lightType'
+> {
     position?: Vec3
     attenuationConstant?: number
     attenuationLinear?: number

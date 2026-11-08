@@ -1,7 +1,7 @@
-import { Mat4, mat4, vec3, Vec3, vec4 } from 'wgpu-matrix'
+import { type Mat4, mat4, vec3, type Vec3, vec4 } from 'wgpu-matrix'
 import { Stuff } from '../../../../utils/Stuff'
-import { Camera, ICameraProps } from '../Camera/Camera'
-import { IPerspectiveCamera } from '../../../types/core/Camera'
+import { Camera, type ICameraProps } from '../Camera/Camera'
+import { type IPerspectiveCamera } from '../../../types/core/Camera'
 
 export interface PerspectiveCameraProps extends ICameraProps {}
 
@@ -20,8 +20,8 @@ export class PerspectiveCamera extends Camera implements IPerspectiveCamera {
     }
 
     private _recalculateAngles(direction: Vec3) {
-        this.yaw = Math.atan2(direction[0], direction[2])
-        this.pitch = -Math.asin(direction[1])
+        this.yaw = Math.atan2(direction[0]!, direction[2]!)
+        this.pitch = -Math.asin(direction[1]!)
     }
 
     update(): Mat4 {

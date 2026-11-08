@@ -1,5 +1,5 @@
-import { Mat4, Vec3, Vec4 } from 'wgpu-matrix'
-import { GLTFAccessor } from './core/Mesh'
+import { type Mat4, type Vec3, type Vec4 } from 'wgpu-matrix'
+import { type GLTFAccessor } from './core/Mesh'
 
 export * from './core/Entity'
 export * from './core/GameObject'

@@ -1,4 +1,4 @@
-import { IBufferStorage } from '../../types/core/BufferStorage'
+import { type IBufferStorage } from '../../types/core/BufferStorage'
 
 export class BufferStorage implements IBufferStorage {
     _buffers: Map<string, ArrayBuffer> = new Map()

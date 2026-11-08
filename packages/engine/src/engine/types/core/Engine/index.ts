@@ -1,5 +1,5 @@
-import { IRenderer } from '../Renderer'
-import { IScene } from '../Scene'
+import { type IRenderer } from '../Renderer'
+import { type IScene } from '../Scene'
 
 export interface IEngine {
     scene?: IScene

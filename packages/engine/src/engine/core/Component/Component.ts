@@ -1,4 +1,4 @@
-import { EntityTypes, IComponent } from '../../types'
+import { EntityTypes, type IComponent } from '../../types'
 import { Entity } from '../Entity'
 
 export class Component<T extends EntityTypes>

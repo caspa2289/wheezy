@@ -1,7 +1,7 @@
 import {
     DirectionalLightV2,
-    IGameObject,
-    IScene,
+    type IGameObject,
+    type IScene,
     Scene,
     SpotLight,
     WheezyGLBLoader,
@@ -25,7 +25,7 @@ export class DemoRTC extends Scene implements IScene {
         })
     }
 
-    public async init() {
+    public override async init() {
         await super.init()
 
         const modelData1 = await WheezyGLBLoader.loadFromUrl(
@@ -94,7 +94,7 @@ export class DemoRTC extends Scene implements IScene {
         document.body.appendChild(wrapper)
     }
 
-    public onRender(dt: number): void {}
+    public override onRender(dt: number): void {}
 
     private _handleMessage = (event: MessageEvent<ArrayBuffer>) => {
         const quaternion = new Float32Array(event.data)
@@ -102,7 +102,7 @@ export class DemoRTC extends Scene implements IScene {
             16 * Float32Array.BYTES_PER_ELEMENT
         )
         mat4.fromQuat(
-            [quaternion[0], quaternion[1], quaternion[2], quaternion[3]],
+            [quaternion[0]!, quaternion[1]!, quaternion[2]!, quaternion[3]!],
             rotationMatrix
         )
 
@@ -114,7 +114,7 @@ export class DemoRTC extends Scene implements IScene {
             .value
 
         const [jsonString, candidate] = peerData.split('POOPY_BALLS')
-        const desc = JSON.parse(jsonString)
+        const desc = JSON.parse(jsonString!)
 
         await this._connection.setRemoteDescription(desc)
 

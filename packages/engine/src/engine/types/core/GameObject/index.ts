@@ -1,6 +1,6 @@
-import { IComponent } from '../Component'
-import { EntityID, EntityTypes, IEntity } from '../Entity'
-import { ITransform } from '../Transform'
+import { type IComponent } from '../Component'
+import { type EntityID, EntityTypes, type IEntity } from '../Entity'
+import { type ITransform } from '../Transform'
 
 export interface IGameObject extends IEntity<EntityTypes.gameObject> {
     name: string

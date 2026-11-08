@@ -1,4 +1,7 @@
-import { DEFAULT_IMAGE_IDS, IImageStorage } from '../../types/core/ImageStorage'
+import {
+    DEFAULT_IMAGE_IDS,
+    type IImageStorage,
+} from '../../types/core/ImageStorage'
 
 export class ImageStorage implements IImageStorage {
     private _images: Map<string, ImageBitmap> = new Map()

@@ -1,0 +1,91 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "wheezy",
+      "dependencies": {
+        "@loaders.gl/core": "4.1.3",
+        "@loaders.gl/gltf": "4.1.3",
+        "wgpu-matrix": "3.0.1",
+      },
+      "devDependencies": {
+        "@types/bun": "^1.4.4",
+        "@webgpu/types": "0.1.44",
+        "bun-git-hooks": "^0.3.3",
+      },
+    },
+    "packages/demos": {
+      "name": "@wheezy/demos",
+      "version": "1.0.0",
+      "dependencies": {
+        "@wheezy/engine": "0.1.0",
+      },
+    },
+    "packages/engine": {
+      "name": "@wheezy/engine",
+      "version": "0.1.0",
+    },
+  },
+  "packages": {
+    "@babel/runtime": ["@babel/runtime@7.29.13", "", {}, "sha512-v+oN26xP4YIlQsbQ/CbTH1WG5m/l/DjKKZNy/Kp3f/AFvbgt7Em/D0FeMM3O2hX0YzeN2M16W8lOpyhIkfCBcQ=="],
+
+    "@loaders.gl/core": ["@loaders.gl/core@4.1.3", "", { "dependencies": { "@babel/runtime": "^7.3.1", "@loaders.gl/loader-utils": "4.1.3", "@loaders.gl/worker-utils": "4.1.3", "@probe.gl/log": "^4.0.2" } }, "sha512-ZbDTvFyx5ylw4ZRfjG8Er3yzpiPohfEMIDwgX0FJwMLPkgqG3xW9ff7PYm3HNmAEMMYW94TD4jc7k7kvHavIUQ=="],
+
+    "@loaders.gl/draco": ["@loaders.gl/draco@4.1.3", "", { "dependencies": { "@babel/runtime": "^7.3.1", "@loaders.gl/loader-utils": "4.1.3", "@loaders.gl/schema": "4.1.3", "@loaders.gl/worker-utils": "4.1.3", "draco3d": "1.5.5" } }, "sha512-hYK4Fp/i4PwgYDbKjCifo9B7N+8p628k+Zw4NMDAXKU+o4xnJeyAuVWqNuqHEN0Ui4DrC9zBetw7O7aDNphFWw=="],
+
+    "@loaders.gl/gltf": ["@loaders.gl/gltf@4.1.3", "", { "dependencies": { "@loaders.gl/draco": "4.1.3", "@loaders.gl/images": "4.1.3", "@loaders.gl/loader-utils": "4.1.3", "@loaders.gl/textures": "4.1.3", "@math.gl/core": "^4.0.0" } }, "sha512-MSX/aO2NJ9YmKL8fX7fSJa6Oh6MA++6jbwfqxjnmIxJvzZ5EJoZX8ZNex5H1XpQqLKDOfP3j0uUiRTP0FS8Ovg=="],
+
+    "@loaders.gl/images": ["@loaders.gl/images@4.1.3", "", { "dependencies": { "@loaders.gl/loader-utils": "4.1.3" } }, "sha512-XG/FDRnhHUzdztQrqlWf1bWv6i0bsTuNaGMdDeOP6ch9plgGXEWoHG6yl9oL8er9mgR/IJ2JcveW6u+htIhasA=="],
+
+    "@loaders.gl/loader-utils": ["@loaders.gl/loader-utils@4.1.3", "", { "dependencies": { "@babel/runtime": "^7.3.1", "@loaders.gl/worker-utils": "4.1.3", "@probe.gl/stats": "^4.0.2" } }, "sha512-yx1Cgzdgy5qnPWDWamWzJ6riq3l11TTjdo++BtDft6U5NHULdZvC/x/mBiylvc7kB0vkO1JKId4I0LxkWFcKRg=="],
+
+    "@loaders.gl/schema": ["@loaders.gl/schema@4.1.3", "", { "dependencies": { "@types/geojson": "^7946.0.7" } }, "sha512-X+EqCshYpTUSm2gqJUKyKpdruu6xtXFMDhfjBCHixnLn8cefneQxv7hp2a7mUMd0UEy9spe9SAAD07gTPxXLSQ=="],
+
+    "@loaders.gl/textures": ["@loaders.gl/textures@4.1.3", "", { "dependencies": { "@loaders.gl/images": "4.1.3", "@loaders.gl/loader-utils": "4.1.3", "@loaders.gl/schema": "4.1.3", "@loaders.gl/worker-utils": "4.1.3", "ktx-parse": "^0.0.4", "texture-compressor": "^1.0.2" } }, "sha512-Jb50t2pZ0QYy/Pk4VddsEP6sXaEhCtIBwRc9Rqvtrv0t4D/nwNbCNXJmnBfoS8cQaaKleuxBkjRlFLxaxeV6eQ=="],
+
+    "@loaders.gl/worker-utils": ["@loaders.gl/worker-utils@4.1.3", "", { "dependencies": { "@babel/runtime": "^7.3.1" } }, "sha512-Nozed0KqlI52b4SVK/QtipjodjcE9AxgOhjnZ67eMRnyD6VIofEP3iUiZ55jDkpRxzL+q5LB6u8wUCqI1dD7OQ=="],
+
+    "@math.gl/core": ["@math.gl/core@4.1.0", "", { "dependencies": { "@math.gl/types": "4.1.0" } }, "sha512-FrdHBCVG3QdrworwrUSzXIaK+/9OCRLscxI2OUy6sLOHyHgBMyfnEGs99/m3KNvs+95BsnQLWklVfpKfQzfwKA=="],
+
+    "@math.gl/types": ["@math.gl/types@4.1.0", "", {}, "sha512-clYZdHcmRvMzVK5fjeDkQlHUzXQSNdZ7s4xOqC3nJPgz4C/TZkUecTo9YS4PruZqtDda/ag4erndP0MIn40dGA=="],
+
+    "@probe.gl/env": ["@probe.gl/env@4.1.2", "", {}, "sha512-KIcdjrEiEZVIGX9nh7pZSmTMIKrd+wCb09gyXqpYYI4hs9WMqrQHvKZ7KD8ASutf6kwARwgd4WNQn8aucLSz3g=="],
+
+    "@probe.gl/log": ["@probe.gl/log@4.1.2", "", { "dependencies": { "@probe.gl/env": "4.1.2" } }, "sha512-2LqSq4CHhc/HJQasHMPOzA6c7rprlGz8CCREGebo19jxcuKdvXQo0DEmlfId076U6UldMp6jGhWvDHEFLX111Q=="],
+
+    "@probe.gl/stats": ["@probe.gl/stats@4.1.2", "", {}, "sha512-Hqc0UIHd0IZ2+JbovzTz7lYG7CY9D8yCB81zyP92Zl9UDSPcw2cLbTySW14keAQeAo1sjGjUw0+KHxr0Y2h/hA=="],
+
+    "@types/bun": ["@types/bun@1.4.4", "", { "dependencies": { "bun-types": "1.4.4" } }, "sha512-9wkRDXUXK124pEnAutE6n/l18j+i9GC5IAHK8TmX/2nlySETmky0OU6yL5U8pW1AoKh++AN9auDCr647BfurjQ=="],
+
+    "@types/geojson": ["@types/geojson@7946.0.16", "", {}, "sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg=="],
+
+    "@types/node": ["@types/node@26.6.6", "", { "dependencies": { "undici-types": "~8.9.0" } }, "sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog=="],
+
+    "@webgpu/types": ["@webgpu/types@0.1.44", "", {}, "sha512-JDpYJN5E/asw84LTYhKyvPpxGnD+bAKPtpW9Ilurf7cZpxaTbxkQcGwOd7jgB9BPBrTYQ+32ufo4HiuomTjHNQ=="],
+
+    "@wheezy/demos": ["@wheezy/demos@workspace:packages/demos"],
+
+    "@wheezy/engine": ["@wheezy/engine@workspace:packages/engine"],
+
+    "argparse": ["argparse@1.0.10", "", { "dependencies": { "sprintf-js": "~1.0.2" } }, "sha512-o5Roy6tNG4SL/FOkCAN6RzjiakZS25RLYFrcMttJqbdd8BWrnA+fGz57iN5Pb06pvBGvl5gQ0B48dJlslXvoTg=="],
+
+    "bun-git-hooks": ["bun-git-hooks@0.3.3", "", { "hasInstallScript": true, "bin": { "git-hooks": "./dist/bin/cli.js", "bun-git-hooks": "./dist/bin/cli.js" } }, "sha512-kcg8teRh/cMs8uZyt/+A/bBuJnmc6EvjnBJ12pWEJ61L9z3uSuqm0mvjrYX4Iu7SZPAwpvAK5fFKmqevS4WBkA=="],
+
+    "bun-types": ["bun-types@1.4.4", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-yjrJh5oGX7mMPKGd19YXyIjmEuj4G4zNC30bs7PM9Az7NQ3ndF3j6hbeRdvJTRQEhJ/FYQwW0a2moweEi2hMxQ=="],
+
+    "draco3d": ["draco3d@1.5.5", "", {}, "sha512-JVuNV0EJzD3LBYhGyIXJLeBID/EVtmFO1ZNhAYflTgiMiAJlbhXQmRRda/azjc8MRVMHh0gqGhiqHUo5dIXM8Q=="],
+
+    "image-size": ["image-size@0.7.4", "", { "bin": { "image-size": "bin/image-size.js" } }, "sha512-GqPgxs+VkOr12aWwjSkyRzf5atzObWpFtiRuDgxCl2I/SDpZOKZFRD3iIAeAN6/usmn8SeLWRt7a8JRYK0Whbw=="],
+
+    "ktx-parse": ["ktx-parse@0.0.4", "", {}, "sha512-LY3nrmfXl+wZZdPxgJ3ZmLvG+wkOZZP3/dr4RbQj1Pk3Qwz44esOOSFFVQJcNWpXAtiNIC66WgXufX/SYgYz6A=="],
+
+    "sprintf-js": ["sprintf-js@1.0.3", "", {}, "sha512-D9cPgkvLlV3t3IzL0D0YLvGA9Ahk4PcvVwUbN0dSGr1aP0Nrt4AEnTUbuGvquEC0mA64Gqt1fzirlRs5ibXx8g=="],
+
+    "texture-compressor": ["texture-compressor@1.0.2", "", { "dependencies": { "argparse": "^1.0.10", "image-size": "^0.7.4" }, "bin": { "texture-compressor": "./bin/texture-compressor.js" } }, "sha512-dStVgoaQ11mA5htJ+RzZ51ZxIZqNOgWKAIvtjLrW1AliQQLCmrDqNzQZ8Jh91YealQ95DXt4MEduLzJmbs6lig=="],
+
+    "undici-types": ["undici-types@8.9.0", "", {}, "sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg=="],
+
+    "wgpu-matrix": ["wgpu-matrix@3.0.1", "", {}, "sha512-TnpsW61o2eUtDW/WU9/gzAAWyp2rbwlw9nBa6ieWjU1MVWUaPi4jt9igLR1dttyvWHRBQ5xeWiR+GGw5eoTKEQ=="],
+  }
+}

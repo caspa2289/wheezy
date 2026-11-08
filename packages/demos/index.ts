@@ -1,4 +1,4 @@
-import { Engine, IEngine } from '@wheezy/engine'
+import { Engine, type IEngine } from '@wheezy/engine'
 import { Demo0 } from './src/Demo0'
 import { Demo1 } from './src/Demo1'
 import { DemoRTC } from './src/DemoRTC'

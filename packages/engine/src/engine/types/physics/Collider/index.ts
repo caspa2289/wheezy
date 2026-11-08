@@ -1,4 +1,4 @@
-import { IComponent } from '../../core/Component'
+import { type IComponent } from '../../core/Component'
 import { EntityTypes } from '../../core/Entity'
 
 export type TColliderType = 'sphere' | 'cube' | 'cylinder'

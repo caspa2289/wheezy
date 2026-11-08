@@ -1,9 +1,9 @@
 import {
-    EntityID,
+    type EntityID,
     EntityTypes,
-    IComponent,
-    IGameObject,
-    ITransform,
+    type IComponent,
+    type IGameObject,
+    type ITransform,
 } from '../../types'
 import { Entity } from '../Entity'
 

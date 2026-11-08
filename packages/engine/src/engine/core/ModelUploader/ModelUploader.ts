@@ -1,20 +1,20 @@
 import { vec3, vec4 } from 'wgpu-matrix'
 import {
-    GLTFAccessor,
+    type GLTFAccessor,
     GLTFTextureFilter,
     GLTFTextureWrap,
-    IBufferStorage,
-    IGameObject,
-    IImageStorage,
-    IMaterial,
-    IModelPreloadData,
-    IObjectManager,
-    IPreloadEntity,
-    ISamplerStorage,
-    ITexture,
-    ITextureStorage,
+    type IBufferStorage,
+    type IGameObject,
+    type IImageStorage,
+    type IMaterial,
+    type IModelPreloadData,
+    type IObjectManager,
+    type IPreloadEntity,
+    type ISamplerStorage,
+    type ITexture,
+    type ITextureStorage,
 } from '../../types'
-import { IMaterialStorage } from '../../types/core/MaterialStorage'
+import { type IMaterialStorage } from '../../types/core/MaterialStorage'
 import { GameObject } from '../GameObject'
 import { Mesh } from '../Mesh'
 import { Transform } from '../Transform'

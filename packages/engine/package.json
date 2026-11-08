@@ -4,8 +4,7 @@
     "description": "A game engine for the web",
     "private": true,
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1",
-        "build": "webpack build"
+        "test": "echo \"Error: no test specified\" && exit 1"
     },
     "keywords": [],
     "author": "caspa2289",

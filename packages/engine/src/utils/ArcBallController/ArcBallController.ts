@@ -1,5 +1,5 @@
 import { mat4, vec3 } from 'wgpu-matrix'
-import { IArcBallCamera } from '../../engine/types/core/Camera'
+import { type IArcBallCamera } from '../../engine/types/core/Camera'
 import { Stuff } from '../Stuff'
 
 export interface ArcBallControllerProps {
@@ -48,15 +48,15 @@ export class ArcBallController {
         })
 
         this.canvas.addEventListener('touchstart', (evt) => {
-            this.touchX = evt.changedTouches[0].clientX
-            this.touchY = evt.changedTouches[0].clientY
+            this.touchX = evt.changedTouches[0]!.clientX
+            this.touchY = evt.changedTouches[0]!.clientY
         })
 
         this.canvas.addEventListener('touchmove', (evt) => {
-            this.analogX += evt.changedTouches[0].clientX - this.touchX
-            this.analogY += evt.changedTouches[0].clientY - this.touchY
-            this.touchX = evt.changedTouches[0].clientX
-            this.touchY = evt.changedTouches[0].clientY
+            this.analogX += evt.changedTouches[0]!.clientX - this.touchX
+            this.analogY += evt.changedTouches[0]!.clientY - this.touchY
+            this.touchX = evt.changedTouches[0]!.clientX
+            this.touchY = evt.changedTouches[0]!.clientY
         })
     }
 

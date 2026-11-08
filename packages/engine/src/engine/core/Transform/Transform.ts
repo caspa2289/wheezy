@@ -1,11 +1,11 @@
-import { mat4, vec3, Vec3, vec4, Vec4 } from 'wgpu-matrix'
+import { mat4, vec3, type Vec3, vec4, type Vec4 } from 'wgpu-matrix'
 import {
     EntityTypes,
-    IGameObject,
-    IRotateRadiansProps,
-    TransformationMatrix,
+    type IGameObject,
+    type IRotateRadiansProps,
+    type TransformationMatrix,
 } from '../../types'
-import { ITransform } from '../../types'
+import { type ITransform } from '../../types'
 import { Component } from '../Component'
 
 export class Transform

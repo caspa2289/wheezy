@@ -1,5 +1,5 @@
-import { IMaterial } from '../../types'
-import { IMaterialStorage } from '../../types/core/MaterialStorage'
+import { type IMaterial } from '../../types'
+import { type IMaterialStorage } from '../../types/core/MaterialStorage'
 
 export class MaterialStorage implements IMaterialStorage {
     _materials: Map<string, IMaterial> = new Map()

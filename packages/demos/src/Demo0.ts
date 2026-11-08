@@ -2,11 +2,11 @@ import { vec3 } from 'wgpu-matrix'
 import {
     WheezyGLBLoader,
     Scene,
-    IGameObject,
+    type IGameObject,
     GameObject,
     Transform,
-    TSkyboxBitmaps,
-    IScene,
+    type TSkyboxBitmaps,
+    type IScene,
     DirectionalLightV2,
     PointLight,
 } from '@wheezy/engine'
@@ -245,7 +245,7 @@ export class Demo0 extends Scene implements IScene {
         this.neptune.transform.translate(vec3.create(5.8, 0, 0))
     }
 
-    public async init() {
+    public override async init() {
         await super.init()
 
         await this._setupSun()
@@ -336,7 +336,7 @@ export class Demo0 extends Scene implements IScene {
         }
     }
 
-    public onRender(deltaTime: number): void {
+    public override onRender(deltaTime: number): void {
         this.controller.update(deltaTime)
         //FYI: Always remember to reset orientation in blender :/
         this.sun.transform.rotateDegreesEuler({

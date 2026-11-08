@@ -1,16 +1,16 @@
 import { vec3 } from 'wgpu-matrix'
 import {
-    IBufferStorage,
-    IEngine,
-    IGameObject,
-    IImageStorage,
-    IObjectManager,
-    ISamplerStorage,
-    IScene,
-    ISceneProps,
-    ISceneUploadModelProps,
+    type IBufferStorage,
+    type IEngine,
+    type IGameObject,
+    type IImageStorage,
+    type IObjectManager,
+    type ISamplerStorage,
+    type IScene,
+    type ISceneProps,
+    type ISceneUploadModelProps,
 } from '../../types'
-import { ICamera } from '../../types/core/Camera'
+import { type ICamera } from '../../types/core/Camera'
 import { BufferStorage } from '../BufferStorage'
 import { ArcBallCamera } from '../cameras/ArcBallCamera'
 import { ImageStorage } from '../ImageStorage'
@@ -21,8 +21,8 @@ import { SamplerStorage } from '../SamplerStorage'
 import { TextureStorage } from '../TextureStorage'
 import { GameObject } from '../GameObject'
 import { MeshRenderDataStorage } from '../MeshRenderDataStorage'
-import { IDirectionalLight } from '../lights/DirectionalLightV2'
-import { IPointLight, ISpotLight } from '../lights'
+import { type IDirectionalLight } from '../lights/DirectionalLightV2'
+import { type IPointLight, type ISpotLight } from '../lights'
 
 export class Scene implements IScene {
     private _objectManager: IObjectManager = new ObjectManager()

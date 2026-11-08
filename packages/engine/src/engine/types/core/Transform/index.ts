@@ -1,5 +1,5 @@
-import { Vec3, Vec4 } from 'wgpu-matrix'
-import { IComponent } from '../Component'
+import { type Vec3, type Vec4 } from 'wgpu-matrix'
+import { type IComponent } from '../Component'
 import { EntityTypes } from '../Entity'
 
 export type TransformationMatrix = Float32Array

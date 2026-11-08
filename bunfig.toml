@@ -1,0 +1,14 @@
+[fmt]
+trailingComma = "es5"
+tabWidth = 4
+semi = false
+singleQuote = true
+bracketSpacing = true
+# git core.autocrlf=true on Windows: working tree is CRLF while blobs stay LF.
+# "auto" preserves each file's existing endings so --check passes cross-platform.
+endOfLine = "auto"
+
+# dev server (bun --hot packages/demos/dev.ts from repo root): WGSL text loader
+# for the HTML-entry bundling path; must match packages/demos/bunfig.toml
+[serve.static]
+plugins = ["./packages/demos/scripts/wgsl-plugin.ts"]

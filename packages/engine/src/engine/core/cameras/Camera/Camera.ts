@@ -1,7 +1,7 @@
-import { Mat4, mat4, vec3, Vec3 } from 'wgpu-matrix'
+import { type Mat4, mat4, vec3, type Vec3 } from 'wgpu-matrix'
 import { EntityTypes } from '../../../types'
 import { Entity } from '../../Entity'
-import { ICamera } from '../../../types/core/Camera'
+import { type ICamera } from '../../../types/core/Camera'
 
 export interface ICameraProps {
     zFar?: number

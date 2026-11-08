@@ -1,6 +1,6 @@
 import {
-    IMeshRenderData,
-    IMeshRenderDataStorage,
+    type IMeshRenderData,
+    type IMeshRenderDataStorage,
 } from '../../types/core/MeshRenderDataStorage'
 
 export class MeshRenderDataStorage implements IMeshRenderDataStorage {

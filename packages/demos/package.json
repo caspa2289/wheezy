@@ -4,8 +4,8 @@
     "description": "Wheezy engine demos",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "dev": "webpack serve --open --port 3000",
-        "build": "webpack build"
+        "dev": "bun --hot dev.ts",
+        "build": "bun scripts/build.ts"
     },
     "keywords": [],
     "author": "caspa2289",

@@ -1,5 +1,5 @@
-import { Mat3, Mat4, Vec3, Vec4 } from 'wgpu-matrix'
-import { EntityTypes, IEntity } from '../Entity'
+import { type Mat3, type Mat4, type Vec3, type Vec4 } from 'wgpu-matrix'
+import { EntityTypes, type IEntity } from '../Entity'
 
 export interface ICamera extends IEntity<EntityTypes.camera> {
     matrix: Mat3 // This is the inverse of the view matrix.

@@ -1,4 +1,4 @@
-import { EntityTypes, IEntity } from '../../types'
+import { EntityTypes, type IEntity } from '../../types'
 
 export class Entity<T extends EntityTypes> implements IEntity<T> {
     private _id: string

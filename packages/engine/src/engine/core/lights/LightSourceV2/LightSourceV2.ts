@@ -1,6 +1,6 @@
-import { vec3, Vec3 } from 'wgpu-matrix'
+import { vec3, type Vec3 } from 'wgpu-matrix'
 import { Component } from '../../Component'
-import { EntityTypes, IGameObject } from '../../../types'
+import { EntityTypes, type IGameObject } from '../../../types'
 
 export enum LIGHT_SOURCE_TYPES {
     directional = 'directional',

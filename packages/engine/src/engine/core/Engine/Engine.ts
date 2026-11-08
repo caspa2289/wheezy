@@ -1,4 +1,9 @@
-import { IScene, IEngine, IEngineProps, IRenderer } from '../../types'
+import {
+    type IScene,
+    type IEngine,
+    type IEngineProps,
+    type IRenderer,
+} from '../../types'
 import { Renderer } from '../Renderer'
 
 export class Engine implements IEngine {

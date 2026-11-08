@@ -1,5 +1,5 @@
-import { EntityType, IEntity } from '../Entity'
-import { IGameObject } from '../GameObject'
+import { type EntityType, type IEntity } from '../Entity'
+import { type IGameObject } from '../GameObject'
 
 export interface IComponent<T extends EntityType> extends IEntity<T> {
     parent: IGameObject

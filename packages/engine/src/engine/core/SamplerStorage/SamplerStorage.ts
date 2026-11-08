@@ -1,4 +1,4 @@
-import { DEFAULT_SAMPLER_IDS, ISamplerStorage } from '../../types'
+import { DEFAULT_SAMPLER_IDS, type ISamplerStorage } from '../../types'
 
 export class SamplerStorage implements ISamplerStorage {
     _samplers: Map<string, GPUSampler> = new Map()

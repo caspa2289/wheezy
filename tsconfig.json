@@ -1,13 +1,19 @@
 {
     "compilerOptions": {
-        "types": ["@webgpu/types"],
-        "sourceMap": true,
-        "outDir": "./dist/",
-        "module": "es6",
-        "target": "ES2021",
+        "lib": ["ESNext", "DOM"],
+        "target": "ESNext",
+        "module": "Preserve",
+        "moduleDetection": "force",
         "allowJs": true,
-        "moduleResolution": "node",
+        "types": ["@webgpu/types", "bun"],
+        "moduleResolution": "bundler",
+        "allowImportingTsExtensions": true,
+        "verbatimModuleSyntax": true,
+        "noEmit": true,
         "strict": true,
-        "declaration": true,
-    },
+        "skipLibCheck": true,
+        "noFallthroughCasesInSwitch": true,
+        "noUncheckedIndexedAccess": true,
+        "noImplicitOverride": true
+    }
 }

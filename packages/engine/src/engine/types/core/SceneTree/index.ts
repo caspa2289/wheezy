@@ -1,5 +1,5 @@
-import { EntityID } from '../Entity'
-import { IGameObject } from '../GameObject'
+import { type EntityID } from '../Entity'
+import { type IGameObject } from '../GameObject'
 
 export type SceneNode = Map<EntityID, SceneNodeContent>
 

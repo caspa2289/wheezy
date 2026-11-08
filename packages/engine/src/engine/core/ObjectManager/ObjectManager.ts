@@ -1,9 +1,9 @@
 import {
-    EntityID,
-    IGameObject,
-    IObjectManager,
-    ISceneTree,
-    SceneTreePosition,
+    type EntityID,
+    type IGameObject,
+    type IObjectManager,
+    type ISceneTree,
+    type SceneTreePosition,
 } from '../../types'
 import { SceneTree } from '../SceneTree'
 
@@ -19,7 +19,7 @@ export class ObjectManager implements IObjectManager {
 
     private getObjectPosition(gameObject?: IGameObject | null) {
         return gameObject
-            ? this._objectPositions.get(gameObject.id) ?? null
+            ? (this._objectPositions.get(gameObject.id) ?? null)
             : null
     }
 

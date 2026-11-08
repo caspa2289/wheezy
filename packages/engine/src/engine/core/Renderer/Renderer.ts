@@ -1,14 +1,14 @@
-import { mat4, Mat4, vec3, vec4 } from 'wgpu-matrix'
+import { mat4, type Mat4, vec3, vec4 } from 'wgpu-matrix'
 import {
     EntityTypes,
-    GLTFAccessor,
-    IMesh,
-    IRenderer,
-    IRendererProps,
-    IScene,
+    type GLTFAccessor,
+    type IMesh,
+    type IRenderer,
+    type IRendererProps,
+    type IScene,
     RENDER_OUTPUT_SOURCES,
-    SceneNodeContent,
-    TSkyboxBitmaps,
+    type SceneNodeContent,
+    type TSkyboxBitmaps,
 } from '../../types'
 import {
     DEFAULT_DEPTH_FORMAT,
@@ -24,7 +24,7 @@ import {
     SPOT_LIGHT_ELEMENT_COUNT,
     VIEW_PARAMS_BUFFER_SIZE,
 } from './constants'
-import { IMeshRenderData } from '../../types/core/MeshRenderDataStorage'
+import { type IMeshRenderData } from '../../types/core/MeshRenderDataStorage'
 import shaderCode from '../../shaders/testShader.wgsl'
 import shadowShaderCode from '../../shaders/vertexShadow.wgsl'
 import skyboxShaderCode from '../../shaders/skybox.wgsl'
@@ -36,7 +36,7 @@ import {
     cubeVertexSize,
 } from '../../primitives/cube'
 import { GBuffer } from './GBuffer'
-import { ILightSourceV2 } from '../lights/LightSourceV2'
+import { type ILightSourceV2 } from '../lights/LightSourceV2'
 
 export const alignTo = (val: number, align: number) => {
     return Math.floor((val + align - 1) / align) * align
@@ -500,7 +500,7 @@ export class Renderer implements IRenderer {
         })
 
         for (let i = 0; i < bitmaps.length; i++) {
-            const imageBitmap = bitmaps[i]
+            const imageBitmap = bitmaps[i]!
             this._device.queue.copyExternalImageToTexture(
                 { source: imageBitmap },
                 { texture: this._skyboxTexture, origin: [0, 0, i] },

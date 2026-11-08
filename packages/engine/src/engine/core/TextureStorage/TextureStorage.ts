@@ -1,5 +1,8 @@
 import { DEFAULT_IMAGE_IDS, DEFAULT_SAMPLER_IDS } from '../../types'
-import { ITexture, ITextureStorage } from '../../types/core/TextureStorage'
+import {
+    type ITexture,
+    type ITextureStorage,
+} from '../../types/core/TextureStorage'
 
 export class TextureStorage implements ITextureStorage {
     _textures: Map<string, ITexture> = new Map()

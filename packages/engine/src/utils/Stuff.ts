@@ -1,4 +1,4 @@
-import { mat4, Mat4, vec3, Vec3 } from 'wgpu-matrix'
+import { mat4, type Mat4, vec3, type Vec3 } from 'wgpu-matrix'
 
 export class Stuff {
     static clamp(x: number, min: number, max: number): number {
@@ -24,14 +24,14 @@ export class Stuff {
         //     z1, z2, z3, z4,  // <- column 2
         //     w1, w2, w3, w4,  // <- column 3
         //   ]
-        const rotXangle = Math.atan2(-mat[9], mat[10])
-        const cosYangle = Math.sqrt(Math.pow(mat[0], 2) + Math.pow(mat[4], 2))
-        const rotYangle = Math.atan2(mat[8], cosYangle)
+        const rotXangle = Math.atan2(-mat[9]!, mat[10]!)
+        const cosYangle = Math.sqrt(Math.pow(mat[0]!, 2) + Math.pow(mat[4]!, 2))
+        const rotYangle = Math.atan2(mat[8]!, cosYangle)
         const sinXangle = Math.sin(rotXangle)
         const cosXangle = Math.cos(rotXangle)
         const rotZangle = Math.atan2(
-            cosXangle * mat[1] + sinXangle * mat[2],
-            cosXangle * mat[5] + sinXangle * mat[6]
+            cosXangle * mat[1]! + sinXangle * mat[2]!,
+            cosXangle * mat[5]! + sinXangle * mat[6]!
         )
 
         return vec3.create(rotXangle, rotYangle, rotZangle)

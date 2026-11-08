@@ -1,5 +1,5 @@
 import { vec3 } from 'wgpu-matrix'
-import { IPerspectiveCamera } from '../../engine/types/core/Camera'
+import { type IPerspectiveCamera } from '../../engine/types/core/Camera'
 import { Stuff } from '../Stuff'
 
 export interface FPSControllerProps {

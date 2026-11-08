@@ -1,4 +1,4 @@
-import { Vec3 } from 'wgpu-matrix'
+import { type Vec3 } from 'wgpu-matrix'
 import { Component } from '../../../core'
 import { EntityTypes } from '../../core/Entity'
 

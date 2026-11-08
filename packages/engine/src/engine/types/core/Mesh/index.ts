@@ -1,6 +1,6 @@
-import { IComponent } from '../Component'
+import { type IComponent } from '../Component'
 import { EntityTypes } from '../Entity'
-import { Vec3, Vec4 } from 'wgpu-matrix'
+import { type Vec3, type Vec4 } from 'wgpu-matrix'
 
 export interface GLTFBufferData {
     id: string

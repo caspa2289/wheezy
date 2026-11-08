@@ -1,5 +1,5 @@
-import { IGameObject } from '../GameObject'
-import { ISceneTree } from '../SceneTree'
+import { type IGameObject } from '../GameObject'
+import { type ISceneTree } from '../SceneTree'
 
 export interface IObjectManager {
     addObject: (child: IGameObject, target?: IGameObject) => void

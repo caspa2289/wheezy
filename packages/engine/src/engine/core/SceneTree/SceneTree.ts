@@ -1,19 +1,19 @@
 import {
-    EntityID,
-    ISceneTree,
-    SceneNode,
-    SceneNodeContent,
-    SceneTreePosition,
+    type EntityID,
+    type ISceneTree,
+    type SceneNode,
+    type SceneNodeContent,
+    type SceneTreePosition,
 } from '../../types'
 
 export class SceneTree implements ISceneTree {
     _nodes: SceneNode = new Map()
 
     public getNodeContentAt(position: SceneTreePosition) {
-        let currentTreeNode = this._nodes.get(position[0])
+        let currentTreeNode = this._nodes.get(position[0]!)
 
         for (let i = 1; i < position.length; i++) {
-            currentTreeNode = currentTreeNode?.children?.get(position[i])
+            currentTreeNode = currentTreeNode?.children?.get(position[i]!)
         }
 
         return currentTreeNode ?? null
@@ -65,7 +65,7 @@ export class SceneTree implements ISceneTree {
             childrenIds.push(nodeId)
         })
 
-        parentNode?.children?.delete(targetPosition[targetPosition.length - 1])
+        parentNode?.children?.delete(targetPosition[targetPosition.length - 1]!)
 
         return childrenIds
     }

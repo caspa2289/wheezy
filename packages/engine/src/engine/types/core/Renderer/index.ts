@@ -1,6 +1,6 @@
-import { Vec3 } from 'wgpu-matrix'
-import { IMesh } from '../Mesh'
-import { IScene } from '../Scene'
+import { type Vec3 } from 'wgpu-matrix'
+import { type IMesh } from '../Mesh'
+import { type IScene } from '../Scene'
 
 export enum RENDER_OUTPUT_SOURCES {
     DEFAULT,

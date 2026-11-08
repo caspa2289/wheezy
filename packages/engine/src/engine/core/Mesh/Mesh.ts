@@ -1,9 +1,9 @@
 import {
     EntityTypes,
-    GLTFAccessor,
-    IGameObject,
-    IMaterial,
-    IMesh,
+    type GLTFAccessor,
+    type IGameObject,
+    type IMaterial,
+    type IMesh,
 } from '../../types'
 import { Component } from '../Component'
 

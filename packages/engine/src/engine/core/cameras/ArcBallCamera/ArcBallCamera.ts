@@ -1,6 +1,6 @@
-import { mat4, Mat4, Vec3, vec3 } from 'wgpu-matrix'
-import { IArcBallCamera } from '../../../types/core/Camera'
-import { Camera, ICameraProps } from '../Camera'
+import { mat4, type Mat4, type Vec3, vec3 } from 'wgpu-matrix'
+import { type IArcBallCamera } from '../../../types/core/Camera'
+import { Camera, type ICameraProps } from '../Camera'
 
 export interface ArcBallCameraProps extends ICameraProps {}
 
@@ -36,11 +36,11 @@ export class ArcBallCamera extends Camera implements IArcBallCamera {
         this._distance = value
     }
 
-    get matrix() {
+    override get matrix() {
         return super.matrix
     }
 
-    set matrix(mat: Mat4) {
+    override set matrix(mat: Mat4) {
         super.matrix = mat
         this._distance = vec3.len(super.position)
     }
