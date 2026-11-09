@@ -23,6 +23,7 @@ interface Sample {
 const AVERAGE_WINDOW_MS = 10_000
 const HUD_UPDATE_INTERVAL_MS = 500
 const STORAGE_KEY = 'wheezy-profiler'
+const GIZMOS_STORAGE_KEY = 'wheezy-profiler-gizmos'
 
 const isProduction = (): boolean => {
     try {
@@ -49,8 +50,21 @@ const resolveEnabled = (): boolean => {
     }
 }
 
+// light gizmos default to on in dev (like the HUD itself)
+const resolveGizmosEnabled = (): boolean => {
+    if (isProduction()) return false
+
+    try {
+        return localStorage.getItem(GIZMOS_STORAGE_KEY) !== 'off'
+    } catch {
+        return true
+    }
+}
+
 class ProfilerImpl {
     public enabled: boolean
+    /** toggles the per-light debug gizmos (see LightGizmo); HUD checkbox below */
+    public gizmosEnabled: boolean
 
     private _samples = new Map<ProfilerMetric, Sample[]>()
     private _hud?: HTMLDivElement
@@ -62,8 +76,19 @@ class ProfilerImpl {
 
     constructor() {
         this.enabled = resolveEnabled()
+        this.gizmosEnabled = resolveGizmosEnabled()
         if (this.enabled) {
             ;(window as any).WheezyProfiler = this
+        }
+    }
+
+    public setGizmosEnabled(enabled: boolean) {
+        this.gizmosEnabled = enabled
+
+        try {
+            localStorage.setItem(GIZMOS_STORAGE_KEY, enabled ? 'on' : 'off')
+        } catch {
+            // storage unavailable (private mode etc.), toggle stays session-only
         }
     }
 
@@ -200,8 +225,23 @@ class ProfilerImpl {
 
         this._makeDraggable(container, titleBar, collapseBtn)
 
+        // light gizmos toggle (drives LightGizmo.sync via Renderer.render)
+        const gizmoRow = document.createElement('label')
+        gizmoRow.style.cssText =
+            'display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;margin-top:2px'
+        const gizmoCheckbox = document.createElement('input')
+        gizmoCheckbox.type = 'checkbox'
+        gizmoCheckbox.checked = this.gizmosEnabled
+        gizmoCheckbox.style.cursor = 'pointer'
+        gizmoCheckbox.addEventListener('change', () => {
+            this.setGizmosEnabled(gizmoCheckbox.checked)
+        })
+        gizmoRow.appendChild(gizmoCheckbox)
+        gizmoRow.appendChild(document.createTextNode('light gizmos'))
+
         container.appendChild(titleBar)
         container.appendChild(table)
+        container.appendChild(gizmoRow)
         document.body.appendChild(container)
 
         this._hud = container

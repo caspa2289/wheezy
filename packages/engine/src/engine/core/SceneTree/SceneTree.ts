@@ -53,21 +53,34 @@ export class SceneTree implements ISceneTree {
     }
 
     public removeNode(targetPosition: SceneTreePosition): EntityID[] {
+        const targetId = targetPosition[targetPosition.length - 1]!
         const parentPosition = targetPosition.slice(
             0,
             targetPosition.length - 1
         )
 
-        const parentNode = this.getNodeContentAt(parentPosition)
+        // the sibling map holding the target: the root map for top-level
+        // nodes, otherwise the parent's children
+        const siblings =
+            parentPosition.length === 0
+                ? this._nodes
+                : this.getNodeContentAt(parentPosition)?.children
 
-        const childrenIds: EntityID[] = []
-        this.traverseNode(parentNode?.children, (nodeId) => {
-            childrenIds.push(nodeId)
-        })
+        const removedIds: EntityID[] = []
+        const targetNode = siblings?.get(targetId)
+        if (targetNode) {
+            // collect the target's OWN subtree only — traversing the parent's
+            // children would report sibling ids too, and ObjectManager would
+            // then discard their position records
+            const targetAsNode: SceneNode = new Map([[targetId, targetNode]])
+            this.traverseNode(targetAsNode, (nodeId) => {
+                removedIds.push(nodeId)
+            })
+        }
 
-        parentNode?.children?.delete(targetPosition[targetPosition.length - 1]!)
+        siblings?.delete(targetId)
 
-        return childrenIds
+        return removedIds
     }
 
     private traverseNode(

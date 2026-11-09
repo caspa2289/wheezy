@@ -14,6 +14,13 @@ export interface ILightSourceV2 {
     color: Vec3
     intensity: number
     lightType: TLightSourceType
+    /** debug marker managed by LightGizmo.sync — do not set manually */
+    gizmo?: IGameObject
+    /**
+     * world position the debug gizmo pins to; null for lights without one
+     * (directional) — they get no gizmo
+     */
+    gizmoPosition: Vec3 | null
 
     getLightData(): number[]
 }
@@ -32,6 +39,7 @@ export abstract class LightSourceV2
     //color and intensity
     color: Vec3
     intensity: number
+    gizmo?: IGameObject
     private _lightType: TLightSourceType
 
     constructor(props: ILightSourceV2Props) {
@@ -44,6 +52,10 @@ export abstract class LightSourceV2
 
     get lightType() {
         return this._lightType
+    }
+
+    get gizmoPosition(): Vec3 | null {
+        return null
     }
 
     abstract getLightData(): number[]

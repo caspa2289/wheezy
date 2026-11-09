@@ -57,9 +57,9 @@ export class Demo1 extends Scene implements IScene {
 
         modelGO1.transform.translate(vec3.create(1, 0, 0))
 
-        modelGO0.transform.rotateDegreesEuler({ x: -90, z: -90 })
-        modelGO0.transform.translate(vec3.create(13, 0, 0))
-        modelGO0.transform.scale(vec3.create(0.5, 0.5, 0.5))
+        modelGO0.transform.rotateDegreesEuler({ y: -90 })
+        modelGO0.transform.translate(vec3.create(5, -2, 0))
+        modelGO0.transform.scale(vec3.create(3, 3, 3))
         // this.directionalLights.push(
         //     new DirectionalLightV2({
         //         parent: this.root,
@@ -70,7 +70,12 @@ export class Demo1 extends Scene implements IScene {
         this.spotLights.push(
             new SpotLight({
                 parent: this.root,
-                position: vec3.create(-2, 0, 0),
+                position: vec3.create(-4, 0, 0),
+                direction: vec3.create(1, 0, 0),
+            }),
+            new SpotLight({
+                parent: this.root,
+                position: vec3.create(-4, 3, 0),
                 direction: vec3.create(1, 0, 0),
             })
         )

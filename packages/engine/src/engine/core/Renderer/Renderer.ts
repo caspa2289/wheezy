@@ -60,6 +60,7 @@ import { GBuffer } from './GBuffer'
 import { type ILightSourceV2 } from '../lights/LightSourceV2'
 import { type IPointLight } from '../lights/PointLight'
 import { type ISpotLight } from '../lights/SpotLight'
+import { LightGizmo } from '../lights/LightGizmo'
 import { Profiler } from '../Profiler'
 
 export const alignTo = (val: number, align: number) => {
@@ -1869,6 +1870,11 @@ export class Renderer implements IRenderer {
         scene.onRender(deltaTime)
         const afterSceneUpdate = performance.now()
         Profiler.sample('sceneUpdate', afterSceneUpdate - frameStart)
+
+        // attach/detach/re-pin the debug light gizmos before the traversal so
+        // a profiler-HUD toggle takes effect this frame (dev-only: the
+        // Profiler is disabled in production builds)
+        LightGizmo.sync(scene, Profiler.enabled && Profiler.gizmosEnabled)
 
         const meshesToRender: IMesh[] = []
 

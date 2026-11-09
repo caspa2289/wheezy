@@ -49,4 +49,8 @@ export class PointLight extends LightSourceV2 implements IPointLight {
             0,
         ]
     }
+
+    override get gizmoPosition(): Vec3 {
+        return this.position
+    }
 }

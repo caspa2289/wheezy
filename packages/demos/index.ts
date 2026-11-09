@@ -2,14 +2,12 @@ import { Engine, type IEngine } from '@wheezy/engine'
 import { Demo0 } from './src/Demo0'
 import { Demo1 } from './src/Demo1'
 import { DemoRTC } from './src/DemoRTC'
-import { DemoShadows } from './src/DemoShadows'
-import { DemoCluster } from './src/DemoCluster'
 
 const canvas = document.getElementById('webgpu-canvas') as HTMLCanvasElement
 
 const initDebugControls = (engine: IEngine) => {
     const defaultOutputSource = 0
-    const defaultScene = 4
+    const defaultScene = 0
 
     const debugContainer = document.getElementById(
         'debug-container'
@@ -20,8 +18,6 @@ const initDebugControls = (engine: IEngine) => {
     ) as HTMLSelectElement
 
     const sceneOptions = [
-        { label: 'Shadow test', value: 3 },
-        { label: 'Many lights (clustered)', value: 4 },
         { label: 'Scene 1', value: 0 },
         { label: 'Scene 2', value: 1 },
         { label: 'RTC control demo', value: 2 },
@@ -106,28 +102,6 @@ const setScene = async (engine: IEngine, index: number) => {
             loader.style.display = 'block'
             engine.scene = undefined
             const scene = new DemoRTC()
-            await scene.init()
-
-            engine.scene = scene
-            loader.style.display = 'none'
-            engine.render()
-            break
-        }
-        case 3: {
-            loader.style.display = 'block'
-            engine.scene = undefined
-            const scene = new DemoShadows()
-            await scene.init()
-
-            engine.scene = scene
-            loader.style.display = 'none'
-            engine.render()
-            break
-        }
-        case 4: {
-            loader.style.display = 'block'
-            engine.scene = undefined
-            const scene = new DemoCluster()
             await scene.init()
 
             engine.scene = scene

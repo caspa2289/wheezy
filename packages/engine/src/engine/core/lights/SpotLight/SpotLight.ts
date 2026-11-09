@@ -67,4 +67,8 @@ export class SpotLight extends LightSourceV2 implements ISpotLight {
             this.attenuationExponential,
         ]
     }
+
+    override get gizmoPosition(): Vec3 {
+        return this.position
+    }
 }
