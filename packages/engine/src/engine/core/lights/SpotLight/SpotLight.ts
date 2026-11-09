@@ -5,6 +5,7 @@ import {
     LIGHT_SOURCE_TYPES,
     LightSourceV2,
 } from '../LightSourceV2'
+import { SPOT_MAX_CONE_HALF_ANGLE } from '../../Renderer/constants'
 
 export interface ISpotLightProps extends Omit<
     ILightSourceV2Props,
@@ -25,6 +26,7 @@ export interface ISpotLight extends ILightSourceV2 {
     attenuationConstant: number
     attenuationLinear: number
     attenuationExponential: number
+    pointAt: (target: Vec3) => void
 }
 
 export class SpotLight extends LightSourceV2 implements ISpotLight {
@@ -50,7 +52,27 @@ export class SpotLight extends LightSourceV2 implements ISpotLight {
     }
 
     set cutoff(eulerDegrees) {
-        this._cutoff = Math.cos(eulerDegrees * 0.01745329252)
+        // clamped to the widest cone the shadow frustum can represent, so the
+        // lit cone and the shadowed cone always cover the same solid angle
+        const halfAngle = Math.min(
+            eulerDegrees * 0.01745329252,
+            SPOT_MAX_CONE_HALF_ANGLE
+        )
+        this._cutoff = Math.cos(halfAngle)
+    }
+
+    /**
+     * Aim the cone at a world-space point: direction = normalize(target −
+     * position). Normalizes explicitly — the plain `direction` property does
+     * not, and the shader's cone test consumes it raw. A degenerate target
+     * (at the light's position) keeps the current direction instead of
+     * producing NaN.
+     */
+    pointAt(target: Vec3) {
+        const toTarget = vec3.sub(target, this.position)
+        if (vec3.len(toTarget) > 1e-6) {
+            this.direction = vec3.normalize(toTarget)
+        }
     }
 
     getLightData() {

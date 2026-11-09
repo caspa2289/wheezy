@@ -13,8 +13,13 @@ export interface IDirectionalLightProps extends Omit<
     direction?: Vec3
 }
 
+// gizmo anchor: a directional light has no position of its own — its debug
+// gizmo sits where pointAt anchors, the world origin (shared read-only vector)
+const WORLD_ORIGIN = vec3.create(0, 0, 0)
+
 export interface IDirectionalLight extends ILightSourceV2 {
     direction: Vec3
+    pointAt: (target: Vec3) => void
 }
 
 export class DirectionalLightV2
@@ -35,6 +40,22 @@ export class DirectionalLightV2
 
     get direction() {
         return this._direction
+    }
+
+    /**
+     * Aim the light so it travels toward a world-space point, anchored at the
+     * world origin (a directional light has no position of its own):
+     * direction = normalize(target). A degenerate target at the origin keeps
+     * the current direction instead of producing NaN.
+     */
+    pointAt(target: Vec3) {
+        if (vec3.len(target) > 1e-6) {
+            this.direction = target
+        }
+    }
+
+    override get gizmoPosition(): Vec3 {
+        return WORLD_ORIGIN
     }
 
     getLightData() {

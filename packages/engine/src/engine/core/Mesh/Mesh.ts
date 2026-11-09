@@ -16,6 +16,7 @@ export class Mesh extends Component<EntityTypes.mesh> implements IMesh {
     normals: GLTFAccessor
     material: IMaterial
     isPipelineBuilt: boolean = false
+    castShadow: boolean = true
 
     constructor(
         parent: IGameObject,

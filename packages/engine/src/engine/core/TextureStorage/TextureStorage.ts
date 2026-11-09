@@ -38,7 +38,7 @@ export class TextureStorage implements ITextureStorage {
     get defaultOcclusion() {
         return {
             samplerId: DEFAULT_SAMPLER_IDS.occlusion,
-            imageId: DEFAULT_IMAGE_IDS.baseColor,
+            imageId: DEFAULT_IMAGE_IDS.occlusion,
         }
     }
 }

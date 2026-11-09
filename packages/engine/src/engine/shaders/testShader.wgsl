@@ -117,7 +117,13 @@ fn fragment_main(in: VertexOutput) -> GBufferOutput {
     // (glTF metallicRoughness channel convention + the free .r slot)
     let metallic_roughness = textureSample(metallic_roughness_texture, metallic_roughness_sampler, in.texcoords);
     let occlusion = textureSample(occlusion_texture, occlusion_sampler, in.texcoords).r;
-    out.metallic_roughness = float4(occlusion, metallic_roughness.g, metallic_roughness.b, 1.0);
+    // glTF: the factors scale the sampled texture channels
+    out.metallic_roughness = float4(
+        occlusion,
+        metallic_roughness.g * material_params.roughness_factor,
+        metallic_roughness.b * material_params.metallic_factor,
+        1.0
+    );
     out.emission = textureSample(emission_texture, emission_sampler, in.texcoords);
 
     return out;

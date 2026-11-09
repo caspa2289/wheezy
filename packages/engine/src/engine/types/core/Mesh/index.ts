@@ -51,4 +51,6 @@ export interface IMesh extends IComponent<EntityTypes.mesh> {
     positions: GLTFAccessor
     mode: number //gpu topology - default is 4 (triangles)
     isPipelineBuilt: boolean
+    /** drawn into the shadow atlas tiles; false for helper geometry (gizmos) */
+    castShadow: boolean
 }

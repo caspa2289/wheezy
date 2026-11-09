@@ -41,6 +41,7 @@ import {
     SHADOW_TILE_SPOT,
     SPOT_LIGHT_BYTESTRIDE,
     SPOT_LIGHT_ELEMENT_COUNT,
+    SPOT_MAX_CONE_HALF_ANGLE,
     VIEW_PARAMS_BUFFER_SIZE,
 } from './constants'
 import { type IMeshRenderData } from '../../types/core/MeshRenderDataStorage'
@@ -1511,10 +1512,11 @@ export class Renderer implements IRenderer {
         const target = vec3.addScaled(light.position, direction, 1)
         const lightView = mat4.lookAt(light.position, target, up)
 
-        // cutoff is stored pre-cosined (see SpotLight.cutoff setter)
+        // cutoff is stored pre-cosined (see SpotLight.cutoff setter); the min()
+        // is the same clamp applied defensively in case `_cutoff` was written
+        // directly, and keeps the projection away from π where it degenerates
         const halfAngle = Math.acos(Math.min(1, Math.max(-1, light.cutoff)))
-        // keep away from π — the projection degenerates
-        const fov = Math.min(2 * halfAngle, 2.9)
+        const fov = Math.min(2 * halfAngle, 2 * SPOT_MAX_CONE_HALF_ANGLE)
         const range = this._deriveLightRange(
             light.intensity,
             light.attenuationConstant,
@@ -2130,6 +2132,9 @@ export class Renderer implements IRenderer {
 
         geometryPass.end()
 
+        // helper geometry (light gizmos) opts out of the atlas via castShadow
+        const shadowCasters = meshesToRender.filter((mesh) => mesh.castShadow)
+
         // one pass over the whole atlas; each tile gets its viewport/scissor and
         // selects its caster entry via the dynamic bind-group offset
         const shadowPass = commandEncoder.beginRenderPass(
@@ -2143,7 +2148,7 @@ export class Renderer implements IRenderer {
                 tile.casterIndex * SHADOW_INDEX_SLOT_SIZE,
             ])
 
-            meshesToRender.forEach((mesh) => {
+            shadowCasters.forEach((mesh) => {
                 this.renderMeshShadows(mesh, scene, shadowPass)
             })
         }

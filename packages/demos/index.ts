@@ -7,7 +7,7 @@ const canvas = document.getElementById('webgpu-canvas') as HTMLCanvasElement
 
 const initDebugControls = (engine: IEngine) => {
     const defaultOutputSource = 0
-    const defaultScene = 0
+    const defaultScene = 1
 
     const debugContainer = document.getElementById(
         'debug-container'

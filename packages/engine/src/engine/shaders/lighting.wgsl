@@ -19,6 +19,12 @@ const ATLAS_TEXEL = 1.0 / f32(ATLAS_SIZE);
 // have no bias field; tune: acne → raise, peter-panning → lower).
 // in world units this is bias × shadow depth range
 const SHADOW_DEPTH_BIAS = 0.0008;
+// Shadows must not stack: a pixel keeps at least this fraction of the light it
+// would receive unshadowed, whether one light or five are occluded. Each light's
+// contribution is attenuated by its own shadow factor, so without this floor
+// every additional occluding light removes another fraction of the energy and
+// overlapping shadows read progressively darker than single ones.
+const SHADOW_MIN_VISIBILITY = 0.35;
 
 // clustered light culling grid — must match lightCulling.wgsl / constants.ts
 const CLUSTER_TILE = 16u;
@@ -184,7 +190,8 @@ fn calculateDirectionalLight(
     light: DirectionalLightData,
     normal: float3,
     world_position: float3,
-    metallic: f32
+    metallic: f32,
+    roughness: f32
 ) -> float4 {
     let diffuse_factor = dot(normal, -light.direction);
 
@@ -199,10 +206,12 @@ fn calculateDirectionalLight(
         var specular_factor = dot(vertex_to_eye, light_reflect);
 
         if (specular_factor > 0.0) {
-            //FIXME: calculate specular power and intensity somehow
-            //this is not it but looks fine from afar
-            let specular_power = metallic * 255;
-            let specular_intensity = metallic;
+            // Phong exponent from roughness: a smooth surface (roughness 0)
+            // gets a tight highlight, a rough one (1.0) a broad one. Metals
+            // reflect their full color, dielectrics only the ~4% Fresnel floor
+            // (no per-material F0 data reaches the G-buffer).
+            let specular_power = max(1.0, pow(2.0, 12.0 * (1.0 - roughness)));
+            let specular_intensity = mix(0.04, 1.0, metallic);
             specular_factor = pow(specular_factor, specular_power);
             specular_color = float4(light.color * specular_intensity * specular_factor, 1.0f);
         }
@@ -215,7 +224,8 @@ fn calculatePointLight(
     light: PointLightData,
     normal: float3,
     world_position: float3,
-    metallic: f32
+    metallic: f32,
+    roughness: f32
 ) -> float4 {
     let light_direction = world_position - light.position;
     let distance = length(light_direction);
@@ -228,7 +238,7 @@ fn calculatePointLight(
     directionalLight.shadow_caster = -1;
 
 
-    let color = calculateDirectionalLight(directionalLight, normal, world_position, metallic);
+    let color = calculateDirectionalLight(directionalLight, normal, world_position, metallic, roughness);
 
     let attenuation = max(0.00000001, light.atten_constant +
         light.atten_linear * distance +
@@ -248,7 +258,8 @@ fn calculateSpotLight(
     light: SpotLightData,
     normal: float3,
     world_position: float3,
-    metallic: f32
+    metallic: f32,
+    roughness: f32
 ) -> float4 {
     let light_to_pixel = normalize(world_position - light.position);
     let spot_factor = dot(light_to_pixel, light.direction);
@@ -265,7 +276,7 @@ fn calculateSpotLight(
         point_light.shadow_caster = -1;
         point_light.range = light.range;
 
-        let color = calculatePointLight(point_light, normal, world_position, metallic);
+        let color = calculatePointLight(point_light, normal, world_position, metallic, roughness);
 
         return color * (1.0 - (1.0 - spot_factor) * 1.0 / (1.0 - light.cutoff));
     } else {
@@ -378,14 +389,18 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
             let fragment_normal = normalize(normal.xyz);
             // packed material target: occlusion in .r, roughness in .g, metallic in .b
             let metallic = metallic_roughness.b;
-
-            var albedo_color = albedo * metallic_roughness.r;
+            let roughness = metallic_roughness.g;
+            let occlusion = metallic_roughness.r;
 
             var total_light = float4(0.0, 0.0, 0.0, 0.0);
+            // the same accumulation without any shadow attenuation — the
+            // reference SHADOW_MIN_VISIBILITY clamps against
+            var unshadowed_light = float4(0.0, 0.0, 0.0, 0.0);
 
             // directional lights are global — always looped in full
             for (var i = 0u; i < arrayLength(&directionalLightsBuffer.lights); i++) {
-                var directional = calculateDirectionalLight(directionalLightsBuffer.lights[i], fragment_normal, world_position, metallic);
+                var directional = calculateDirectionalLight(directionalLightsBuffer.lights[i], fragment_normal, world_position, metallic, roughness);
+                unshadowed_light += directional;
                 if (directionalLightsBuffer.lights[i].shadow_caster >= 0) {
                     directional *= calculateShadowFactor(directionalLightsBuffer.lights[i].shadow_caster, world_position);
                 }
@@ -410,14 +425,16 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
 
                 if (light_type == 0u) {
                     let light = pointLightsBuffer.lights[light_index];
-                    var color = calculatePointLight(light, fragment_normal, world_position, metallic);
+                    var color = calculatePointLight(light, fragment_normal, world_position, metallic, roughness);
+                    unshadowed_light += color;
                     if (light.shadow_caster >= 0) {
                         color *= pointShadowFactor(light.shadow_caster, world_position, light.position);
                     }
                     total_light += color;
                 } else {
                     let light = spotLightsBuffer.lights[light_index];
-                    var color = calculateSpotLight(light, fragment_normal, world_position, metallic);
+                    var color = calculateSpotLight(light, fragment_normal, world_position, metallic, roughness);
+                    unshadowed_light += color;
                     if (light.shadow_caster >= 0) {
                         color *= calculateShadowFactor(light.shadow_caster, world_position);
                     }
@@ -425,12 +442,19 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
                 }
             }
 
-            if ((total_light[0] == 0.0) & (total_light[1] == 0.0) & (total_light[2] == 0.0)) {
-                total_light = float4(view_params.ambient_light_color.xyz * view_params.ambient_light_color.w, 0.0f);
-            }
+            // overlapping shadows converge to one level instead of stacking
+            total_light = max(total_light, unshadowed_light * SHADOW_MIN_VISIBILITY);
+
+            // ambient is a floor, not a fallback: it always contributes, so
+            // fully unlit surfaces still read. Occlusion attenuates only this
+            // term — AO models blocked indirect light, not blocked direct light.
+            let ambient = float4(
+                view_params.ambient_light_color.xyz * view_params.ambient_light_color.w,
+                0.0f
+            ) * occlusion;
 
             return gamma_correct(
-                (albedo_color * total_light) + emission
+                (albedo * (total_light + ambient)) + emission
             );
         }
     }

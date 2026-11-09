@@ -17,8 +17,9 @@ export interface ILightSourceV2 {
     /** debug marker managed by LightGizmo.sync — do not set manually */
     gizmo?: IGameObject
     /**
-     * world position the debug gizmo pins to; null for lights without one
-     * (directional) — they get no gizmo
+     * world position the debug gizmo pins to; null means no gizmo. Point/spot
+     * return their position, directional the world origin (their pointAt
+     * anchor).
      */
     gizmoPosition: Vec3 | null
 

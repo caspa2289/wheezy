@@ -46,6 +46,11 @@ export const SHADOW_FRUSTUM_Z_EXTEND = 20
 export const SHADOW_DISTANCE = 20
 // far plane of spot / point-face shadow frustums (clamped by light range)
 export const SHADOW_LOCAL_FAR = 20
+// widest spot cone the shadow frustum can represent: mat4.perspective
+// degenerates as fov approaches π, so _spotShadowVP clamps there. SpotLight's
+// cutoff setter clamps to the same value — otherwise a wider cone stays lit
+// outside the shadow map's NDC range and renders unshadowed.
+export const SPOT_MAX_CONE_HALF_ANGLE = 1.45 // radians (~83°)
 // a light's influence radius ends where intensity/attenuation drops below this
 export const LIGHT_RANGE_THRESHOLD = 0.02
 
