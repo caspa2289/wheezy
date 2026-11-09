@@ -2,6 +2,10 @@ import { mat4, vec3 } from 'wgpu-matrix'
 import { type IArcBallCamera } from '../../engine/types/core/Camera'
 import { Stuff } from '../Stuff'
 
+// guard against zooming through the orbit target — the view matrix
+// degenerates as distance approaches 0
+const MIN_CAMERA_DISTANCE = 0.1
+
 export interface ArcBallControllerProps {
     camera: IArcBallCamera
     canvas: HTMLCanvasElement
@@ -58,6 +62,24 @@ export class ArcBallController {
             this.touchX = evt.changedTouches[0]!.clientX
             this.touchY = evt.changedTouches[0]!.clientY
         })
+
+        this.canvas.addEventListener(
+            'wheel',
+            (evt) => {
+                evt.preventDefault()
+                // multiplicative zoom — a constant factor per notch feels the
+                // same at any distance; wheel up (deltaY < 0) zooms in
+                const factor =
+                    evt.deltaY > 0 ? 1 + this.zoomSpeed : 1 - this.zoomSpeed
+                this.camera.distance = Math.max(
+                    MIN_CAMERA_DISTANCE,
+                    this.camera.distance * factor
+                )
+            },
+            // preventDefault (stop the page from scrolling) needs a
+            // non-passive listener
+            { passive: false }
+        )
     }
 
     update(deltaTime: number) {

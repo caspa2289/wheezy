@@ -8,6 +8,7 @@ export const PROFILER_METRICS = [
     'submit',
     'gpu geometry',
     'gpu shadow',
+    'gpu culling',
     'gpu lighting',
     'gpu skybox',
 ] as const

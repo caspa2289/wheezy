@@ -1,34 +1,48 @@
 alias float4 = vec4<f32>;
 alias float3 = vec3<f32>;
-alias float2 = vec2<f32>;
 
 struct VertexInput {
     @location(0) position: float3,
-};
-
-struct ViewParams {
-    camera_projection_matrix: mat4x4<f32>,
-    camera_view_matrix: mat4x4<f32>,
-    camera_position: vec4f,
-    light_projection_matrix: mat4x4<f32>,
-    light_view_matrix: mat4x4<f32>,
-    light_position: vec4f,
-    ambient_light_color: vec4f,
 };
 
 struct NodeParams {
     transform: mat4x4<f32>,
 };
 
+// per-draw caster index, selected via a dynamic bind-group offset
+// (slot i of the index buffer holds the value i — see Renderer)
+struct CasterIndex {
+    index: u32,
+};
+
+// must match the CPU layout in Renderer/constants.ts (SHADOW_* constants)
+struct ShadowCasterData {
+    light_view_projection: mat4x4<f32>,
+    tile_rect: vec4f,
+    enabled: u32,
+    _pad0: u32,
+    _pad1: u32,
+    _pad2: u32,
+};
+
+struct ShadowDataBuffer {
+    caster_count: u32,
+    _padh0: u32,
+    _padh1: u32,
+    _padh2: u32,
+    casters: array<ShadowCasterData>,
+};
+
 @group(0) @binding(0)
-var<uniform> view_params: ViewParams;
+var<uniform> caster_index: CasterIndex;
+
+@group(0) @binding(1)
+var<storage, read> shadow_data: ShadowDataBuffer;
 
 @group(1) @binding(0)
 var<uniform> node_params: NodeParams;
 
 @vertex
 fn vertex_main(vert: VertexInput) -> @builtin(position) vec4f {
-    let light_view_projection_matrix = view_params.light_projection_matrix * view_params.light_view_matrix;
-
-    return light_view_projection_matrix * node_params.transform * float4(vert.position, 1.0);
+    return shadow_data.casters[caster_index.index].light_view_projection * node_params.transform * float4(vert.position, 1.0);
 };
