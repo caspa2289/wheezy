@@ -12,6 +12,8 @@ export class Engine implements IEngine {
 
     private _prevFrameTime: number = 0
 
+    private _frameScheduled = false
+
     private _scene?: IScene
 
     public async initRenderer(canvas: HTMLCanvasElement) {
@@ -55,6 +57,18 @@ export class Engine implements IEngine {
     public render(time: number = 0) {
         if (!this.scene) return
 
+        // scheduled before the frame body, and at most one callback outstanding:
+        // an exception in a scene's onRender or in the renderer must not kill the
+        // loop (a dead chain looks like a frozen tab with one console error), and
+        // an external render() call must not start a second chain
+        if (!this._frameScheduled) {
+            this._frameScheduled = true
+            requestAnimationFrame((t: number) => {
+                this._frameScheduled = false
+                this.render(t)
+            })
+        }
+
         const frameDelta = time - this._prevFrameTime
         const dt = frameDelta / 100
         if (this._prevFrameTime && frameDelta > 0) {
@@ -64,7 +78,5 @@ export class Engine implements IEngine {
         this._prevFrameTime = time
 
         this._renderer.render(dt, this.scene)
-
-        requestAnimationFrame((time: number) => this.render(time))
     }
 }

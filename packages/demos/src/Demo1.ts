@@ -1,5 +1,4 @@
 import {
-    DirectionalLightV2,
     GameObject,
     type IGameObject,
     type IScene,
@@ -30,8 +29,6 @@ const WALL_HEIGHT = 2.158
 const WALL_X = 5
 const HELMET_POSITION = vec3.create(3, 0, 0)
 const LIGHT_X = -4
-// radius of the moving spot's orbit around the view axis
-const ORBIT_RADIUS = 1.5
 // the colored spots ride a wider orbit, 90° apart from each other
 const COLORED_ORBIT_RADIUS = 2.8
 const SPOT_CUTOFF = 15
@@ -47,12 +44,8 @@ export class Demo1 extends Scene implements IScene {
     private _controller: ArcBallController
 
     private _testHook!: IGameObject
-    private _orbitingLight!: SpotLight
     private _coloredSpots: SpotLight[] = []
-    private _wideSpot!: SpotLight
     private _orbitAngle = 0
-    private _ambientRaised = false
-    private _coneWide = false
 
     constructor() {
         super()
@@ -116,33 +109,16 @@ export class Demo1 extends Scene implements IScene {
         )
 
         this._setupLights()
-        this._setupToggles()
     }
 
     private _setupLights() {
-        const spotUpper = new SpotLight({
-            parent: this.root,
-            position: vec3.create(LIGHT_X, 1, 0),
-        })
-        const spotLower = new SpotLight({
-            parent: this.root,
-            position: vec3.create(LIGHT_X, -1, 0),
-        })
-        spotUpper.pointAt(HELMET_POSITION)
-        spotLower.pointAt(HELMET_POSITION)
-        this._wideSpot = spotUpper
-
-        // four colored spots 90° apart on a shared orbit around the view axis
-        // (moved in onRender), all aimed at the helmet: their shadows sweep
-        // across the wall and through each other, and the mixed colors make the
-        // overlaps easy to read
         const coloredSpots = [
-            vec3.create(1, 0.25, 0.2), // red
-            vec3.create(0.3, 1, 0.45), // green
-            vec3.create(0.3, 0.55, 1), // blue
-            vec3.create(1, 0.4, 0.9), // magenta
+            vec3.create(1, 0, 0), // red
+            vec3.create(0, 1, 0), // green
+            // vec3.create(0, 0, 1), // blue
+            // vec3.create(1, 0.4, 0.9), // magenta
         ].map((color, index) => {
-            const phase = (index * Math.PI) / 2
+            const phase = index * Math.PI
             const spot = new SpotLight({
                 parent: this.root,
                 position: vec3.create(
@@ -158,62 +134,7 @@ export class Demo1 extends Scene implements IScene {
         })
         this._coloredSpots = coloredSpots
 
-        // tilted off the view axis so its shadow lands apart from the spots' —
-        // the overlap region stays identifiable
-        const sun = new DirectionalLightV2({
-            parent: this.root,
-            direction: vec3.create(1, -0.2, 0.15),
-            intensity: 0.01,
-        })
-
-        this.spotLights.push(
-            // spotUpper,
-            // spotLower,
-            ...coloredSpots
-        )
-        // this.directionalLights.push(sun)
-    }
-
-    private _setupToggles() {
-        const wrapper = document.createElement('div')
-        wrapper.style.position = 'absolute'
-        wrapper.style.top = '0'
-        wrapper.style.zIndex = '10'
-        wrapper.style.padding = '10px'
-
-        const ambientButton = document.createElement('button')
-        const coneButton = document.createElement('button')
-
-        const labelAmbient = () =>
-            `ambient floor: ${this._ambientRaised ? 'on' : 'off'}`
-        const labelCone = () =>
-            `spot cone: ${this._coneWide ? `${SPOT_CUTOFF_WIDE}°` : `${SPOT_CUTOFF}°`}`
-
-        ambientButton.addEventListener('click', () => {
-            this._ambientRaised = !this._ambientRaised
-            // ambient is re-read into the view params every frame. Kept small:
-            // it now adds to every pixel (not just unlit ones) and the lighting
-            // pass gamma-expands darks, so even 0.04 reads as a visible lift.
-            this.engine.renderer.ambientLightColor = this._ambientRaised
-                ? vec3.create(0.04, 0.044, 0.055)
-                : vec3.create(0.01, 0.01, 0.01)
-            ambientButton.textContent = labelAmbient()
-        })
-
-        coneButton.addEventListener('click', () => {
-            this._coneWide = !this._coneWide
-            this._wideSpot.cutoff = this._coneWide
-                ? SPOT_CUTOFF_WIDE
-                : SPOT_CUTOFF
-            coneButton.textContent = labelCone()
-        })
-
-        ambientButton.textContent = labelAmbient()
-        coneButton.textContent = labelCone()
-        wrapper.appendChild(ambientButton)
-        wrapper.appendChild(coneButton)
-
-        document.body.appendChild(wrapper)
+        this.spotLights.push(...coloredSpots)
     }
 
     public override onRender(dt: number): void {
@@ -222,10 +143,8 @@ export class Demo1 extends Scene implements IScene {
         // dt is frameDelta / 100, not seconds — the engine-wide contract
         this._orbitAngle += dt * 0.05
 
-        // the colored spots ride the same angle on a wider orbit, 90° apart, so
-        // their shadows sweep across the wall and through each other
         this._coloredSpots.forEach((spot, index) => {
-            const angle = this._orbitAngle + (index * Math.PI) / 2
+            const angle = this._orbitAngle + index * Math.PI
             spot.position[1] = Math.cos(angle) * COLORED_ORBIT_RADIUS
             spot.position[2] = Math.sin(angle) * COLORED_ORBIT_RADIUS
             spot.pointAt(HELMET_POSITION)
