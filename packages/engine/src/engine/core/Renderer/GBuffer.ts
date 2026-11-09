@@ -1,9 +1,12 @@
+import { HDR_TARGET_FORMAT } from './constants'
+
 export class GBuffer {
     readonly _normal: GPUTextureView
     readonly _albedo: GPUTextureView
     readonly _depth: GPUTextureView
     readonly _metallicRoughness: GPUTextureView
     readonly _emission: GPUTextureView
+    readonly _litColor: GPUTextureView
 
     constructor(
         device: GPUDevice,
@@ -27,6 +30,10 @@ export class GBuffer {
         this._albedo = createTextureView()
         this._emission = createTextureView()
         this._metallicRoughness = createTextureView()
+        // HDR target of the lighting pass, consumed by the tonemapping post pass.
+        // Not part of the geometry MRT set, so it does not count against
+        // maxColorAttachmentBytesPerSample; rgba16float keeps intensities above 1.
+        this._litColor = createTextureView(HDR_TARGET_FORMAT)
     }
 
     get normal() {
@@ -47,5 +54,9 @@ export class GBuffer {
 
     get emission() {
         return this._emission
+    }
+
+    get litColor() {
+        return this._litColor
     }
 }

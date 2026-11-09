@@ -3,6 +3,20 @@ export const DEFAULT_SWAP_CHAIN_FORMAT: GPUTextureFormat = 'rgba8unorm'
 // reconstructs world positions from it (depth24plus sampling is implementation-defined)
 export const DEFAULT_DEPTH_FORMAT: GPUTextureFormat = 'depth32float'
 export const DEFAULT_SHADOW_DEPTH_FORMAT: GPUTextureFormat = 'depth32float'
+// linear HDR target of the lighting pass, tonemapped into the swapchain by the
+// post pass. Shared by GBuffer (the texture) and the lighting pipeline (the
+// attachment format) — a mismatch is a validation error, so keep one constant.
+export const HDR_TARGET_FORMAT: GPUTextureFormat = 'rgba16float'
+// --- image-based lighting (environment prefilter, one-off per skybox change) ---
+// the WGSL side duplicates the sizes as module consts (no shared header), so
+// ibl.wgsl and lighting.wgsl must be updated together with these
+export const IBL_IRRADIANCE_SIZE = 32
+export const IBL_PREFILTER_SIZE = 128
+export const IBL_PREFILTER_MIP_LEVELS = 5
+export const IBL_BRDF_LUT_SIZE = 256
+export const IBL_IRRADIANCE_SAMPLES = 1024
+export const IBL_PREFILTER_SAMPLES = 256
+export const IBL_BRDF_SAMPLES = 512
 export const VIEW_PARAMS_BUFFER_SIZE: number =
     16 * 4 + 16 * 4 + 4 * 4 + 4 * 4 + 16 * 4 + 16 * 4 + 16 + 16 * 3 + 4 + 4
 export const DIRECTIONAL_LIGHT_ELEMENT_COUNT = 8 // 7 floats and 1 pad

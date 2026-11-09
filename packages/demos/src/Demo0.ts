@@ -65,6 +65,9 @@ export class Demo0 extends Scene implements IScene {
                 attenuationConstant: 1,
                 attenuationExponential: 0.0001,
                 attenuationLinear: 0.0001,
+                // the PBR diffuse term divides by π, so π× the old intensity
+                // keeps the previous brightness
+                intensity: Math.PI,
             })
         )
 

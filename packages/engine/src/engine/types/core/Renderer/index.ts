@@ -33,6 +33,8 @@ export interface IRenderer {
     depthTextureFormat: GPUTextureFormat
     ambientLightIntensity: number
     ambientLightColor: Vec3
+    /** multiplied into the linear HDR lighting result before tonemapping */
+    exposure: number
     lightsBindGroupLayout: GPUBindGroupLayout
 
     outputSource: TRenderOutputSource

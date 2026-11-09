@@ -4,6 +4,7 @@ import {
     type IScene,
     Scene,
     SpotLight,
+    type TSkyboxBitmaps,
     WheezyGLBLoader,
 } from '@wheezy/engine'
 import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCamera'
@@ -31,6 +32,9 @@ const HELMET_POSITION = vec3.create(3, 0, 0)
 const LIGHT_X = -4
 // the colored spots ride a wider orbit, 90° apart from each other
 const COLORED_ORBIT_RADIUS = 2.8
+// the PBR diffuse term divides by π, so intensities need roughly π× the value
+// that looked right under the old Phong shading
+const SPOT_INTENSITY = 3
 const SPOT_CUTOFF = 15
 // wide enough that each lit pool on the wall is larger than the helmet's
 // shadow, so shadow edges and the colored overlaps stay readable
@@ -77,18 +81,18 @@ export class Demo1 extends Scene implements IScene {
         // draw (Renderer.buildRenderPipeline), so they have to be set on the
         // preload data before uploadModel. Non-default values make them
         // observable in the Metallic/Roughness debug views.
-        modelData.materials.forEach((material) => {
-            material.metallicFactor = 0
-            material.roughnessFactor = 0.95
-        })
-        modelData1.materials.forEach((material) => {
-            material.metallicFactor = 1
-            material.roughnessFactor = 0.25
-        })
+        // modelData.materials.forEach((material) => {
+        //     material.metallicFactor = 0
+        //     material.roughnessFactor = 0.95
+        // })
+        // modelData1.materials.forEach((material) => {
+        //     material.metallicFactor = 1
+        //     material.roughnessFactor = 0.25
+        // })
 
-        const modelGO0 = await this.uploadModel({
-            modelData: modelData,
-        })
+        // const modelGO0 = await this.uploadModel({
+        //     modelData: modelData,
+        // })
 
         const modelGO1 = await this.uploadModel({
             modelData: modelData1,
@@ -96,19 +100,40 @@ export class Demo1 extends Scene implements IScene {
 
         this._testHook = new GameObject()
         this.objectManager.addObject(this._testHook, this.root)
-        this.objectManager.reparentObject(modelGO0, this._testHook)
+        // this.objectManager.reparentObject(modelGO0, this._testHook)
 
         modelGO1.transform.translate(HELMET_POSITION)
+        modelGO1.transform.rotateDegreesEuler({ x: 90, z: 90 })
 
-        modelGO0.transform.rotateDegreesEuler({ y: -90 })
-        modelGO0.transform.translate(
-            vec3.create(WALL_X, (-WALL_HEIGHT * WALL_SCALE) / 2, 0)
-        )
-        modelGO0.transform.scale(
-            vec3.create(WALL_SCALE, WALL_SCALE, WALL_SCALE)
-        )
+        // modelGO0.transform.rotateDegreesEuler({ y: -90 })
+        // modelGO0.transform.translate(
+        // vec3.create(WALL_X, (-WALL_HEIGHT * WALL_SCALE) / 2, 0)
+        // )
+        // modelGO0.transform.scale(
+        // vec3.create(WALL_SCALE, WALL_SCALE, WALL_SCALE)
+        // )
 
-        this._setupLights()
+        // this._setupLights()
+        await this._setupSkyBox()
+    }
+
+    private async _setupSkyBox() {
+        const imgSrcs = [
+            'static/cubemaps/bridge/posx.jpg',
+            'static/cubemaps/bridge/negx.jpg',
+            'static/cubemaps/bridge/posy.jpg',
+            'static/cubemaps/bridge/negy.jpg',
+            'static/cubemaps/bridge/posz.jpg',
+            'static/cubemaps/bridge/negz.jpg',
+        ]
+
+        const promises = imgSrcs.map(async (source) => {
+            const response = await fetch(source)
+            return createImageBitmap(await response.blob())
+        })
+        const imageBitmaps = (await Promise.all(promises)) as TSkyboxBitmaps
+
+        this._engine?.renderer.setSkyBoxTexture(imageBitmaps)
     }
 
     private _setupLights() {
@@ -128,6 +153,7 @@ export class Demo1 extends Scene implements IScene {
                 ),
                 color,
                 cutoff: SPOT_CUTOFF_POOL,
+                intensity: SPOT_INTENSITY,
             })
             spot.pointAt(HELMET_POSITION)
             return spot

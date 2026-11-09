@@ -19,12 +19,6 @@ const ATLAS_TEXEL = 1.0 / f32(ATLAS_SIZE);
 // have no bias field; tune: acne → raise, peter-panning → lower).
 // in world units this is bias × shadow depth range
 const SHADOW_DEPTH_BIAS = 0.0008;
-// Shadows must not stack: a pixel keeps at least this fraction of the light it
-// would receive unshadowed, whether one light or five are occluded. Each light's
-// contribution is attenuated by its own shadow factor, so without this floor
-// every additional occluding light removes another fraction of the energy and
-// overlapping shadows read progressively darker than single ones.
-const SHADOW_MIN_VISIBILITY = 0.35;
 
 // clustered light culling grid — must match lightCulling.wgsl / constants.ts
 const CLUSTER_TILE = 16u;
@@ -162,6 +156,20 @@ var<storage, read> cluster_counts: array<u32>;
 @group(3) @binding(4)
 var<storage, read> cluster_indices: array<u32>;
 
+// image-based lighting, convolved from the skybox by ibl.wgsl — bindings 5–8 of
+// the same group, because WebGPU's default maxBindGroups is 4
+@group(3) @binding(5)
+var irradiance_texture: texture_cube<f32>;
+
+@group(3) @binding(6)
+var prefiltered_texture: texture_cube<f32>;
+
+@group(3) @binding(7)
+var brdf_lut_texture: texture_2d<f32>;
+
+@group(3) @binding(8)
+var ibl_sampler: sampler;
+
 @group(0) @binding(0)
 var<uniform> view_params: ViewParams;
 
@@ -182,106 +190,198 @@ fn vertex_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     return out;
 }
 
-fn gamma_correct(color: float4) -> float4 {
-    return float4(pow(color, float4(1.0/2.2)));
+const PI = 3.14159265359;
+
+// --- Cook-Torrance microfacet BRDF, metallic-roughness workflow ---
+
+// Trowbridge-Reitz / GGX normal distribution function
+fn distribution_ggx(n_dot_h: f32, roughness: f32) -> f32 {
+    let a = roughness * roughness;
+    let a2 = a * a;
+    let d = n_dot_h * n_dot_h * (a2 - 1.0) + 1.0;
+    return a2 / max(PI * d * d, 1e-7);
+}
+
+// Schlick's approximation of the Fresnel equation
+fn fresnel_schlick(cos_theta: f32, f0: float3) -> float3 {
+    let f = pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
+    return f0 + (float3(1.0) - f0) * f;
+}
+
+fn geometry_schlick_ggx(n_dot_x: f32, k: f32) -> f32 {
+    return n_dot_x / (n_dot_x * (1.0 - k) + k);
+}
+
+// Smith's method with the Schlick-GGX approximation; k = a/2 for direct lighting
+fn geometry_smith(n_dot_v: f32, n_dot_l: f32, roughness: f32) -> f32 {
+    let k = max(roughness * roughness * 0.5, 1e-4);
+    return geometry_schlick_ggx(n_dot_v, k) * geometry_schlick_ggx(n_dot_l, k);
+}
+
+// Outgoing radiance from one light. `to_light` points from the surface toward the
+// light; `radiance` is the light's color × intensity after attenuation and any
+// cone/fade windows, without the NdotL term (this function applies it).
+fn shade_pbr(
+    to_light: float3,
+    radiance: float3,
+    normal: float3,
+    to_eye: float3,
+    albedo: float3,
+    metallic: f32,
+    roughness: f32
+) -> float3 {
+    let n_dot_l = dot(normal, to_light);
+    if (n_dot_l <= 0.0) {
+        return float3(0.0);
+    }
+    let n_dot_v = max(dot(normal, to_eye), 1e-4);
+    let half_vector = normalize(to_light + to_eye);
+    let n_dot_h = max(dot(normal, half_vector), 0.0);
+    let h_dot_v = max(dot(half_vector, to_eye), 0.0);
+
+    // dielectrics reflect ~4% specularly and take their color from diffuse;
+    // metals have no diffuse and tint the specular lobe with the albedo
+    let f0 = mix(float3(0.04), albedo, metallic);
+    let d = distribution_ggx(n_dot_h, roughness);
+    let g = geometry_smith(n_dot_v, n_dot_l, roughness);
+    let f = fresnel_schlick(h_dot_v, f0);
+
+    let specular = d * g * f / max(4.0 * n_dot_v * n_dot_l, 1e-4);
+    // whatever the specular lobe reflects cannot also be diffusely reflected
+    let kd = (float3(1.0) - f) * (1.0 - metallic);
+    let diffuse = kd * albedo / PI;
+
+    return (diffuse + specular) * radiance * n_dot_l;
+}
+
+// --- image-based lighting (split sum) ---
+
+// must match IBL_PREFILTER_MIP_LEVELS in Renderer/constants.ts
+const IBL_PREFILTER_MIP_LEVELS = 5.0;
+
+// Fresnel with a roughness-dependent cap: a rough surface does not reflect the
+// full F0 at grazing angles the way a mirror does
+fn fresnel_schlick_roughness(cos_theta: f32, f0: float3, roughness: f32) -> float3 {
+    let f = pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
+    return f0 + (max(float3(1.0 - roughness), f0) - f0) * f;
+}
+
+// Indirect light from the skybox: irradiance for the diffuse lobe, the
+// roughness-indexed prefiltered mip plus the BRDF integration LUT for the
+// specular one. `strength` is the environment tint × intensity.
+fn calculate_ibl(
+    normal: float3,
+    to_eye: float3,
+    albedo: float3,
+    metallic: f32,
+    roughness: f32,
+    strength: float3
+) -> float3 {
+    let n_dot_v = max(dot(normal, to_eye), 1e-4);
+    let f0 = mix(float3(0.04), albedo, metallic);
+    let f = fresnel_schlick_roughness(n_dot_v, f0, roughness);
+    let kd = (float3(1.0) - f) * (1.0 - metallic);
+
+    // the irradiance map stores irradiance/π (see ibl.wgsl), which is exactly
+    // the factor the diffuse BRDF would otherwise divide by
+    let irradiance = textureSampleLevel(irradiance_texture, ibl_sampler, normal, 0.0).rgb;
+    let diffuse = kd * irradiance * albedo;
+
+    let reflected = reflect(-to_eye, normal);
+    let mip = roughness * (IBL_PREFILTER_MIP_LEVELS - 1.0);
+    let prefiltered = textureSampleLevel(prefiltered_texture, ibl_sampler, reflected, mip).rgb;
+    // LUT x = NdotV, y = roughness — must match ibl.wgsl's brdf_lut_main.
+    // SampleLevel, not Sample: the LUT has one mip level, and the explicit
+    // level keeps this outside naga's uniform-control-flow requirement (the
+    // caller is inside a switch on the debug output source).
+    let env_brdf = textureSampleLevel(brdf_lut_texture, ibl_sampler, float2(n_dot_v, roughness), 0.0).rg;
+    let specular = prefiltered * (f * env_brdf.x + env_brdf.y);
+
+    return (diffuse + specular) * strength;
 }
 
 fn calculateDirectionalLight(
     light: DirectionalLightData,
     normal: float3,
     world_position: float3,
+    albedo: float3,
     metallic: f32,
     roughness: f32
-) -> float4 {
-    let diffuse_factor = dot(normal, -light.direction);
-
-    var diffuse_color = float4(0, 0, 0, 0);
-    var specular_color = float4(0, 0, 0, 0);
-
-    if (diffuse_factor > 0.0) {
-
-        diffuse_color = float4(light.color * light.intensity * diffuse_factor, 1.0);
-        let vertex_to_eye = normalize(view_params.camera_position.xyz - world_position);
-        let light_reflect = normalize(reflect(light.direction, normal));
-        var specular_factor = dot(vertex_to_eye, light_reflect);
-
-        if (specular_factor > 0.0) {
-            // Phong exponent from roughness: a smooth surface (roughness 0)
-            // gets a tight highlight, a rough one (1.0) a broad one. Metals
-            // reflect their full color, dielectrics only the ~4% Fresnel floor
-            // (no per-material F0 data reaches the G-buffer).
-            let specular_power = max(1.0, pow(2.0, 12.0 * (1.0 - roughness)));
-            let specular_intensity = mix(0.04, 1.0, metallic);
-            specular_factor = pow(specular_factor, specular_power);
-            specular_color = float4(light.color * specular_intensity * specular_factor, 1.0f);
-        }
-    }
-
-    return (diffuse_color + specular_color);
+) -> float3 {
+    let to_eye = normalize(view_params.camera_position.xyz - world_position);
+    // light.direction is the way the light travels, so negate it for "to light"
+    return shade_pbr(
+        -light.direction,
+        light.color * light.intensity,
+        normal,
+        to_eye,
+        albedo,
+        metallic,
+        roughness
+    );
 }
 
 fn calculatePointLight(
     light: PointLightData,
     normal: float3,
     world_position: float3,
+    albedo: float3,
     metallic: f32,
     roughness: f32
-) -> float4 {
-    let light_direction = world_position - light.position;
-    let distance = length(light_direction);
-
-    var directionalLight: DirectionalLightData;
-
-    directionalLight.color = light.color;
-    directionalLight.intensity = light.intensity;
-    directionalLight.direction = normalize(light_direction);
-    directionalLight.shadow_caster = -1;
-
-
-    let color = calculateDirectionalLight(directionalLight, normal, world_position, metallic, roughness);
+) -> float3 {
+    let to_pixel = world_position - light.position;
+    let distance = length(to_pixel);
+    // guarded: at distance 0 the direction is degenerate
+    let to_light = -to_pixel / max(distance, 1e-6);
 
     let attenuation = max(0.00000001, light.atten_constant +
         light.atten_linear * distance +
         light.atten_exponential * distance * distance);
+    var radiance = light.color * light.intensity / attenuation;
 
-    let lit = color / attenuation;
     // smooth fade to zero at the culling-derived range — the cluster lists
     // drop the light beyond it, and without this window that cutoff would be
-    // a hard visible edge (contribution at range is still ~15% in sRGB)
-    if (light.range <= 0.0) {
-        return lit;
+    // a hard visible edge
+    if (light.range > 0.0) {
+        radiance *= 1.0 - smoothstep(0.75 * light.range, light.range, distance);
     }
-    return lit * (1.0 - smoothstep(0.75 * light.range, light.range, distance));
+
+    let to_eye = normalize(view_params.camera_position.xyz - world_position);
+    return shade_pbr(to_light, radiance, normal, to_eye, albedo, metallic, roughness);
 }
 
 fn calculateSpotLight(
     light: SpotLightData,
     normal: float3,
     world_position: float3,
+    albedo: float3,
     metallic: f32,
     roughness: f32
-) -> float4 {
-    let light_to_pixel = normalize(world_position - light.position);
+) -> float3 {
+    let to_pixel = world_position - light.position;
+    let distance = length(to_pixel);
+    let light_to_pixel = to_pixel / max(distance, 1e-6);
     let spot_factor = dot(light_to_pixel, light.direction);
 
-    if (spot_factor > light.cutoff) {
-        var point_light: PointLightData;
-
-        point_light.color = light.color;
-        point_light.intensity = light.intensity;
-        point_light.position = light.position;
-        point_light.atten_constant = light.atten_constant;
-        point_light.atten_linear = light.atten_linear;
-        point_light.atten_exponential = light.atten_exponential;
-        point_light.shadow_caster = -1;
-        point_light.range = light.range;
-
-        let color = calculatePointLight(point_light, normal, world_position, metallic, roughness);
-
-        return color * (1.0 - (1.0 - spot_factor) * 1.0 / (1.0 - light.cutoff));
-    } else {
-        return vec4(0, 0, 0, 0);
+    if (spot_factor <= light.cutoff) {
+        return float3(0.0);
     }
+
+    // linear ramp from the cone edge (cutoff) to the axis; the cutoff setter
+    // clamps the cone so 1 - cutoff cannot degenerate
+    let cone = 1.0 - (1.0 - spot_factor) / (1.0 - light.cutoff);
+
+    let attenuation = max(0.00000001, light.atten_constant +
+        light.atten_linear * distance +
+        light.atten_exponential * distance * distance);
+    var radiance = light.color * light.intensity * cone / attenuation;
+
+    if (light.range > 0.0) {
+        radiance *= 1.0 - smoothstep(0.75 * light.range, light.range, distance);
+    }
+
+    let to_eye = normalize(view_params.camera_position.xyz - world_position);
+    return shade_pbr(-light_to_pixel, radiance, normal, to_eye, albedo, metallic, roughness);
 }
 
 // 3×3 PCF tent over one atlas tile; returns visibility in [0, 1] (1 = fully
@@ -392,19 +492,16 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
             let roughness = metallic_roughness.g;
             let occlusion = metallic_roughness.r;
 
-            var total_light = float4(0.0, 0.0, 0.0, 0.0);
-            // the same accumulation without any shadow attenuation — the
-            // reference SHADOW_MIN_VISIBILITY clamps against
-            var unshadowed_light = float4(0.0, 0.0, 0.0, 0.0);
+            // outgoing radiance, accumulated per light
+            var lo = float3(0.0);
 
             // directional lights are global — always looped in full
             for (var i = 0u; i < arrayLength(&directionalLightsBuffer.lights); i++) {
-                var directional = calculateDirectionalLight(directionalLightsBuffer.lights[i], fragment_normal, world_position, metallic, roughness);
-                unshadowed_light += directional;
+                var directional = calculateDirectionalLight(directionalLightsBuffer.lights[i], fragment_normal, world_position, albedo.rgb, metallic, roughness);
                 if (directionalLightsBuffer.lights[i].shadow_caster >= 0) {
                     directional *= calculateShadowFactor(directionalLightsBuffer.lights[i].shadow_caster, world_position);
                 }
-                total_light += directional;
+                lo += directional;
             }
 
             // point + spot lights come from the froxel cluster lists
@@ -425,37 +522,37 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
 
                 if (light_type == 0u) {
                     let light = pointLightsBuffer.lights[light_index];
-                    var color = calculatePointLight(light, fragment_normal, world_position, metallic, roughness);
-                    unshadowed_light += color;
+                    var color = calculatePointLight(light, fragment_normal, world_position, albedo.rgb, metallic, roughness);
                     if (light.shadow_caster >= 0) {
                         color *= pointShadowFactor(light.shadow_caster, world_position, light.position);
                     }
-                    total_light += color;
+                    lo += color;
                 } else {
                     let light = spotLightsBuffer.lights[light_index];
-                    var color = calculateSpotLight(light, fragment_normal, world_position, metallic, roughness);
-                    unshadowed_light += color;
+                    var color = calculateSpotLight(light, fragment_normal, world_position, albedo.rgb, metallic, roughness);
                     if (light.shadow_caster >= 0) {
                         color *= calculateShadowFactor(light.shadow_caster, world_position);
                     }
-                    total_light += color;
+                    lo += color;
                 }
             }
 
-            // overlapping shadows converge to one level instead of stacking
-            total_light = max(total_light, unshadowed_light * SHADOW_MIN_VISIBILITY);
-
-            // ambient is a floor, not a fallback: it always contributes, so
-            // fully unlit surfaces still read. Occlusion attenuates only this
-            // term — AO models blocked indirect light, not blocked direct light.
-            let ambient = float4(
-                view_params.ambient_light_color.xyz * view_params.ambient_light_color.w,
-                0.0f
+            // indirect light from the skybox — `ambient_light_color.rgb` is the
+            // environment tint and `.w` its intensity. This is what fills
+            // shadows, physically, so no artificial visibility floor is needed.
+            let to_eye = normalize(view_params.camera_position.xyz - world_position);
+            let ibl = calculate_ibl(
+                fragment_normal,
+                to_eye,
+                albedo.rgb,
+                metallic,
+                roughness,
+                view_params.ambient_light_color.xyz * view_params.ambient_light_color.w
             ) * occlusion;
 
-            return gamma_correct(
-                (albedo * (total_light + ambient)) + emission
-            );
+            // linear HDR output — the post pass applies exposure, tonemapping
+            // and the sRGB transfer function
+            return float4(lo + ibl + emission.rgb, 1.0);
         }
     }
 };

@@ -22,6 +22,11 @@ import {
     DEFAULT_SWAP_CHAIN_FORMAT,
     DIRECTIONAL_LIGHT_BYTESTRIDE,
     DIRECTIONAL_LIGHT_ELEMENT_COUNT,
+    HDR_TARGET_FORMAT,
+    IBL_BRDF_LUT_SIZE,
+    IBL_IRRADIANCE_SIZE,
+    IBL_PREFILTER_MIP_LEVELS,
+    IBL_PREFILTER_SIZE,
     LIGHT_RANGE_THRESHOLD,
     MAX_CULL_LIGHTS,
     MAX_SHADOW_CASTERS,
@@ -50,6 +55,8 @@ import lightingShaderCode from '../../shaders/lighting.wgsl'
 import lightCullingShaderCode from '../../shaders/lightCulling.wgsl'
 import shadowShaderCode from '../../shaders/vertexShadow.wgsl'
 import skyboxShaderCode from '../../shaders/skybox.wgsl'
+import postShaderCode from '../../shaders/post.wgsl'
+import iblShaderCode from '../../shaders/ibl.wgsl'
 import {
     cubePositionOffset,
     cubeUVOffset,
@@ -182,6 +189,7 @@ export class Renderer implements IRenderer {
 
     private _geometryPassDescriptor!: GPURenderPassDescriptor
     private _lightingPassDescriptor!: GPURenderPassDescriptor
+    private _postPassDescriptor!: GPURenderPassDescriptor
     private _shadowPassDescriptor!: GPURenderPassDescriptor
 
     private _viewParamsBuffer!: GPUBuffer
@@ -191,6 +199,31 @@ export class Renderer implements IRenderer {
 
     private _shaderModule!: GPUShaderModule
     private _lightingShaderModule!: GPUShaderModule
+    private _postShaderModule!: GPUShaderModule
+
+    private _postBindGroupLayout!: GPUBindGroupLayout
+    private _postBindGroup!: GPUBindGroup
+
+    // image-based lighting: prefiltered from the skybox, persistent so the
+    // lighting bind group (group 3) stays static across skybox changes
+    private _iblShaderModule!: GPUShaderModule
+    private _iblIrradianceTexture!: GPUTexture
+    private _iblPrefilteredTexture!: GPUTexture
+    private _iblBrdfLutTexture!: GPUTexture
+    private _iblIrradianceView!: GPUTextureView
+    private _iblPrefilteredView!: GPUTextureView
+    private _iblBrdfLutView!: GPUTextureView
+    private _iblSampler!: GPUSampler
+    private _iblEnvBGLayout!: GPUBindGroupLayout
+    private _iblCubeOutBGLayout!: GPUBindGroupLayout
+    private _iblLutOutBGLayout!: GPUBindGroupLayout
+    private _iblEnvBG!: GPUBindGroup
+    private _iblIrradianceOutBG!: GPUBindGroup
+    private _iblPrefilterOutBGs: GPUBindGroup[] = []
+    private _iblLutOutBG!: GPUBindGroup
+    private _iblIrradiancePipeline!: GPUComputePipeline
+    private _iblPrefilterPipeline!: GPUComputePipeline
+    private _iblBrdfLutPipeline!: GPUComputePipeline
 
     private _gpuTimingSupported = false
     private _timestampQuerySet?: GPUQuerySet
@@ -198,13 +231,18 @@ export class Renderer implements IRenderer {
     private _timestampReadbackBuffer?: GPUBuffer
     private _timestampReadbackPending = false
 
-    public ambientLightColor = vec3.create(0.01, 0.01, 0.01)
+    // environment tint and strength for the image-based lighting term — white
+    // at full strength means "the skybox lights the scene as authored"
+    public ambientLightColor = vec3.create(1, 1, 1)
     public ambientLightIntensity: number = 1
+    // applied to the HDR lighting result before tonemapping (1 = unchanged)
+    public exposure: number = 1
 
     public outputSource = RENDER_OUTPUT_SOURCES.DEFAULT
 
     private geometryPipeline!: GPURenderPipeline
     private lightingPipeline!: GPURenderPipeline
+    private postPipeline!: GPURenderPipeline
     private materialBindGroupLayout!: GPUBindGroupLayout
 
     constructor({ canvas }: IRendererProps) {
@@ -322,7 +360,16 @@ export class Renderer implements IRenderer {
             code: lightingShaderCode,
         })
 
+        this._postShaderModule = this.device.createShaderModule({
+            label: 'post shader',
+            code: postShaderCode,
+        })
+
         this._initializeBindGroupLayouts()
+
+        // before the clustered-culling bind group below: lighting group 3
+        // samples the IBL textures, so they must exist first
+        this._initializeIBL()
 
         this._initializeClusteredCulling()
 
@@ -357,6 +404,28 @@ export class Renderer implements IRenderer {
                     visibility: GPUShaderStage.FRAGMENT,
                     buffer: { type: 'read-only-storage' },
                 },
+                // image-based lighting: irradiance cube, roughness-prefiltered
+                // cube, split-sum BRDF LUT and their shared trilinear sampler
+                {
+                    binding: 5,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: { sampleType: 'float', viewDimension: 'cube' },
+                },
+                {
+                    binding: 6,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: { sampleType: 'float', viewDimension: 'cube' },
+                },
+                {
+                    binding: 7,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: { sampleType: 'float', viewDimension: '2d' },
+                },
+                {
+                    binding: 8,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: { type: 'filtering' },
+                },
             ],
         })
 
@@ -372,6 +441,10 @@ export class Renderer implements IRenderer {
                     binding: 4,
                     resource: { buffer: this._clusterIndicesBuffer },
                 },
+                { binding: 5, resource: this._iblIrradianceView },
+                { binding: 6, resource: this._iblPrefilteredView },
+                { binding: 7, resource: this._iblBrdfLutView },
+                { binding: 8, resource: this._iblSampler },
             ],
         })
 
@@ -416,8 +489,22 @@ export class Renderer implements IRenderer {
             },
         }
 
+        // the lighting pass renders into the HDR target and the post pass
+        // tonemaps that into the swapchain, so this view is static
         this._lightingPassDescriptor = {
             label: 'lighting pass descriptor',
+            colorAttachments: [
+                {
+                    view: this._gBuffer.litColor,
+                    loadOp: 'clear' as GPULoadOp,
+                    clearValue: [0.0, 0.0, 0.0, 1.0],
+                    storeOp: 'store' as GPUStoreOp,
+                },
+            ],
+        }
+
+        this._postPassDescriptor = {
+            label: 'post pass descriptor',
             colorAttachments: [
                 {
                     view: null as unknown as GPUTextureView, // swap chain, assigned per frame
@@ -544,10 +631,15 @@ export class Renderer implements IRenderer {
                 beginningOfPassWriteIndex: 6,
                 endOfPassWriteIndex: 7,
             }
-            this._skyBoxRenderPassDescriptor.timestampWrites = {
+            this._postPassDescriptor.timestampWrites = {
                 querySet,
                 beginningOfPassWriteIndex: 8,
                 endOfPassWriteIndex: 9,
+            }
+            this._skyBoxRenderPassDescriptor.timestampWrites = {
+                querySet,
+                beginningOfPassWriteIndex: 10,
+                endOfPassWriteIndex: 11,
             }
         }
 
@@ -808,6 +900,49 @@ export class Renderer implements IRenderer {
             fragment: {
                 module: this._lightingShaderModule,
                 entryPoint: 'fragment_main',
+                // linear HDR — the post pass tonemaps this into the swapchain
+                targets: [{ format: HDR_TARGET_FORMAT }],
+            },
+            primitive: {
+                topology: 'triangle-list',
+            },
+        })
+
+        // group 0 is shared with the geometry/lighting passes (view + debug
+        // params); group 1 carries only the HDR texture
+        this._postBindGroupLayout = this.device.createBindGroupLayout({
+            label: 'post bind group layout',
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: { sampleType: 'float' },
+                },
+            ],
+        })
+
+        this._postBindGroup = this.device.createBindGroup({
+            label: 'post bind group',
+            layout: this._postBindGroupLayout,
+            entries: [{ binding: 0, resource: this._gBuffer.litColor }],
+        })
+
+        this.postPipeline = this.device.createRenderPipeline({
+            label: 'post render pipeline',
+            layout: this.device.createPipelineLayout({
+                bindGroupLayouts: [
+                    this._uniformsBGLayout,
+                    this._postBindGroupLayout,
+                ],
+            }),
+            vertex: {
+                module: this._postShaderModule,
+                entryPoint: 'vertex_main',
+                buffers: [],
+            },
+            fragment: {
+                module: this._postShaderModule,
+                entryPoint: 'fragment_main',
                 targets: [{ format: this.swapChainFormat }],
             },
             primitive: {
@@ -874,6 +1009,9 @@ export class Renderer implements IRenderer {
                 },
             ],
         })
+
+        // indirect light comes from this skybox, so it has to be re-convolved
+        this._prefilterEnvironment()
     }
 
     get device() {
@@ -1098,24 +1236,271 @@ export class Renderer implements IRenderer {
     }
 
     private _initializeGpuTiming() {
-        // 5 passes (geometry, shadow, culling compute, lighting, skybox) x begin/end
+        // 6 passes (geometry, shadow, culling compute, lighting, post, skybox)
+        // x begin/end
         this._timestampQuerySet = this._device.createQuerySet({
             label: 'profiler timestamp query set',
             type: 'timestamp',
-            count: 10,
+            count: 12,
         })
 
         this._timestampResolveBuffer = this._device.createBuffer({
             label: 'profiler timestamp resolve buffer',
-            size: 10 * 8,
+            size: 12 * 8,
             usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
         })
 
         this._timestampReadbackBuffer = this._device.createBuffer({
             label: 'profiler timestamp readback buffer',
-            size: 10 * 8,
+            size: 12 * 8,
             usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
         })
+    }
+
+    /**
+     * Allocates the IBL targets, views, layouts and compute pipelines.
+     *
+     * Called before `_initializeClusteredCulling()` because the lighting bind
+     * group (group 3) samples these textures and must stay static: only their
+     * contents are rewritten, in `_prefilterEnvironment()`.
+     */
+    private _initializeIBL() {
+        this._iblShaderModule = this._device.createShaderModule({
+            label: 'ibl shader',
+            code: iblShaderCode,
+        })
+
+        this._iblIrradianceTexture = this._device.createTexture({
+            label: 'ibl irradiance',
+            dimension: '2d',
+            size: [IBL_IRRADIANCE_SIZE, IBL_IRRADIANCE_SIZE, 6],
+            format: 'rgba8unorm',
+            usage:
+                GPUTextureUsage.TEXTURE_BINDING |
+                GPUTextureUsage.STORAGE_BINDING,
+        })
+
+        this._iblPrefilteredTexture = this._device.createTexture({
+            label: 'ibl prefiltered',
+            dimension: '2d',
+            size: [IBL_PREFILTER_SIZE, IBL_PREFILTER_SIZE, 6],
+            format: 'rgba8unorm',
+            mipLevelCount: IBL_PREFILTER_MIP_LEVELS,
+            usage:
+                GPUTextureUsage.TEXTURE_BINDING |
+                GPUTextureUsage.STORAGE_BINDING,
+        })
+
+        this._iblBrdfLutTexture = this._device.createTexture({
+            label: 'ibl brdf lut',
+            dimension: '2d',
+            size: [IBL_BRDF_LUT_SIZE, IBL_BRDF_LUT_SIZE],
+            // rgba16float, not rg16float: rg16float is not storage-capable in
+            // WebGPU (createTexture rejects STORAGE_BINDING for it), and the
+            // extra precision helps the envBRDF scale/bias terms
+            format: 'rgba16float',
+            usage:
+                GPUTextureUsage.TEXTURE_BINDING |
+                GPUTextureUsage.STORAGE_BINDING,
+        })
+
+        // cube views for the lighting pass; the compute writes go through
+        // 2d-array views because textureStore cannot target a cube view
+        this._iblIrradianceView = this._iblIrradianceTexture.createView({
+            dimension: 'cube',
+        })
+        this._iblPrefilteredView = this._iblPrefilteredTexture.createView({
+            dimension: 'cube',
+        })
+        this._iblBrdfLutView = this._iblBrdfLutTexture.createView()
+
+        // trilinear, so roughness picks between the prefilter mip levels
+        this._iblSampler = this._device.createSampler({
+            magFilter: 'linear',
+            minFilter: 'linear',
+            mipmapFilter: 'linear',
+        })
+
+        this._iblEnvBGLayout = this._device.createBindGroupLayout({
+            label: 'ibl env source layout',
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.COMPUTE,
+                    texture: { sampleType: 'float', viewDimension: 'cube' },
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.COMPUTE,
+                    sampler: { type: 'filtering' },
+                },
+            ],
+        })
+
+        this._iblCubeOutBGLayout = this._device.createBindGroupLayout({
+            label: 'ibl cube output layout',
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.COMPUTE,
+                    storageTexture: {
+                        access: 'write-only',
+                        format: 'rgba8unorm',
+                        viewDimension: '2d-array',
+                    },
+                },
+            ],
+        })
+
+        this._iblLutOutBGLayout = this._device.createBindGroupLayout({
+            label: 'ibl brdf lut output layout',
+            entries: [
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.COMPUTE,
+                    storageTexture: {
+                        access: 'write-only',
+                        format: 'rgba16float',
+                        viewDimension: '2d',
+                    },
+                },
+            ],
+        })
+
+        this._iblIrradianceOutBG = this._device.createBindGroup({
+            label: 'ibl irradiance output',
+            layout: this._iblCubeOutBGLayout,
+            entries: [
+                {
+                    binding: 0,
+                    resource: this._iblIrradianceTexture.createView({
+                        dimension: '2d-array',
+                    }),
+                },
+            ],
+        })
+
+        // one output bind group per prefilter mip: WGSL's textureStore has no
+        // mip argument, so each level is written through its own single-mip view
+        this._iblPrefilterOutBGs = []
+        for (let mip = 0; mip < IBL_PREFILTER_MIP_LEVELS; mip++) {
+            this._iblPrefilterOutBGs.push(
+                this._device.createBindGroup({
+                    label: `ibl prefilter output mip ${mip}`,
+                    layout: this._iblCubeOutBGLayout,
+                    entries: [
+                        {
+                            binding: 0,
+                            resource: this._iblPrefilteredTexture.createView({
+                                dimension: '2d-array',
+                                baseMipLevel: mip,
+                                mipLevelCount: 1,
+                            }),
+                        },
+                    ],
+                })
+            )
+        }
+
+        this._iblLutOutBG = this._device.createBindGroup({
+            label: 'ibl brdf lut output',
+            layout: this._iblLutOutBGLayout,
+            entries: [{ binding: 1, resource: this._iblBrdfLutView }],
+        })
+
+        const cubePipeline = (label: string, entryPoint: string) =>
+            this._device.createComputePipeline({
+                label,
+                layout: this._device.createPipelineLayout({
+                    bindGroupLayouts: [
+                        this._iblEnvBGLayout,
+                        this._iblCubeOutBGLayout,
+                    ],
+                }),
+                compute: { module: this._iblShaderModule, entryPoint },
+            })
+
+        this._iblIrradiancePipeline = cubePipeline(
+            'ibl irradiance pipeline',
+            'irradiance_main'
+        )
+        this._iblPrefilterPipeline = cubePipeline(
+            'ibl prefilter pipeline',
+            'prefilter_main'
+        )
+        // the LUT needs no environment input, but group 0 is part of its layout
+        // and must still be bound at dispatch time
+        this._iblBrdfLutPipeline = this._device.createComputePipeline({
+            label: 'ibl brdf lut pipeline',
+            layout: this._device.createPipelineLayout({
+                bindGroupLayouts: [
+                    this._iblEnvBGLayout,
+                    this._iblLutOutBGLayout,
+                ],
+            }),
+            compute: {
+                module: this._iblShaderModule,
+                entryPoint: 'brdf_lut_main',
+            },
+        })
+    }
+
+    /**
+     * Convolves the current skybox into the irradiance map, the roughness-indexed
+     * prefiltered specular map and the BRDF integration LUT. Runs once per
+     * skybox assignment, not per frame.
+     */
+    private _prefilterEnvironment() {
+        // the skybox texture is recreated on every assignment, so this group
+        // cannot be built once at init
+        this._iblEnvBG = this._device.createBindGroup({
+            label: 'ibl env source',
+            layout: this._iblEnvBGLayout,
+            entries: [
+                {
+                    binding: 0,
+                    resource: this._skyboxTexture.createView({
+                        dimension: 'cube',
+                    }),
+                },
+                { binding: 1, resource: this._iblSampler },
+            ],
+        })
+
+        const encoder = this._device.createCommandEncoder({
+            label: 'ibl prefilter encoder',
+        })
+        const pass = encoder.beginComputePass({
+            label: 'ibl prefilter pass',
+        })
+
+        pass.setBindGroup(0, this._iblEnvBG)
+
+        pass.setPipeline(this._iblIrradiancePipeline)
+        pass.setBindGroup(1, this._iblIrradianceOutBG)
+        pass.dispatchWorkgroups(
+            IBL_IRRADIANCE_SIZE / 8,
+            IBL_IRRADIANCE_SIZE / 8,
+            6
+        )
+
+        pass.setPipeline(this._iblPrefilterPipeline)
+        for (let mip = 0; mip < IBL_PREFILTER_MIP_LEVELS; mip++) {
+            const size = IBL_PREFILTER_SIZE >> mip
+            pass.setBindGroup(1, this._iblPrefilterOutBGs[mip]!)
+            pass.dispatchWorkgroups(
+                Math.max(1, size / 8),
+                Math.max(1, size / 8),
+                6
+            )
+        }
+
+        pass.setPipeline(this._iblBrdfLutPipeline)
+        pass.setBindGroup(1, this._iblLutOutBG)
+        pass.dispatchWorkgroups(IBL_BRDF_LUT_SIZE / 8, IBL_BRDF_LUT_SIZE / 8, 1)
+
+        pass.end()
+        this._device.queue.submit([encoder.finish()])
     }
 
     private _createMeshBuffer(accessor: GLTFAccessor, scene: IScene) {
@@ -1921,6 +2306,8 @@ export class Renderer implements IRenderer {
         viewInts[59] = this._clusterTilesY
         viewInts[60] = this._canvas.width
         viewInts[61] = this._canvas.height
+        // post-pass exposure (float 62 — see ViewParams in post.wgsl)
+        viewMap[62] = this.exposure
 
         viewParamsUploadBuffer.unmap()
 
@@ -2108,7 +2495,7 @@ export class Renderer implements IRenderer {
             this._skyBoxUniformBufferSize
         )
         const currentTextureView = this.context.getCurrentTexture().createView()
-        ;(this._lightingPassDescriptor as any).colorAttachments[0].view =
+        ;(this._postPassDescriptor as any).colorAttachments[0].view =
             currentTextureView
         ;(this._skyBoxRenderPassDescriptor as any).colorAttachments[0].view =
             currentTextureView
@@ -2117,7 +2504,7 @@ export class Renderer implements IRenderer {
             this._gpuTimingSupported && !this._timestampReadbackPending
 
         // pass order: geometry (G-buffer) → shadow (atlas tiles) → culling
-        // (compute) → lighting → skybox
+        // (compute) → lighting (HDR) → post (tonemap → swapchain) → skybox
 
         const geometryPass = commandEncoder.beginRenderPass(
             this._geometryPassDescriptor
@@ -2185,6 +2572,19 @@ export class Renderer implements IRenderer {
 
         lightingPass.end()
 
+        // exposure → ACES tonemap → sRGB into the swapchain; the debug channel
+        // views pass through this shader untouched
+        const postPass = commandEncoder.beginRenderPass(
+            this._postPassDescriptor
+        )
+
+        postPass.setBindGroup(0, this._viewParamsBindGroup)
+        postPass.setBindGroup(1, this._postBindGroup)
+        postPass.setPipeline(this.postPipeline)
+        postPass.draw(3) // fullscreen triangle
+
+        postPass.end()
+
         const skyBoxPass = commandEncoder.beginRenderPass(
             this._skyBoxRenderPassDescriptor
         )
@@ -2198,7 +2598,7 @@ export class Renderer implements IRenderer {
             commandEncoder.resolveQuerySet(
                 this._timestampQuerySet!,
                 0,
-                10,
+                12,
                 this._timestampResolveBuffer!,
                 0
             )
@@ -2207,7 +2607,7 @@ export class Renderer implements IRenderer {
                 0,
                 this._timestampReadbackBuffer!,
                 0,
-                10 * 8
+                12 * 8
             )
             this._timestampReadbackPending = true
         }
@@ -2243,7 +2643,8 @@ export class Renderer implements IRenderer {
                 Profiler.sample('gpu shadow', durationMs(2, 3))
                 Profiler.sample('gpu culling', durationMs(4, 5))
                 Profiler.sample('gpu lighting', durationMs(6, 7))
-                Profiler.sample('gpu skybox', durationMs(8, 9))
+                Profiler.sample('gpu post', durationMs(8, 9))
+                Profiler.sample('gpu skybox', durationMs(10, 11))
 
                 readbackBuffer.unmap()
                 this._timestampReadbackPending = false
