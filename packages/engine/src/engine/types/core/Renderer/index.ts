@@ -16,6 +16,9 @@ export enum RENDER_OUTPUT_SOURCES {
 
 export type TRenderOutputSource = number
 
+/** post-chain anti-aliasing mode; 'none' skips the FXAA pass entirely */
+export type TAntiAliasing = 'none' | 'fxaa'
+
 export type TSkyboxBitmaps = [
     ImageBitmap,
     ImageBitmap,
@@ -35,6 +38,7 @@ export interface IRenderer {
     ambientLightColor: Vec3
     /** multiplied into the linear HDR lighting result before tonemapping */
     exposure: number
+    antiAliasing: TAntiAliasing
     lightsBindGroupLayout: GPUBindGroupLayout
 
     outputSource: TRenderOutputSource

@@ -87,17 +87,22 @@ fn linear_to_srgb(color: float3) -> float3 {
     );
 }
 
+// Rec.709 luma of a display-referred color. Stored in the target's alpha so the
+// FXAA pass reads it per tap instead of recomputing it.
+fn luma(color: float3) -> f32 {
+    return dot(color, float3(0.2126, 0.7152, 0.0722));
+}
+
 @fragment
 fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     // 1:1 with the HDR target's pixels — no filtering needed
     let hdr = textureLoad(lit_texture, vec2i(in.position.xy), 0).rgb;
 
     if (debug_params.output_type != OUT_DEFAULT) {
+        // debug views show raw G-buffer channels: not tonemapped, not antialiased
         return float4(hdr, 1.0);
     }
 
-    return float4(
-        linear_to_srgb(aces_film(hdr * view_params.exposure)),
-        1.0
-    );
+    let encoded = linear_to_srgb(aces_film(hdr * view_params.exposure));
+    return float4(encoded, luma(encoded));
 };

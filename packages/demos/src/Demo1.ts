@@ -51,6 +51,8 @@ export class Demo1 extends Scene implements IScene {
     private _coloredSpots: SpotLight[] = []
     private _orbitAngle = 0
 
+    private _helmet!: IGameObject
+
     constructor() {
         super()
 
@@ -77,41 +79,28 @@ export class Demo1 extends Scene implements IScene {
             'static/models/DamagedHelmet.glb'
         )
 
-        // material factors are baked into the GPU params buffer on the first
-        // draw (Renderer.buildRenderPipeline), so they have to be set on the
-        // preload data before uploadModel. Non-default values make them
-        // observable in the Metallic/Roughness debug views.
-        // modelData.materials.forEach((material) => {
-        //     material.metallicFactor = 0
-        //     material.roughnessFactor = 0.95
-        // })
-        // modelData1.materials.forEach((material) => {
-        //     material.metallicFactor = 1
-        //     material.roughnessFactor = 0.25
-        // })
+        const modelGO0 = await this.uploadModel({
+            modelData: modelData,
+        })
 
-        // const modelGO0 = await this.uploadModel({
-        //     modelData: modelData,
-        // })
-
-        const modelGO1 = await this.uploadModel({
+        this._helmet = await this.uploadModel({
             modelData: modelData1,
         })
 
         this._testHook = new GameObject()
         this.objectManager.addObject(this._testHook, this.root)
-        // this.objectManager.reparentObject(modelGO0, this._testHook)
+        this.objectManager.reparentObject(modelGO0, this._testHook)
 
-        modelGO1.transform.translate(HELMET_POSITION)
-        modelGO1.transform.rotateDegreesEuler({ x: 90, z: 90 })
+        this._helmet.transform.translate(HELMET_POSITION)
+        this._helmet.transform.rotateDegreesEuler({ x: 90, z: 90 })
 
-        // modelGO0.transform.rotateDegreesEuler({ y: -90 })
-        // modelGO0.transform.translate(
-        // vec3.create(WALL_X, (-WALL_HEIGHT * WALL_SCALE) / 2, 0)
-        // )
-        // modelGO0.transform.scale(
-        // vec3.create(WALL_SCALE, WALL_SCALE, WALL_SCALE)
-        // )
+        modelGO0.transform.rotateDegreesEuler({ y: -90 })
+        modelGO0.transform.translate(
+            vec3.create(WALL_X, (-WALL_HEIGHT * WALL_SCALE) / 2, 0)
+        )
+        modelGO0.transform.scale(
+            vec3.create(WALL_SCALE, WALL_SCALE, WALL_SCALE)
+        )
 
         // this._setupLights()
         await this._setupSkyBox()
@@ -166,6 +155,7 @@ export class Demo1 extends Scene implements IScene {
     public override onRender(dt: number): void {
         this._controller.update(dt)
 
+        this._helmet.transform.rotateDegreesEuler({ z: 0.1 })
         // dt is frameDelta / 100, not seconds — the engine-wide contract
         this._orbitAngle += dt * 0.05
 

@@ -7,6 +7,7 @@ export class GBuffer {
     readonly _metallicRoughness: GPUTextureView
     readonly _emission: GPUTextureView
     readonly _litColor: GPUTextureView
+    readonly _postColor: GPUTextureView
 
     constructor(
         device: GPUDevice,
@@ -34,6 +35,10 @@ export class GBuffer {
         // Not part of the geometry MRT set, so it does not count against
         // maxColorAttachmentBytesPerSample; rgba16float keeps intensities above 1.
         this._litColor = createTextureView(HDR_TARGET_FORMAT)
+        // tonemapped LDR result: the FXAA pass reads this (luma in .a) and writes
+        // the swapchain. Skipped when anti-aliasing is off — the tonemap pass then
+        // targets the swapchain directly.
+        this._postColor = createTextureView()
     }
 
     get normal() {
@@ -58,5 +63,9 @@ export class GBuffer {
 
     get litColor() {
         return this._litColor
+    }
+
+    get postColor() {
+        return this._postColor
     }
 }

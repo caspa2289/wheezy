@@ -10,8 +10,9 @@ export const PROFILER_METRICS = [
     'gpu shadow',
     'gpu culling',
     'gpu lighting',
-    'gpu post',
     'gpu skybox',
+    'gpu tonemap',
+    'gpu fxaa',
 ] as const
 
 export type ProfilerMetric = (typeof PROFILER_METRICS)[number]

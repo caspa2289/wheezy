@@ -254,6 +254,24 @@ fn shade_pbr(
     return (diffuse + specular) * radiance * n_dot_l;
 }
 
+// --- geometric specular anti-aliasing ---
+
+// screen-space normal variance → a roughness floor (Kaplanyan / Ubisoft). A
+// normal-mapped, low-roughness surface aliases into high-frequency sparkle that
+// no edge-detect AA (FXAA/SMAA) can remove, because the aliasing is in the
+// shading, not in the coverage.
+const SPECULAR_AA_SCREEN_VARIANCE = 0.25;
+const SPECULAR_AA_THRESHOLD = 0.18;
+
+fn geometric_specular_aa(normal: float3, roughness: f32) -> f32 {
+    let dx = dpdx(normal);
+    let dy = dpdy(normal);
+    let variance = SPECULAR_AA_SCREEN_VARIANCE * (dot(dx, dx) + dot(dy, dy));
+    let kernel_roughness = min(2.0 * variance, SPECULAR_AA_THRESHOLD);
+    // summed in alpha (roughness²) space, which is what the BRDF consumes
+    return clamp(sqrt(roughness * roughness + kernel_roughness), 0.0, 1.0);
+}
+
 // --- image-based lighting (split sum) ---
 
 // must match IBL_PREFILTER_MIP_LEVELS in Renderer/constants.ts
@@ -489,8 +507,11 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
             let fragment_normal = normalize(normal.xyz);
             // packed material target: occlusion in .r, roughness in .g, metallic in .b
             let metallic = metallic_roughness.b;
-            let roughness = metallic_roughness.g;
             let occlusion = metallic_roughness.r;
+            // roughness with the geometric specular AA floor applied. Computed
+            // once here rather than per light: dpdx/dpdy need uniform control
+            // flow, and the loops below branch on per-light shadow data.
+            let roughness = geometric_specular_aa(fragment_normal, metallic_roughness.g);
 
             // outgoing radiance, accumulated per light
             var lo = float3(0.0);

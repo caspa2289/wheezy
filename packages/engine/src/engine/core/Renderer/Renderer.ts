@@ -8,6 +8,7 @@ import {
     type IScene,
     RENDER_OUTPUT_SOURCES,
     type SceneNodeContent,
+    type TAntiAliasing,
     type TSkyboxBitmaps,
 } from '../../types'
 import {
@@ -56,6 +57,7 @@ import lightCullingShaderCode from '../../shaders/lightCulling.wgsl'
 import shadowShaderCode from '../../shaders/vertexShadow.wgsl'
 import skyboxShaderCode from '../../shaders/skybox.wgsl'
 import postShaderCode from '../../shaders/post.wgsl'
+import fxaaShaderCode from '../../shaders/fxaa.wgsl'
 import iblShaderCode from '../../shaders/ibl.wgsl'
 import {
     cubePositionOffset,
@@ -204,6 +206,12 @@ export class Renderer implements IRenderer {
     private _postBindGroupLayout!: GPUBindGroupLayout
     private _postBindGroup!: GPUBindGroup
 
+    private _fxaaShaderModule!: GPUShaderModule
+    private _fxaaBindGroupLayout!: GPUBindGroupLayout
+    private _fxaaBindGroup!: GPUBindGroup
+    private _fxaaSampler!: GPUSampler
+    private _fxaaPassDescriptor!: GPURenderPassDescriptor
+
     // image-based lighting: prefiltered from the skybox, persistent so the
     // lighting bind group (group 3) stays static across skybox changes
     private _iblShaderModule!: GPUShaderModule
@@ -237,12 +245,15 @@ export class Renderer implements IRenderer {
     public ambientLightIntensity: number = 1
     // applied to the HDR lighting result before tonemapping (1 = unchanged)
     public exposure: number = 1
+    // 'fxaa' inserts the final LDR pass; 'none' tonemaps straight to the swapchain
+    public antiAliasing: TAntiAliasing = 'fxaa'
 
     public outputSource = RENDER_OUTPUT_SOURCES.DEFAULT
 
     private geometryPipeline!: GPURenderPipeline
     private lightingPipeline!: GPURenderPipeline
     private postPipeline!: GPURenderPipeline
+    private fxaaPipeline!: GPURenderPipeline
     private materialBindGroupLayout!: GPUBindGroupLayout
 
     constructor({ canvas }: IRendererProps) {
@@ -363,6 +374,11 @@ export class Renderer implements IRenderer {
         this._postShaderModule = this.device.createShaderModule({
             label: 'post shader',
             code: postShaderCode,
+        })
+
+        this._fxaaShaderModule = this.device.createShaderModule({
+            label: 'fxaa shader',
+            code: fxaaShaderCode,
         })
 
         this._initializeBindGroupLayouts()
@@ -503,8 +519,22 @@ export class Renderer implements IRenderer {
             ],
         }
 
+        // the tonemap target is assigned per frame: postColor when FXAA runs,
+        // the swapchain when it doesn't
         this._postPassDescriptor = {
             label: 'post pass descriptor',
+            colorAttachments: [
+                {
+                    view: null as unknown as GPUTextureView,
+                    loadOp: 'clear' as GPULoadOp,
+                    clearValue: [0.0, 0.0, 0.0, 1.0],
+                    storeOp: 'store' as GPUStoreOp,
+                },
+            ],
+        }
+
+        this._fxaaPassDescriptor = {
+            label: 'fxaa pass descriptor',
             colorAttachments: [
                 {
                     view: null as unknown as GPUTextureView, // swap chain, assigned per frame
@@ -565,7 +595,9 @@ export class Renderer implements IRenderer {
                 }),
                 targets: [
                     {
-                        format: this.swapChainFormat,
+                        // the sky is composited into the HDR target so the post
+                        // chain (tonemap + FXAA) sees the geometry/sky silhouette
+                        format: HDR_TARGET_FORMAT,
                     },
                 ],
             },
@@ -574,9 +606,9 @@ export class Renderer implements IRenderer {
                 cullMode: 'front',
             },
             depthStencil: {
-                // skybox renders last: its fragments are forced to depth 1.0 in
-                // skybox.wgsl, so 'less-equal' against the G-buffer depth passes
-                // only where the depth is still the 1.0 clear value (no geometry)
+                // skybox fragments are forced to depth 1.0 in skybox.wgsl, so
+                // 'less-equal' against the G-buffer depth passes only where the
+                // depth is still the 1.0 clear value (no geometry)
                 depthWriteEnabled: false,
                 depthCompare: 'less-equal',
                 format: this.depthTextureFormat,
@@ -597,7 +629,9 @@ export class Renderer implements IRenderer {
             label: 'skybox render pass',
             colorAttachments: [
                 {
-                    view: null as unknown as GPUTextureView, // swap chain, assigned per frame
+                    // static: the sky composites into the HDR target, which the
+                    // tonemap pass then reads
+                    view: this._gBuffer.litColor,
                     loadOp: 'load', // lighting result is already on the target
                     storeOp: 'store',
                 },
@@ -631,15 +665,20 @@ export class Renderer implements IRenderer {
                 beginningOfPassWriteIndex: 6,
                 endOfPassWriteIndex: 7,
             }
-            this._postPassDescriptor.timestampWrites = {
+            this._skyBoxRenderPassDescriptor.timestampWrites = {
                 querySet,
                 beginningOfPassWriteIndex: 8,
                 endOfPassWriteIndex: 9,
             }
-            this._skyBoxRenderPassDescriptor.timestampWrites = {
+            this._postPassDescriptor.timestampWrites = {
                 querySet,
                 beginningOfPassWriteIndex: 10,
                 endOfPassWriteIndex: 11,
+            }
+            this._fxaaPassDescriptor.timestampWrites = {
+                querySet,
+                beginningOfPassWriteIndex: 12,
+                endOfPassWriteIndex: 13,
             }
         }
 
@@ -950,6 +989,61 @@ export class Renderer implements IRenderer {
             },
         })
 
+        // FXAA reads the tonemapped LDR target; a filtering sampler is required
+        // because its taps land between pixels
+        this._fxaaSampler = this.device.createSampler({
+            magFilter: 'linear',
+            minFilter: 'linear',
+        })
+
+        this._fxaaBindGroupLayout = this.device.createBindGroupLayout({
+            label: 'fxaa bind group layout',
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: { sampleType: 'float' },
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: { type: 'filtering' },
+                },
+            ],
+        })
+
+        this._fxaaBindGroup = this.device.createBindGroup({
+            label: 'fxaa bind group',
+            layout: this._fxaaBindGroupLayout,
+            entries: [
+                { binding: 0, resource: this._gBuffer.postColor },
+                { binding: 1, resource: this._fxaaSampler },
+            ],
+        })
+
+        this.fxaaPipeline = this.device.createRenderPipeline({
+            label: 'fxaa render pipeline',
+            layout: this.device.createPipelineLayout({
+                bindGroupLayouts: [
+                    this._uniformsBGLayout,
+                    this._fxaaBindGroupLayout,
+                ],
+            }),
+            vertex: {
+                module: this._fxaaShaderModule,
+                entryPoint: 'vertex_main',
+                buffers: [],
+            },
+            fragment: {
+                module: this._fxaaShaderModule,
+                entryPoint: 'fragment_main',
+                targets: [{ format: this.swapChainFormat }],
+            },
+            primitive: {
+                topology: 'triangle-list',
+            },
+        })
+
         await this.setDefaultSkyBoxTexture()
     }
 
@@ -1236,23 +1330,23 @@ export class Renderer implements IRenderer {
     }
 
     private _initializeGpuTiming() {
-        // 6 passes (geometry, shadow, culling compute, lighting, post, skybox)
-        // x begin/end
+        // 7 passes (geometry, shadow, culling compute, lighting, skybox,
+        // tonemap, fxaa) x begin/end
         this._timestampQuerySet = this._device.createQuerySet({
             label: 'profiler timestamp query set',
             type: 'timestamp',
-            count: 12,
+            count: 14,
         })
 
         this._timestampResolveBuffer = this._device.createBuffer({
             label: 'profiler timestamp resolve buffer',
-            size: 12 * 8,
+            size: 14 * 8,
             usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
         })
 
         this._timestampReadbackBuffer = this._device.createBuffer({
             label: 'profiler timestamp readback buffer',
-            size: 12 * 8,
+            size: 14 * 8,
             usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
         })
     }
@@ -2495,16 +2589,19 @@ export class Renderer implements IRenderer {
             this._skyBoxUniformBufferSize
         )
         const currentTextureView = this.context.getCurrentTexture().createView()
+        const fxaaEnabled = this.antiAliasing === 'fxaa'
+        // tonemap writes the LDR target when FXAA follows it, otherwise straight
+        // to the swapchain — so disabling AA skips a pass instead of running it
         ;(this._postPassDescriptor as any).colorAttachments[0].view =
-            currentTextureView
-        ;(this._skyBoxRenderPassDescriptor as any).colorAttachments[0].view =
+            fxaaEnabled ? this._gBuffer.postColor : currentTextureView
+        ;(this._fxaaPassDescriptor as any).colorAttachments[0].view =
             currentTextureView
 
         const gpuTimingThisFrame =
             this._gpuTimingSupported && !this._timestampReadbackPending
 
         // pass order: geometry (G-buffer) → shadow (atlas tiles) → culling
-        // (compute) → lighting (HDR) → post (tonemap → swapchain) → skybox
+        // (compute) → lighting (HDR) → skybox (into HDR) → tonemap (LDR) → fxaa
 
         const geometryPass = commandEncoder.beginRenderPass(
             this._geometryPassDescriptor
@@ -2572,8 +2669,19 @@ export class Renderer implements IRenderer {
 
         lightingPass.end()
 
-        // exposure → ACES tonemap → sRGB into the swapchain; the debug channel
-        // views pass through this shader untouched
+        // composited into the HDR target so the post chain sees the sky and the
+        // geometry/sky silhouette gets antialiased too
+        const skyBoxPass = commandEncoder.beginRenderPass(
+            this._skyBoxRenderPassDescriptor
+        )
+        skyBoxPass.setPipeline(this._skyBoxPipeline)
+        skyBoxPass.setVertexBuffer(0, this._skyBoxVerticesBuffer)
+        skyBoxPass.setBindGroup(0, this._skyBoxUniformBindGroup)
+        skyBoxPass.draw(cubeVertexCount)
+        skyBoxPass.end()
+
+        // exposure → ACES tonemap → sRGB; the debug channel views pass through
+        // this shader untouched
         const postPass = commandEncoder.beginRenderPass(
             this._postPassDescriptor
         )
@@ -2585,20 +2693,28 @@ export class Renderer implements IRenderer {
 
         postPass.end()
 
-        const skyBoxPass = commandEncoder.beginRenderPass(
-            this._skyBoxRenderPassDescriptor
-        )
-        skyBoxPass.setPipeline(this._skyBoxPipeline)
-        skyBoxPass.setVertexBuffer(0, this._skyBoxVerticesBuffer)
-        skyBoxPass.setBindGroup(0, this._skyBoxUniformBindGroup)
-        skyBoxPass.draw(cubeVertexCount)
-        skyBoxPass.end()
+        if (fxaaEnabled) {
+            const fxaaPass = commandEncoder.beginRenderPass(
+                this._fxaaPassDescriptor
+            )
+
+            fxaaPass.setBindGroup(0, this._viewParamsBindGroup)
+            fxaaPass.setBindGroup(1, this._fxaaBindGroup)
+            fxaaPass.setPipeline(this.fxaaPipeline)
+            fxaaPass.draw(3) // fullscreen triangle
+
+            fxaaPass.end()
+        }
+
+        // the fxaa pass is skipped when AA is off, so its two timestamps are
+        // never written — resolve only what this frame actually produced
+        const gpuQueryCount = fxaaEnabled ? 14 : 12
 
         if (gpuTimingThisFrame) {
             commandEncoder.resolveQuerySet(
                 this._timestampQuerySet!,
                 0,
-                12,
+                gpuQueryCount,
                 this._timestampResolveBuffer!,
                 0
             )
@@ -2607,7 +2723,7 @@ export class Renderer implements IRenderer {
                 0,
                 this._timestampReadbackBuffer!,
                 0,
-                12 * 8
+                gpuQueryCount * 8
             )
             this._timestampReadbackPending = true
         }
@@ -2619,14 +2735,14 @@ export class Renderer implements IRenderer {
         Profiler.sample('submit', performance.now() - afterEncode)
 
         if (gpuTimingThisFrame) {
-            this._readTimestamps()
+            this._readTimestamps(fxaaEnabled)
         }
 
         viewParamsUploadBuffer.destroy()
         skyBoxViewParamsUploadBuffer.destroy()
     }
 
-    private _readTimestamps() {
+    private _readTimestamps(fxaaTimed: boolean) {
         const readbackBuffer = this._timestampReadbackBuffer!
 
         readbackBuffer
@@ -2643,8 +2759,12 @@ export class Renderer implements IRenderer {
                 Profiler.sample('gpu shadow', durationMs(2, 3))
                 Profiler.sample('gpu culling', durationMs(4, 5))
                 Profiler.sample('gpu lighting', durationMs(6, 7))
-                Profiler.sample('gpu post', durationMs(8, 9))
-                Profiler.sample('gpu skybox', durationMs(10, 11))
+                Profiler.sample('gpu skybox', durationMs(8, 9))
+                Profiler.sample('gpu tonemap', durationMs(10, 11))
+                // indices 12/13 are only written when the pass ran
+                if (fxaaTimed) {
+                    Profiler.sample('gpu fxaa', durationMs(12, 13))
+                }
 
                 readbackBuffer.unmap()
                 this._timestampReadbackPending = false
