@@ -68,13 +68,13 @@ class ProfilerImpl {
     /** toggles the per-light debug gizmos (see LightGizmo); HUD checkbox below */
     public gizmosEnabled: boolean
 
-    private _samples = new Map<ProfilerMetric, Sample[]>()
-    private _hud?: HTMLDivElement
-    private _cells = new Map<
+    #samples = new Map<ProfilerMetric, Sample[]>()
+    #hud?: HTMLDivElement
+    #cells = new Map<
         ProfilerMetric,
         { last: HTMLTableCellElement; avg: HTMLTableCellElement }
     >()
-    private _updateTimer?: ReturnType<typeof setInterval>
+    #updateTimer?: ReturnType<typeof setInterval>
 
     constructor() {
         this.enabled = resolveEnabled()
@@ -98,17 +98,17 @@ class ProfilerImpl {
         if (!this.enabled) return
 
         const sample = { t: performance.now(), v: value }
-        const samples = this._samples.get(metric)
+        const samples = this.#samples.get(metric)
         if (samples) {
             samples.push(sample)
         } else {
-            this._samples.set(metric, [sample])
+            this.#samples.set(metric, [sample])
         }
     }
 
     public start() {
-        if (!this.enabled || this._hud) return
-        this._createHud()
+        if (!this.enabled || this.#hud) return
+        this.#createHud()
     }
 
     public setEnabled(enabled: boolean) {
@@ -123,7 +123,7 @@ class ProfilerImpl {
         if (enabled) {
             this.start()
         } else {
-            this._destroyHud()
+            this.#destroyHud()
         }
     }
 
@@ -131,8 +131,8 @@ class ProfilerImpl {
         this.setEnabled(!this.enabled)
     }
 
-    private _prune(metric: ProfilerMetric, now: number): Sample[] {
-        const samples = this._samples.get(metric)
+    #prune(metric: ProfilerMetric, now: number): Sample[] {
+        const samples = this.#samples.get(metric)
         if (!samples) return []
 
         const cutoff = now - AVERAGE_WINDOW_MS
@@ -142,7 +142,7 @@ class ProfilerImpl {
         return samples
     }
 
-    private _createHud() {
+    #createHud() {
         const container = document.createElement('div')
         container.style.cssText = [
             'position:fixed',
@@ -216,7 +216,7 @@ class ProfilerImpl {
                 cell.style.cssText = 'text-align:right;padding:0 6px'
             }
 
-            this._cells.set(metric, { last, avg })
+            this.#cells.set(metric, { last, avg })
         }
 
         collapseBtn.addEventListener('click', () => {
@@ -225,7 +225,7 @@ class ProfilerImpl {
             collapseBtn.textContent = collapsed ? '-' : '+'
         })
 
-        this._makeDraggable(container, titleBar, collapseBtn)
+        this.#makeDraggable(container, titleBar, collapseBtn)
 
         // light gizmos toggle (drives LightGizmo.sync via Renderer.render)
         const gizmoRow = document.createElement('label')
@@ -246,15 +246,15 @@ class ProfilerImpl {
         container.appendChild(gizmoRow)
         document.body.appendChild(container)
 
-        this._hud = container
-        this._updateTimer = setInterval(
-            () => this._updateHud(),
+        this.#hud = container
+        this.#updateTimer = setInterval(
+            () => this.#updateHud(),
             HUD_UPDATE_INTERVAL_MS
         )
-        this._updateHud()
+        this.#updateHud()
     }
 
-    private _makeDraggable(
+    #makeDraggable(
         container: HTMLDivElement,
         handle: HTMLElement,
         ignore: HTMLElement
@@ -311,31 +311,31 @@ class ProfilerImpl {
         })
     }
 
-    private _destroyHud() {
-        if (this._updateTimer !== undefined) {
-            clearInterval(this._updateTimer)
-            this._updateTimer = undefined
+    #destroyHud() {
+        if (this.#updateTimer !== undefined) {
+            clearInterval(this.#updateTimer)
+            this.#updateTimer = undefined
         }
-        this._hud?.remove()
-        this._hud = undefined
-        this._cells.clear()
-        this._samples.clear()
+        this.#hud?.remove()
+        this.#hud = undefined
+        this.#cells.clear()
+        this.#samples.clear()
     }
 
-    private _format(metric: ProfilerMetric, value: number): string {
+    #format(metric: ProfilerMetric, value: number): string {
         return metric === 'fps'
             ? `${value.toFixed(1)} fps`
             : `${value.toFixed(2)} ms`
     }
 
-    private _updateHud() {
+    #updateHud() {
         const now = performance.now()
 
         for (const metric of PROFILER_METRICS) {
-            const cells = this._cells.get(metric)
+            const cells = this.#cells.get(metric)
             if (!cells) continue
 
-            const samples = this._prune(metric, now)
+            const samples = this.#prune(metric, now)
             if (!samples.length) {
                 cells.last.textContent = 'n/a'
                 cells.avg.textContent = 'n/a'
@@ -347,8 +347,8 @@ class ProfilerImpl {
                 samples.reduce((sum, sample) => sum + sample.v, 0) /
                 samples.length
 
-            cells.last.textContent = this._format(metric, last)
-            cells.avg.textContent = this._format(metric, avg)
+            cells.last.textContent = this.#format(metric, last)
+            cells.avg.textContent = this.#format(metric, avg)
         }
     }
 }

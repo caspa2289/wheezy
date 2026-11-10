@@ -45,13 +45,13 @@ const SPOT_CUTOFF_POOL = 25
 const SPOT_CUTOFF_WIDE = 85
 
 export class Demo1 extends Scene implements IScene {
-    private _controller: ArcBallController
+    #controller: ArcBallController
 
-    private _testHook!: IGameObject
-    private _coloredSpots: SpotLight[] = []
-    private _orbitAngle = 0
+    #testHook!: IGameObject
+    #coloredSpots: SpotLight[] = []
+    #orbitAngle = 0
 
-    private _helmet!: IGameObject
+    #helmet!: IGameObject
 
     constructor() {
         super()
@@ -62,7 +62,7 @@ export class Demo1 extends Scene implements IScene {
             position: vec3.create(-8, 0, 0),
         })
 
-        this._controller = new ArcBallController({
+        this.#controller = new ArcBallController({
             camera: this.camera as ArcBallCamera,
             canvas: this.engine.renderer.context.canvas as HTMLCanvasElement,
         })
@@ -83,16 +83,16 @@ export class Demo1 extends Scene implements IScene {
             modelData: modelData,
         })
 
-        this._helmet = await this.uploadModel({
+        this.#helmet = await this.uploadModel({
             modelData: modelData1,
         })
 
-        this._testHook = new GameObject()
-        this.objectManager.addObject(this._testHook, this.root)
-        this.objectManager.reparentObject(modelGO0, this._testHook)
+        this.#testHook = new GameObject()
+        this.objectManager.addObject(this.#testHook, this.root)
+        this.objectManager.reparentObject(modelGO0, this.#testHook)
 
-        this._helmet.transform.translate(HELMET_POSITION)
-        this._helmet.transform.rotateDegreesEuler({ x: 90, z: 90 })
+        this.#helmet.transform.translate(HELMET_POSITION)
+        this.#helmet.transform.rotateDegreesEuler({ x: 90, z: 90 })
 
         modelGO0.transform.rotateDegreesEuler({ y: -90 })
         modelGO0.transform.translate(
@@ -102,11 +102,11 @@ export class Demo1 extends Scene implements IScene {
             vec3.create(WALL_SCALE, WALL_SCALE, WALL_SCALE)
         )
 
-        // this._setupLights()
-        await this._setupSkyBox()
+        // this.#setupLights()
+        await this.#setupSkyBox()
     }
 
-    private async _setupSkyBox() {
+    async #setupSkyBox() {
         const imgSrcs = [
             'static/cubemaps/bridge/posx.jpg',
             'static/cubemaps/bridge/negx.jpg',
@@ -125,7 +125,7 @@ export class Demo1 extends Scene implements IScene {
         this._engine?.renderer.setSkyBoxTexture(imageBitmaps)
     }
 
-    private _setupLights() {
+    #setupLights() {
         const coloredSpots = [
             vec3.create(1, 0, 0), // red
             vec3.create(0, 1, 0), // green
@@ -147,20 +147,20 @@ export class Demo1 extends Scene implements IScene {
             spot.pointAt(HELMET_POSITION)
             return spot
         })
-        this._coloredSpots = coloredSpots
+        this.#coloredSpots = coloredSpots
 
         this.spotLights.push(...coloredSpots)
     }
 
     public override onRender(dt: number): void {
-        this._controller.update(dt)
+        this.#controller.update(dt)
 
-        this._helmet.transform.rotateDegreesEuler({ z: 0.1 })
+        this.#helmet.transform.rotateDegreesEuler({ z: 0.1 })
         // dt is frameDelta / 100, not seconds — the engine-wide contract
-        this._orbitAngle += dt * 0.05
+        this.#orbitAngle += dt * 0.05
 
-        this._coloredSpots.forEach((spot, index) => {
-            const angle = this._orbitAngle + index * Math.PI
+        this.#coloredSpots.forEach((spot, index) => {
+            const angle = this.#orbitAngle + index * Math.PI
             spot.position[1] = Math.cos(angle) * COLORED_ORBIT_RADIUS
             spot.position[2] = Math.sin(angle) * COLORED_ORBIT_RADIUS
             spot.pointAt(HELMET_POSITION)

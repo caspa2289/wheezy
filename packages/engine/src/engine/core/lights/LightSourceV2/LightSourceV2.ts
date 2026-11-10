@@ -41,18 +41,18 @@ export abstract class LightSourceV2
     color: Vec3
     intensity: number
     gizmo?: IGameObject
-    private _lightType: TLightSourceType
+    #lightType: TLightSourceType
 
     constructor(props: ILightSourceV2Props) {
         super(props.parent, EntityTypes.light)
 
-        this._lightType = props.lightType
+        this.#lightType = props.lightType
         this.color = props.color ?? vec3.create(1, 1, 1)
         this.intensity = props.intensity ?? 1
     }
 
     get lightType() {
-        return this._lightType
+        return this.#lightType
     }
 
     get gizmoPosition(): Vec3 | null {

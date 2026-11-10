@@ -1,7 +1,7 @@
 import { DEFAULT_SAMPLER_IDS, type ISamplerStorage } from '../../types'
 
 export class SamplerStorage implements ISamplerStorage {
-    _samplers: Map<string, GPUSampler> = new Map()
+    #samplers: Map<string, GPUSampler> = new Map()
 
     constructor(device: GPUDevice) {
         const sampler = device.createSampler({
@@ -20,6 +20,6 @@ export class SamplerStorage implements ISamplerStorage {
     }
 
     get samplers() {
-        return this._samplers
+        return this.#samplers
     }
 }

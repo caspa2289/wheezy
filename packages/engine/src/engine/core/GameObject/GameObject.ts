@@ -11,31 +11,31 @@ export class GameObject
     extends Entity<EntityTypes.gameObject>
     implements IGameObject
 {
-    _name: string
-    _components = new Map() as Map<EntityID, IComponent<EntityTypes>>
-    _transform?: ITransform
+    #name: string
+    #components = new Map() as Map<EntityID, IComponent<EntityTypes>>
+    #transform?: ITransform
 
     constructor() {
         super(EntityTypes.gameObject)
-        this._name = `GameObject ${super.id}`
+        this.#name = `GameObject ${super.id}`
     }
 
     get name() {
-        return this._name
+        return this.#name
     }
 
     set name(value: string) {
-        this._name = value
+        this.#name = value
     }
 
     get components() {
-        return this._components
+        return this.#components
     }
 
     get transform() {
         //FIXME: find a less dumb way to do it
-        if (this._transform) {
-            return this._transform
+        if (this.#transform) {
+            return this.#transform
         }
 
         return [...this.components.values()].find(
@@ -44,10 +44,10 @@ export class GameObject
     }
 
     public addComponent(component: IComponent<EntityTypes>) {
-        this._components.set(component.id, component)
+        this.#components.set(component.id, component)
     }
 
     public removeComponent(id: EntityID) {
-        this._components.delete(id)
+        this.#components.delete(id)
     }
 }

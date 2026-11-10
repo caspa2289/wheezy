@@ -5,15 +5,15 @@ export class Component<T extends EntityTypes>
     extends Entity<T>
     implements IComponent<T>
 {
-    _parent: IComponent<T>['parent']
+    #parent: IComponent<T>['parent']
 
     constructor(parent: IComponent<T>['parent'], componentType: T) {
         super(componentType)
-        this._parent = parent
-        this._parent.addComponent(this)
+        this.#parent = parent
+        this.#parent.addComponent(this)
     }
 
     get parent() {
-        return this._parent
+        return this.#parent
     }
 }

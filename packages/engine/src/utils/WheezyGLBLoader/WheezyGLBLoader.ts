@@ -25,7 +25,7 @@ const generateId = () => {
 }
 
 export class WheezyGLBLoader {
-    private static loadImages(
+    static #loadImages(
         modelData: GLB,
         bufferIndexMap: IndexMap
     ): {
@@ -67,7 +67,7 @@ export class WheezyGLBLoader {
         return { imagesIndexMap, imagesMap }
     }
 
-    private static loadSamplers = (
+    static #loadSamplers = (
         modelData: GLB
     ): {
         samplersIndexMap: IndexMap
@@ -87,7 +87,7 @@ export class WheezyGLBLoader {
         return { samplersIndexMap, samplersMap }
     }
 
-    private static loadTextures = (
+    static #loadTextures = (
         modelData: GLB,
         samplersIndexMap: IndexMap,
         imagesIndexMap: IndexMap
@@ -119,7 +119,7 @@ export class WheezyGLBLoader {
         return { texturesIndexMap, texturesMap }
     }
 
-    private static loadMaterials = (
+    static #loadMaterials = (
         modelData: GLB,
         texturesIndexMap: IndexMap
     ): {
@@ -205,7 +205,7 @@ export class WheezyGLBLoader {
         return { materialsIndexMap, materialsMap }
     }
 
-    private static loadBuffers = (modelData: GLB) => {
+    static #loadBuffers = (modelData: GLB) => {
         const bufferIndexMap: IndexMap = new Map()
         const bufferMap: BufferMap = new Map()
 
@@ -225,22 +225,22 @@ export class WheezyGLBLoader {
 
         console.log(modelData)
 
-        const { bufferIndexMap, bufferMap } = this.loadBuffers(modelData)
+        const { bufferIndexMap, bufferMap } = this.#loadBuffers(modelData)
 
-        const { imagesIndexMap, imagesMap } = this.loadImages(
+        const { imagesIndexMap, imagesMap } = this.#loadImages(
             modelData,
             bufferIndexMap
         )
 
-        const { samplersIndexMap, samplersMap } = this.loadSamplers(modelData)
+        const { samplersIndexMap, samplersMap } = this.#loadSamplers(modelData)
 
-        const { texturesIndexMap, texturesMap } = this.loadTextures(
+        const { texturesIndexMap, texturesMap } = this.#loadTextures(
             modelData,
             samplersIndexMap,
             imagesIndexMap
         )
 
-        const { materialsIndexMap, materialsMap } = this.loadMaterials(
+        const { materialsIndexMap, materialsMap } = this.#loadMaterials(
             modelData,
             texturesIndexMap
         )
@@ -254,7 +254,7 @@ export class WheezyGLBLoader {
         modelData?.json?.scenes?.forEach((scene: { nodes?: number[] }) => {
             scene?.nodes?.forEach((nodeIndex) => {
                 modelPreload.children.push(
-                    this.loadNode(
+                    this.#loadNode(
                         nodeIndex,
                         modelData,
                         bufferIndexMap,
@@ -275,7 +275,7 @@ export class WheezyGLBLoader {
         }
     }
 
-    private static createNormalsBuffer = (
+    static #createNormalsBuffer = (
         meshData: IPreloadMesh,
         bufferIndexMap: IndexMap,
         bufferMap: BufferMap
@@ -369,7 +369,7 @@ export class WheezyGLBLoader {
         } as GLTFAccessor
     }
 
-    private static createTextureCoordinatesBuffer = (
+    static #createTextureCoordinatesBuffer = (
         bufferIndexMap: IndexMap,
         bufferMap: BufferMap
     ) => {
@@ -390,7 +390,7 @@ export class WheezyGLBLoader {
         } as GLTFAccessor
     }
 
-    private static createTangentsBuffer = (
+    static #createTangentsBuffer = (
         meshData: IPreloadMesh,
         bufferIndexMap: IndexMap,
         bufferMap: BufferMap
@@ -511,7 +511,7 @@ export class WheezyGLBLoader {
         } as GLTFAccessor
     }
 
-    private static parseAccessor = (
+    static #parseAccessor = (
         modelData: Record<string, any>,
         accessorId: number,
         usage: GPUBufferUsageFlags,
@@ -551,7 +551,7 @@ export class WheezyGLBLoader {
         }
     }
 
-    private static loadNode(
+    static #loadNode(
         nodeIndex: number,
         modelData: Record<string, any>,
         bufferIndexMap: IndexMap,
@@ -581,25 +581,25 @@ export class WheezyGLBLoader {
                 }) => {
                     //FIXME: generate indices for non-indexed geometry
                     const meshData: Partial<IPreloadMesh> = {
-                        positions: WheezyGLBLoader.parseAccessor(
+                        positions: WheezyGLBLoader.#parseAccessor(
                             modelData,
                             primitive.attributes.POSITION,
                             GPUBufferUsage.VERTEX,
                             bufferIndexMap
                         ),
-                        indices: WheezyGLBLoader.parseAccessor(
+                        indices: WheezyGLBLoader.#parseAccessor(
                             modelData,
                             primitive.indices,
                             GPUBufferUsage.INDEX,
                             bufferIndexMap
                         ),
-                        normals: WheezyGLBLoader.parseAccessor(
+                        normals: WheezyGLBLoader.#parseAccessor(
                             modelData,
                             primitive.attributes.NORMAL,
                             GPUBufferUsage.VERTEX,
                             bufferIndexMap
                         ),
-                        textureCoordinates: WheezyGLBLoader.parseAccessor(
+                        textureCoordinates: WheezyGLBLoader.#parseAccessor(
                             modelData,
                             primitive.attributes.TEXCOORD_0,
                             GPUBufferUsage.VERTEX,
@@ -613,7 +613,7 @@ export class WheezyGLBLoader {
                     }
 
                     if (!meshData.normals) {
-                        meshData.normals = this.createNormalsBuffer(
+                        meshData.normals = this.#createNormalsBuffer(
                             meshData as IPreloadMesh,
                             bufferIndexMap,
                             bufferMap
@@ -622,13 +622,13 @@ export class WheezyGLBLoader {
 
                     if (!meshData.textureCoordinates) {
                         meshData.textureCoordinates =
-                            this.createTextureCoordinatesBuffer(
+                            this.#createTextureCoordinatesBuffer(
                                 bufferIndexMap,
                                 bufferMap
                             )
                     }
 
-                    meshData.tangents = this.createTangentsBuffer(
+                    meshData.tangents = this.#createTangentsBuffer(
                         meshData as IPreloadMesh,
                         bufferIndexMap,
                         bufferMap
@@ -641,7 +641,7 @@ export class WheezyGLBLoader {
 
         nodeJsonData?.children?.forEach((childIndex: number) => {
             dataStructEntry.children.push(
-                this.loadNode(
+                this.#loadNode(
                     childIndex,
                     modelData,
                     bufferIndexMap,

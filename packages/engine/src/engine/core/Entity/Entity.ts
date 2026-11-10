@@ -1,23 +1,23 @@
 import { EntityTypes, type IEntity } from '../../types'
 
 export class Entity<T extends EntityTypes> implements IEntity<T> {
-    private _id: string
-    private _type: T
+    #id: string
+    #type: T
 
     constructor(type: T) {
-        this._id = this._generateId()
-        this._type = type
+        this.#id = this.#generateId()
+        this.#type = type
     }
 
-    private _generateId() {
+    #generateId() {
         return String(Math.random())
     }
 
     get id() {
-        return this._id
+        return this.#id
     }
 
     get type() {
-        return this._type
+        return this.#type
     }
 }

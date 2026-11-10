@@ -1,13 +1,13 @@
 import { HDR_TARGET_FORMAT } from './constants'
 
 export class GBuffer {
-    readonly _normal: GPUTextureView
-    readonly _albedo: GPUTextureView
-    readonly _depth: GPUTextureView
-    readonly _metallicRoughness: GPUTextureView
-    readonly _emission: GPUTextureView
-    readonly _litColor: GPUTextureView
-    readonly _postColor: GPUTextureView
+    readonly #normal: GPUTextureView
+    readonly #albedo: GPUTextureView
+    readonly #depth: GPUTextureView
+    readonly #metallicRoughness: GPUTextureView
+    readonly #emission: GPUTextureView
+    readonly #litColor: GPUTextureView
+    readonly #postColor: GPUTextureView
 
     constructor(
         device: GPUDevice,
@@ -26,46 +26,46 @@ export class GBuffer {
                 })
                 .createView()
 
-        this._depth = createTextureView(depthFormat)
-        this._normal = createTextureView('rgba16float')
-        this._albedo = createTextureView()
-        this._emission = createTextureView()
-        this._metallicRoughness = createTextureView()
+        this.#depth = createTextureView(depthFormat)
+        this.#normal = createTextureView('rgba16float')
+        this.#albedo = createTextureView()
+        this.#emission = createTextureView()
+        this.#metallicRoughness = createTextureView()
         // HDR target of the lighting pass, consumed by the tonemapping post pass.
         // Not part of the geometry MRT set, so it does not count against
         // maxColorAttachmentBytesPerSample; rgba16float keeps intensities above 1.
-        this._litColor = createTextureView(HDR_TARGET_FORMAT)
+        this.#litColor = createTextureView(HDR_TARGET_FORMAT)
         // tonemapped LDR result: the FXAA pass reads this (luma in .a) and writes
         // the swapchain. Skipped when anti-aliasing is off — the tonemap pass then
         // targets the swapchain directly.
-        this._postColor = createTextureView()
+        this.#postColor = createTextureView()
     }
 
     get normal() {
-        return this._normal
+        return this.#normal
     }
 
     get albedo() {
-        return this._albedo
+        return this.#albedo
     }
 
     get depth() {
-        return this._depth
+        return this.#depth
     }
 
     get metallicRoughness() {
-        return this._metallicRoughness
+        return this.#metallicRoughness
     }
 
     get emission() {
-        return this._emission
+        return this.#emission
     }
 
     get litColor() {
-        return this._litColor
+        return this.#litColor
     }
 
     get postColor() {
-        return this._postColor
+        return this.#postColor
     }
 }

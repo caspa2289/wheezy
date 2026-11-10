@@ -10,10 +10,10 @@ import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCam
 import { mat4, vec3 } from 'wgpu-matrix'
 
 export class DemoRTC extends Scene implements IScene {
-    private _gameObject!: IGameObject
-    private _connection: RTCPeerConnection = new RTCPeerConnection()
-    private _dataChannel!: RTCDataChannel
-    private _candidateDescription!: string
+    #gameObject!: IGameObject
+    #connection: RTCPeerConnection = new RTCPeerConnection()
+    #dataChannel!: RTCDataChannel
+    #candidateDescription!: string
 
     constructor() {
         super()
@@ -32,7 +32,7 @@ export class DemoRTC extends Scene implements IScene {
             'static/models/DamagedHelmet.glb'
         )
 
-        this._gameObject = await this.uploadModel({
+        this.#gameObject = await this.uploadModel({
             modelData: modelData1,
         })
 
@@ -43,33 +43,33 @@ export class DemoRTC extends Scene implements IScene {
             })
         )
 
-        this._dataChannel =
-            await this._connection.createDataChannel('test channel')
+        this.#dataChannel =
+            await this.#connection.createDataChannel('test channel')
 
-        this._dataChannel.onmessage = this._handleMessage
+        this.#dataChannel.onmessage = this.#handleMessage
 
-        const offer = await this._connection.createOffer({
+        const offer = await this.#connection.createOffer({
             offerToReceiveAudio: false,
             offerToReceiveVideo: false,
         })
 
-        await this._connection.setLocalDescription(offer)
+        await this.#connection.setLocalDescription(offer)
 
-        this._connection.onconnectionstatechange = async (event: any) => {
+        this.#connection.onconnectionstatechange = async (event: any) => {
             console.log(event?.currentTarget?.connectionState)
         }
 
-        this._connection.onicecandidate = (event) => {
-            if (event.candidate && !this._candidateDescription) {
-                if (this._connection.remoteDescription) {
-                    this._connection.addIceCandidate(event.candidate)
+        this.#connection.onicecandidate = (event) => {
+            if (event.candidate && !this.#candidateDescription) {
+                if (this.#connection.remoteDescription) {
+                    this.#connection.addIceCandidate(event.candidate)
                 }
-                this._candidateDescription = event.candidate.candidate
+                this.#candidateDescription = event.candidate.candidate
 
                 console.log(
-                    JSON.stringify(this._connection.localDescription) +
+                    JSON.stringify(this.#connection.localDescription) +
                         'POOPY_BALLS' +
-                        this._candidateDescription
+                        this.#candidateDescription
                 )
             }
         }
@@ -86,7 +86,7 @@ export class DemoRTC extends Scene implements IScene {
         const button = document.createElement('button')
         button.textContent = 'ok'
 
-        button.addEventListener('click', this._handleInput)
+        button.addEventListener('click', this.#handleInput)
 
         wrapper.appendChild(input)
         wrapper.appendChild(button)
@@ -96,7 +96,7 @@ export class DemoRTC extends Scene implements IScene {
 
     public override onRender(dt: number): void {}
 
-    private _handleMessage = (event: MessageEvent<ArrayBuffer>) => {
+    #handleMessage = (event: MessageEvent<ArrayBuffer>) => {
         const quaternion = new Float32Array(event.data)
         const rotationMatrix = new Float32Array(
             16 * Float32Array.BYTES_PER_ELEMENT
@@ -106,19 +106,19 @@ export class DemoRTC extends Scene implements IScene {
             rotationMatrix
         )
 
-        this._gameObject.transform.matrix = rotationMatrix
+        this.#gameObject.transform.matrix = rotationMatrix
     }
 
-    private _handleInput = async () => {
+    #handleInput = async () => {
         const peerData = (document.getElementById('input') as HTMLInputElement)
             .value
 
         const [jsonString, candidate] = peerData.split('POOPY_BALLS')
         const desc = JSON.parse(jsonString!)
 
-        await this._connection.setRemoteDescription(desc)
+        await this.#connection.setRemoteDescription(desc)
 
-        await this._connection.addIceCandidate({
+        await this.#connection.addIceCandidate({
             candidate,
             sdpMLineIndex: 0,
             sdpMid: '0',

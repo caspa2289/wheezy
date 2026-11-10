@@ -7,10 +7,10 @@ import {
 } from '../../types'
 
 export class SceneTree implements ISceneTree {
-    _nodes: SceneNode = new Map()
+    #nodes: SceneNode = new Map()
 
     public getNodeContentAt(position: SceneTreePosition) {
-        let currentTreeNode = this._nodes.get(position[0]!)
+        let currentTreeNode = this.#nodes.get(position[0]!)
 
         for (let i = 1; i < position.length; i++) {
             currentTreeNode = currentTreeNode?.children?.get(position[i]!)
@@ -24,7 +24,7 @@ export class SceneTree implements ISceneTree {
         nodeContent: SceneNodeContent
     ): SceneTreePosition {
         if (!position) {
-            this._nodes.set(nodeContent.gameObject.id, nodeContent)
+            this.#nodes.set(nodeContent.gameObject.id, nodeContent)
 
             return [nodeContent.gameObject.id]
         }
@@ -63,7 +63,7 @@ export class SceneTree implements ISceneTree {
         // nodes, otherwise the parent's children
         const siblings =
             parentPosition.length === 0
-                ? this._nodes
+                ? this.#nodes
                 : this.getNodeContentAt(parentPosition)?.children
 
         const removedIds: EntityID[] = []
@@ -73,7 +73,7 @@ export class SceneTree implements ISceneTree {
             // children would report sibling ids too, and ObjectManager would
             // then discard their position records
             const targetAsNode: SceneNode = new Map([[targetId, targetNode]])
-            this.traverseNode(targetAsNode, (nodeId) => {
+            this.#traverseNode(targetAsNode, (nodeId) => {
                 removedIds.push(nodeId)
             })
         }
@@ -83,7 +83,7 @@ export class SceneTree implements ISceneTree {
         return removedIds
     }
 
-    private traverseNode(
+    #traverseNode(
         node: SceneNode | null | undefined,
         callback: (nodeId: EntityID, nodeContent: SceneNodeContent) => void
     ) {
@@ -100,6 +100,6 @@ export class SceneTree implements ISceneTree {
     }
 
     get nodes() {
-        return this._nodes
+        return this.#nodes
     }
 }

@@ -5,10 +5,10 @@ import {
 } from '../../types/core/TextureStorage'
 
 export class TextureStorage implements ITextureStorage {
-    _textures: Map<string, ITexture> = new Map()
+    #textures: Map<string, ITexture> = new Map()
 
     get textures() {
-        return this._textures
+        return this.#textures
     }
 
     get defaultBaseColor() {

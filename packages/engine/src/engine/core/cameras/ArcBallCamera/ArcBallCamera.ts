@@ -5,15 +5,15 @@ import { Camera, type ICameraProps } from '../Camera'
 export interface ArcBallCameraProps extends ICameraProps {}
 
 export class ArcBallCamera extends Camera implements IArcBallCamera {
-    private _distance = 0
-    private _axis = vec3.create()
+    #distance = 0
+    #axis = vec3.create()
 
     constructor(props: ArcBallCameraProps) {
         super(props)
 
         const positionVec = props?.position ?? vec3.create(0, 0, 0)
         super.position = positionVec
-        this._distance = vec3.len(super.position)
+        this.#distance = vec3.len(super.position)
         super.back = vec3.normalize(super.position)
         this.recalculateRight()
         this.recalculateUp()
@@ -21,19 +21,19 @@ export class ArcBallCamera extends Camera implements IArcBallCamera {
     }
 
     get axis() {
-        return this._axis
+        return this.#axis
     }
 
     set axis(vec: Vec3) {
-        vec3.copy(vec, this._axis)
+        vec3.copy(vec, this.#axis)
     }
 
     get distance() {
-        return this._distance
+        return this.#distance
     }
 
     set distance(value) {
-        this._distance = value
+        this.#distance = value
     }
 
     override get matrix() {
@@ -42,7 +42,7 @@ export class ArcBallCamera extends Camera implements IArcBallCamera {
 
     override set matrix(mat: Mat4) {
         super.matrix = mat
-        this._distance = vec3.len(super.position)
+        this.#distance = vec3.len(super.position)
     }
 
     recalculateRight() {

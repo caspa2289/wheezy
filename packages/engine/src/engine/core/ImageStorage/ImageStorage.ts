@@ -4,7 +4,7 @@ import {
 } from '../../types/core/ImageStorage'
 
 export class ImageStorage implements IImageStorage {
-    private _images: Map<string, ImageBitmap> = new Map()
+    #images: Map<string, ImageBitmap> = new Map()
 
     public async createDefaults() {
         const whiteBitmap = await createImageBitmap(
@@ -23,17 +23,17 @@ export class ImageStorage implements IImageStorage {
             new ImageData(new Uint8ClampedArray([128, 128, 255, 255]), 1, 1)
         )
 
-        this._images.set(DEFAULT_IMAGE_IDS.metallicRoughness, whiteBitmap)
-        this._images.set(DEFAULT_IMAGE_IDS.occlusion, whiteBitmap)
+        this.#images.set(DEFAULT_IMAGE_IDS.metallicRoughness, whiteBitmap)
+        this.#images.set(DEFAULT_IMAGE_IDS.occlusion, whiteBitmap)
 
-        this._images.set(DEFAULT_IMAGE_IDS.baseColor, greyBitmap)
+        this.#images.set(DEFAULT_IMAGE_IDS.baseColor, greyBitmap)
 
-        this._images.set(DEFAULT_IMAGE_IDS.emission, blackBitmap)
+        this.#images.set(DEFAULT_IMAGE_IDS.emission, blackBitmap)
 
-        this._images.set(DEFAULT_IMAGE_IDS.normal, normalBitmap)
+        this.#images.set(DEFAULT_IMAGE_IDS.normal, normalBitmap)
     }
 
     get images() {
-        return this._images
+        return this.#images
     }
 }

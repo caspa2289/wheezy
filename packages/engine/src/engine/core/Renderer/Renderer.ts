@@ -111,133 +111,131 @@ const POINT_RANGE_SLOT = 11
 const SPOT_RANGE_SLOT = 7
 
 export class Renderer implements IRenderer {
-    private _adapter!: GPUAdapter
-    private _device!: GPUDevice
-    private _context!: GPUCanvasContext
-    private _canvas: HTMLCanvasElement
-    private _gBuffer!: GBuffer
+    #adapter!: GPUAdapter
+    #device!: GPUDevice
+    #context!: GPUCanvasContext
+    #canvas: HTMLCanvasElement
+    #gBuffer!: GBuffer
 
-    private _shadowDepthTexture!: GPUTexture
-    private _shadowDepthTextureView!: GPUTextureView
-    private _shadowDepthTextureSize = SHADOW_ATLAS_SIZE
-    private _shadowDepthSampler!: GPUSampler
-    private _shadowShaderModule!: GPUShaderModule
+    #shadowDepthTexture!: GPUTexture
+    #shadowDepthTextureView!: GPUTextureView
+    #shadowDepthTextureSize = SHADOW_ATLAS_SIZE
+    #shadowDepthSampler!: GPUSampler
+    #shadowShaderModule!: GPUShaderModule
 
     // persistent shadow-data storage buffer (header + MAX_SHADOW_CASTERS entries,
     // see constants.ts) — contents rewritten per frame via queue.writeBuffer so
     // the bind groups referencing it stay static
-    private _shadowDataBuffer!: GPUBuffer
-    private _shadowDataUpload = new ArrayBuffer(SHADOW_DATA_BUFFER_SIZE)
+    #shadowDataBuffer!: GPUBuffer
+    #shadowDataUpload = new ArrayBuffer(SHADOW_DATA_BUFFER_SIZE)
     // dynamic-offset uniform buffer: slot i holds the u32 value i; the shadow
     // pass binds slot = caster entry index so vertexShadow.wgsl knows which
     // tile's light VP to use
-    private _shadowIndexBuffer!: GPUBuffer
+    #shadowIndexBuffer!: GPUBuffer
     // group 0 of the shadow pipelines (dynamic-offset caster index + data storage)
-    private _shadowDataBGLayout!: GPUBindGroupLayout
-    private _shadowDataBindGroup!: GPUBindGroup
+    #shadowDataBGLayout!: GPUBindGroupLayout
+    #shadowDataBindGroup!: GPUBindGroup
     // group 3 of the lighting pipeline (atlas + comparison sampler + data +
     // cluster counts/indices — merged because maxBindGroups defaults to 4)
-    private _shadowBindGroupLayout!: GPUBindGroupLayout
-    private _shadowBindGroup!: GPUBindGroup
+    #shadowBindGroupLayout!: GPUBindGroupLayout
+    #shadowBindGroup!: GPUBindGroup
     // per-frame atlas tiles to render: pixel rect + caster entry index
-    private _frameTiles: {
+    #frameTiles: {
         x: number
         y: number
         size: number
         casterIndex: number
     }[] = []
     // hysteresis: lights that held a tile last frame get budget priority
-    private _prevShadowedLights = new Set<ILightSourceV2>()
+    #prevShadowedLights = new Set<ILightSourceV2>()
     // shadow pipelines keyed by position vertex format (`elementType:byteStride`)
-    private _shadowPipelineCache = new Map<string, GPURenderPipeline>()
+    #shadowPipelineCache = new Map<string, GPURenderPipeline>()
 
     // clustered (froxel) light culling — Phase 3
-    private _cullingShaderModule!: GPUShaderModule
-    private _cullResetPipeline!: GPUComputePipeline
-    private _cullPipeline!: GPUComputePipeline
-    private _computePassDescriptor!: GPUComputePassDescriptor
-    private _clusterCountsBuffer!: GPUBuffer
-    private _clusterIndicesBuffer!: GPUBuffer
-    private _clusterCount = 0
-    private _clusterTilesX = 0
-    private _clusterTilesY = 0
-    private _cullLightsBuffer!: GPUBuffer
-    private _cullLightsUpload = new ArrayBuffer(CULL_LIGHTS_BUFFER_SIZE)
-    private _cullLightsBGLayout!: GPUBindGroupLayout
-    private _cullLightsBindGroup!: GPUBindGroup
-    private _clusterComputeBGLayout!: GPUBindGroupLayout
-    private _clusterComputeBindGroup!: GPUBindGroup
+    #cullingShaderModule!: GPUShaderModule
+    #cullResetPipeline!: GPUComputePipeline
+    #cullPipeline!: GPUComputePipeline
+    #computePassDescriptor!: GPUComputePassDescriptor
+    #clusterCountsBuffer!: GPUBuffer
+    #clusterIndicesBuffer!: GPUBuffer
+    #clusterCount = 0
+    #clusterTilesX = 0
+    #clusterTilesY = 0
+    #cullLightsBuffer!: GPUBuffer
+    #cullLightsUpload = new ArrayBuffer(CULL_LIGHTS_BUFFER_SIZE)
+    #cullLightsBGLayout!: GPUBindGroupLayout
+    #cullLightsBindGroup!: GPUBindGroup
+    #clusterComputeBGLayout!: GPUBindGroupLayout
+    #clusterComputeBindGroup!: GPUBindGroup
 
-    private _skyBoxVerticesBuffer!: GPUBuffer
-    private _skyBoxPipeline!: GPURenderPipeline
-    private _skyBoxUniformBuffer!: GPUBuffer
-    private _skyBoxUniformBufferSize = 16 * 4 * 3 + 4 * 4
-    private _skyBoxRenderPassDescriptor!: GPURenderPassDescriptor
-    private _skyBoxUniformBindGroup!: GPUBindGroup
-    private _skyBoxModelMatrix: Mat4 = mat4.scaling(
-        vec3.fromValues(100, 100, 100)
-    )
-    private _skyboxTexture!: GPUTexture
-    private _skyboxSampler!: GPUSampler
+    #skyBoxVerticesBuffer!: GPUBuffer
+    #skyBoxPipeline!: GPURenderPipeline
+    #skyBoxUniformBuffer!: GPUBuffer
+    #skyBoxUniformBufferSize = 16 * 4 * 3 + 4 * 4
+    #skyBoxRenderPassDescriptor!: GPURenderPassDescriptor
+    #skyBoxUniformBindGroup!: GPUBindGroup
+    #skyBoxModelMatrix: Mat4 = mat4.scaling(vec3.fromValues(100, 100, 100))
+    #skyboxTexture!: GPUTexture
+    #skyboxSampler!: GPUSampler
 
-    private _lightsBindGroupLayout!: GPUBindGroupLayout
-    private _gBufferBindGroupLayout!: GPUBindGroupLayout
-    private _gBufferBindGroup!: GPUBindGroup
+    #lightsBindGroupLayout!: GPUBindGroupLayout
+    #gBufferBindGroupLayout!: GPUBindGroupLayout
+    #gBufferBindGroup!: GPUBindGroup
 
-    private _uniformsBGLayout!: GPUBindGroupLayout
-    private _nodeParamsBGLayout!: GPUBindGroupLayout
+    #uniformsBGLayout!: GPUBindGroupLayout
+    #nodeParamsBGLayout!: GPUBindGroupLayout
 
-    private _viewParamsBufferSize: number = VIEW_PARAMS_BUFFER_SIZE
+    #viewParamsBufferSize: number = VIEW_PARAMS_BUFFER_SIZE
 
-    private _geometryPassDescriptor!: GPURenderPassDescriptor
-    private _lightingPassDescriptor!: GPURenderPassDescriptor
-    private _postPassDescriptor!: GPURenderPassDescriptor
-    private _shadowPassDescriptor!: GPURenderPassDescriptor
+    #geometryPassDescriptor!: GPURenderPassDescriptor
+    #lightingPassDescriptor!: GPURenderPassDescriptor
+    #postPassDescriptor!: GPURenderPassDescriptor
+    #shadowPassDescriptor!: GPURenderPassDescriptor
 
-    private _viewParamsBuffer!: GPUBuffer
-    private _viewParamsBindGroup!: GPUBindGroup
+    #viewParamsBuffer!: GPUBuffer
+    #viewParamsBindGroup!: GPUBindGroup
 
-    private _debugParamsBuffer!: GPUBuffer
+    #debugParamsBuffer!: GPUBuffer
 
-    private _shaderModule!: GPUShaderModule
-    private _lightingShaderModule!: GPUShaderModule
-    private _postShaderModule!: GPUShaderModule
+    #shaderModule!: GPUShaderModule
+    #lightingShaderModule!: GPUShaderModule
+    #postShaderModule!: GPUShaderModule
 
-    private _postBindGroupLayout!: GPUBindGroupLayout
-    private _postBindGroup!: GPUBindGroup
+    #postBindGroupLayout!: GPUBindGroupLayout
+    #postBindGroup!: GPUBindGroup
 
-    private _fxaaShaderModule!: GPUShaderModule
-    private _fxaaBindGroupLayout!: GPUBindGroupLayout
-    private _fxaaBindGroup!: GPUBindGroup
-    private _fxaaSampler!: GPUSampler
-    private _fxaaPassDescriptor!: GPURenderPassDescriptor
+    #fxaaShaderModule!: GPUShaderModule
+    #fxaaBindGroupLayout!: GPUBindGroupLayout
+    #fxaaBindGroup!: GPUBindGroup
+    #fxaaSampler!: GPUSampler
+    #fxaaPassDescriptor!: GPURenderPassDescriptor
 
     // image-based lighting: prefiltered from the skybox, persistent so the
     // lighting bind group (group 3) stays static across skybox changes
-    private _iblShaderModule!: GPUShaderModule
-    private _iblIrradianceTexture!: GPUTexture
-    private _iblPrefilteredTexture!: GPUTexture
-    private _iblBrdfLutTexture!: GPUTexture
-    private _iblIrradianceView!: GPUTextureView
-    private _iblPrefilteredView!: GPUTextureView
-    private _iblBrdfLutView!: GPUTextureView
-    private _iblSampler!: GPUSampler
-    private _iblEnvBGLayout!: GPUBindGroupLayout
-    private _iblCubeOutBGLayout!: GPUBindGroupLayout
-    private _iblLutOutBGLayout!: GPUBindGroupLayout
-    private _iblEnvBG!: GPUBindGroup
-    private _iblIrradianceOutBG!: GPUBindGroup
-    private _iblPrefilterOutBGs: GPUBindGroup[] = []
-    private _iblLutOutBG!: GPUBindGroup
-    private _iblIrradiancePipeline!: GPUComputePipeline
-    private _iblPrefilterPipeline!: GPUComputePipeline
-    private _iblBrdfLutPipeline!: GPUComputePipeline
+    #iblShaderModule!: GPUShaderModule
+    #iblIrradianceTexture!: GPUTexture
+    #iblPrefilteredTexture!: GPUTexture
+    #iblBrdfLutTexture!: GPUTexture
+    #iblIrradianceView!: GPUTextureView
+    #iblPrefilteredView!: GPUTextureView
+    #iblBrdfLutView!: GPUTextureView
+    #iblSampler!: GPUSampler
+    #iblEnvBGLayout!: GPUBindGroupLayout
+    #iblCubeOutBGLayout!: GPUBindGroupLayout
+    #iblLutOutBGLayout!: GPUBindGroupLayout
+    #iblEnvBG!: GPUBindGroup
+    #iblIrradianceOutBG!: GPUBindGroup
+    #iblPrefilterOutBGs: GPUBindGroup[] = []
+    #iblLutOutBG!: GPUBindGroup
+    #iblIrradiancePipeline!: GPUComputePipeline
+    #iblPrefilterPipeline!: GPUComputePipeline
+    #iblBrdfLutPipeline!: GPUComputePipeline
 
-    private _gpuTimingSupported = false
-    private _timestampQuerySet?: GPUQuerySet
-    private _timestampResolveBuffer?: GPUBuffer
-    private _timestampReadbackBuffer?: GPUBuffer
-    private _timestampReadbackPending = false
+    #gpuTimingSupported = false
+    #timestampQuerySet?: GPUQuerySet
+    #timestampResolveBuffer?: GPUBuffer
+    #timestampReadbackBuffer?: GPUBuffer
+    #timestampReadbackPending = false
 
     // environment tint and strength for the image-based lighting term — white
     // at full strength means "the skybox lights the scene as authored"
@@ -250,37 +248,37 @@ export class Renderer implements IRenderer {
 
     public outputSource = RENDER_OUTPUT_SOURCES.DEFAULT
 
-    private geometryPipeline!: GPURenderPipeline
-    private lightingPipeline!: GPURenderPipeline
-    private postPipeline!: GPURenderPipeline
-    private fxaaPipeline!: GPURenderPipeline
-    private materialBindGroupLayout!: GPUBindGroupLayout
+    #geometryPipeline!: GPURenderPipeline
+    #lightingPipeline!: GPURenderPipeline
+    #postPipeline!: GPURenderPipeline
+    #fxaaPipeline!: GPURenderPipeline
+    #materialBindGroupLayout!: GPUBindGroupLayout
 
     constructor({ canvas }: IRendererProps) {
-        this._canvas = canvas
+        this.#canvas = canvas
     }
 
     public async init() {
-        await this._initializeContext(this._canvas)
+        await this.#initializeContext(this.#canvas)
 
-        this._context.configure({
-            device: this._device,
+        this.#context.configure({
+            device: this.#device,
             usage: GPUTextureUsage.RENDER_ATTACHMENT,
             format: DEFAULT_SWAP_CHAIN_FORMAT,
         })
 
-        this._gBuffer = new GBuffer(
-            this._device,
-            this._context,
+        this.#gBuffer = new GBuffer(
+            this.#device,
+            this.#context,
             this.swapChainFormat,
             this.depthTextureFormat
         )
 
-        this._shadowDepthTexture = this._device.createTexture({
+        this.#shadowDepthTexture = this.#device.createTexture({
             label: 'shadowDepthTexture',
             size: [
-                this._shadowDepthTextureSize,
-                this._shadowDepthTextureSize,
+                this.#shadowDepthTextureSize,
+                this.#shadowDepthTextureSize,
                 1,
             ],
             usage:
@@ -289,19 +287,19 @@ export class Renderer implements IRenderer {
             format: DEFAULT_SHADOW_DEPTH_FORMAT,
         })
 
-        this._shadowDepthSampler = this.device.createSampler({
+        this.#shadowDepthSampler = this.device.createSampler({
             compare: 'less',
             label: 'shadow depth sampler',
         })
 
-        this._shadowDepthTextureView = this._shadowDepthTexture.createView()
+        this.#shadowDepthTextureView = this.#shadowDepthTexture.createView()
 
-        this._shadowShaderModule = this.device.createShaderModule({
+        this.#shadowShaderModule = this.device.createShaderModule({
             label: 'shadow shader module',
             code: shadowShaderCode,
         })
 
-        this._shadowDataBuffer = this.device.createBuffer({
+        this.#shadowDataBuffer = this.device.createBuffer({
             label: 'shadow data buffer',
             size: SHADOW_DATA_BUFFER_SIZE,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
@@ -309,7 +307,7 @@ export class Renderer implements IRenderer {
 
         // slot i of the index buffer holds the u32 value i; bound with a dynamic
         // offset (i × 256) per atlas tile draw
-        this._shadowIndexBuffer = this.device.createBuffer({
+        this.#shadowIndexBuffer = this.device.createBuffer({
             label: 'shadow caster index buffer',
             size: MAX_SHADOW_CASTERS * SHADOW_INDEX_SLOT_SIZE,
             usage: GPUBufferUsage.UNIFORM,
@@ -317,15 +315,15 @@ export class Renderer implements IRenderer {
         })
         {
             const slots = new Uint32Array(
-                this._shadowIndexBuffer.getMappedRange()
+                this.#shadowIndexBuffer.getMappedRange()
             )
             for (let i = 0; i < MAX_SHADOW_CASTERS; i++) {
                 slots[(i * SHADOW_INDEX_SLOT_SIZE) / 4] = i
             }
-            this._shadowIndexBuffer.unmap()
+            this.#shadowIndexBuffer.unmap()
         }
 
-        this._shadowDataBGLayout = this.device.createBindGroupLayout({
+        this.#shadowDataBGLayout = this.device.createBindGroupLayout({
             label: 'shadow data bind group layout',
             entries: [
                 {
@@ -345,54 +343,54 @@ export class Renderer implements IRenderer {
             ],
         })
 
-        this._shadowDataBindGroup = this.device.createBindGroup({
+        this.#shadowDataBindGroup = this.device.createBindGroup({
             label: 'shadow data bind group',
-            layout: this._shadowDataBGLayout,
+            layout: this.#shadowDataBGLayout,
             entries: [
                 {
                     binding: 0,
                     resource: {
-                        buffer: this._shadowIndexBuffer,
+                        buffer: this.#shadowIndexBuffer,
                         offset: 0,
                         size: 4,
                     },
                 },
-                { binding: 1, resource: { buffer: this._shadowDataBuffer } },
+                { binding: 1, resource: { buffer: this.#shadowDataBuffer } },
             ],
         })
 
-        this._shaderModule = this.device.createShaderModule({
+        this.#shaderModule = this.device.createShaderModule({
             label: 'geometry shader',
             code: shaderCode,
         })
 
-        this._lightingShaderModule = this.device.createShaderModule({
+        this.#lightingShaderModule = this.device.createShaderModule({
             label: 'lighting shader',
             code: lightingShaderCode,
         })
 
-        this._postShaderModule = this.device.createShaderModule({
+        this.#postShaderModule = this.device.createShaderModule({
             label: 'post shader',
             code: postShaderCode,
         })
 
-        this._fxaaShaderModule = this.device.createShaderModule({
+        this.#fxaaShaderModule = this.device.createShaderModule({
             label: 'fxaa shader',
             code: fxaaShaderCode,
         })
 
-        this._initializeBindGroupLayouts()
+        this.#initializeBindGroupLayouts()
 
         // before the clustered-culling bind group below: lighting group 3
         // samples the IBL textures, so they must exist first
-        this._initializeIBL()
+        this.#initializeIBL()
 
-        this._initializeClusteredCulling()
+        this.#initializeClusteredCulling()
 
         // created after the cluster buffers exist: the lighting-side shadow
         // group also carries the culling results — the default maxBindGroups
         // is 4, so the lighting pipeline cannot have a separate 5th group
-        this._shadowBindGroupLayout = this.device.createBindGroupLayout({
+        this.#shadowBindGroupLayout = this.device.createBindGroupLayout({
             label: 'shadow bind group layout',
             entries: [
                 {
@@ -445,60 +443,60 @@ export class Renderer implements IRenderer {
             ],
         })
 
-        this._shadowBindGroup = this.device.createBindGroup({
+        this.#shadowBindGroup = this.device.createBindGroup({
             label: 'shadow bind group',
-            layout: this._shadowBindGroupLayout,
+            layout: this.#shadowBindGroupLayout,
             entries: [
-                { binding: 0, resource: this._shadowDepthTextureView },
-                { binding: 1, resource: this._shadowDepthSampler },
-                { binding: 2, resource: { buffer: this._shadowDataBuffer } },
-                { binding: 3, resource: { buffer: this._clusterCountsBuffer } },
+                { binding: 0, resource: this.#shadowDepthTextureView },
+                { binding: 1, resource: this.#shadowDepthSampler },
+                { binding: 2, resource: { buffer: this.#shadowDataBuffer } },
+                { binding: 3, resource: { buffer: this.#clusterCountsBuffer } },
                 {
                     binding: 4,
-                    resource: { buffer: this._clusterIndicesBuffer },
+                    resource: { buffer: this.#clusterIndicesBuffer },
                 },
-                { binding: 5, resource: this._iblIrradianceView },
-                { binding: 6, resource: this._iblPrefilteredView },
-                { binding: 7, resource: this._iblBrdfLutView },
-                { binding: 8, resource: this._iblSampler },
+                { binding: 5, resource: this.#iblIrradianceView },
+                { binding: 6, resource: this.#iblPrefilteredView },
+                { binding: 7, resource: this.#iblBrdfLutView },
+                { binding: 8, resource: this.#iblSampler },
             ],
         })
 
-        this._initializeViewParams()
+        this.#initializeViewParams()
 
         // attachment order must match GBufferOutput @location order in testShader.wgsl.
         // 4 targets: WebGPU's default maxColorAttachmentBytesPerSample is 32 and counts
         // each attachment 8-byte-aligned — occlusion is packed into metallicRoughness .r
-        this._geometryPassDescriptor = {
+        this.#geometryPassDescriptor = {
             label: 'geometry pass descriptor',
             colorAttachments: [
                 {
-                    view: this._gBuffer.albedo,
+                    view: this.#gBuffer.albedo,
                     loadOp: 'clear' as GPULoadOp,
                     clearValue: [0.0, 0.0, 0.0, 0.0],
                     storeOp: 'store' as GPUStoreOp,
                 },
                 {
-                    view: this._gBuffer.normal,
+                    view: this.#gBuffer.normal,
                     loadOp: 'clear' as GPULoadOp,
                     clearValue: [0.0, 0.0, 0.0, 0.0],
                     storeOp: 'store' as GPUStoreOp,
                 },
                 {
-                    view: this._gBuffer.metallicRoughness,
+                    view: this.#gBuffer.metallicRoughness,
                     loadOp: 'clear' as GPULoadOp,
                     clearValue: [0.0, 0.0, 0.0, 0.0],
                     storeOp: 'store' as GPUStoreOp,
                 },
                 {
-                    view: this._gBuffer.emission,
+                    view: this.#gBuffer.emission,
                     loadOp: 'clear' as GPULoadOp,
                     clearValue: [0.0, 0.0, 0.0, 0.0],
                     storeOp: 'store' as GPUStoreOp,
                 },
             ],
             depthStencilAttachment: {
-                view: this._gBuffer.depth,
+                view: this.#gBuffer.depth,
                 depthLoadOp: 'clear' as GPULoadOp,
                 depthClearValue: 1.0,
                 depthStoreOp: 'store' as GPUStoreOp,
@@ -507,11 +505,11 @@ export class Renderer implements IRenderer {
 
         // the lighting pass renders into the HDR target and the post pass
         // tonemaps that into the swapchain, so this view is static
-        this._lightingPassDescriptor = {
+        this.#lightingPassDescriptor = {
             label: 'lighting pass descriptor',
             colorAttachments: [
                 {
-                    view: this._gBuffer.litColor,
+                    view: this.#gBuffer.litColor,
                     loadOp: 'clear' as GPULoadOp,
                     clearValue: [0.0, 0.0, 0.0, 1.0],
                     storeOp: 'store' as GPUStoreOp,
@@ -521,7 +519,7 @@ export class Renderer implements IRenderer {
 
         // the tonemap target is assigned per frame: postColor when FXAA runs,
         // the swapchain when it doesn't
-        this._postPassDescriptor = {
+        this.#postPassDescriptor = {
             label: 'post pass descriptor',
             colorAttachments: [
                 {
@@ -533,7 +531,7 @@ export class Renderer implements IRenderer {
             ],
         }
 
-        this._fxaaPassDescriptor = {
+        this.#fxaaPassDescriptor = {
             label: 'fxaa pass descriptor',
             colorAttachments: [
                 {
@@ -545,30 +543,30 @@ export class Renderer implements IRenderer {
             ],
         }
 
-        this._shadowPassDescriptor = {
+        this.#shadowPassDescriptor = {
             colorAttachments: [],
             depthStencilAttachment: {
-                view: this._shadowDepthTextureView,
+                view: this.#shadowDepthTextureView,
                 depthClearValue: 1.0,
                 depthLoadOp: 'clear',
                 depthStoreOp: 'store',
             },
         }
 
-        this._skyBoxVerticesBuffer = this._device.createBuffer({
+        this.#skyBoxVerticesBuffer = this.#device.createBuffer({
             size: cubeVertexArray.byteLength,
             usage: GPUBufferUsage.VERTEX,
             mappedAtCreation: true,
         })
-        new Float32Array(this._skyBoxVerticesBuffer.getMappedRange()).set(
+        new Float32Array(this.#skyBoxVerticesBuffer.getMappedRange()).set(
             cubeVertexArray
         )
-        this._skyBoxVerticesBuffer.unmap()
+        this.#skyBoxVerticesBuffer.unmap()
 
-        this._skyBoxPipeline = this._device.createRenderPipeline({
+        this.#skyBoxPipeline = this.#device.createRenderPipeline({
             layout: 'auto',
             vertex: {
-                module: this._device.createShaderModule({
+                module: this.#device.createShaderModule({
                     code: skyboxShaderCode,
                 }),
                 buffers: [
@@ -590,7 +588,7 @@ export class Renderer implements IRenderer {
                 ],
             },
             fragment: {
-                module: this._device.createShaderModule({
+                module: this.#device.createShaderModule({
                     code: skyboxShaderCode,
                 }),
                 targets: [
@@ -615,67 +613,67 @@ export class Renderer implements IRenderer {
             },
         })
 
-        this._skyboxSampler = this._device.createSampler({
+        this.#skyboxSampler = this.#device.createSampler({
             magFilter: 'linear',
             minFilter: 'linear',
         })
 
-        this._skyBoxUniformBuffer = this._device.createBuffer({
+        this.#skyBoxUniformBuffer = this.#device.createBuffer({
             size: skyBoxUniformBufferSize,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         })
 
-        this._skyBoxRenderPassDescriptor = {
+        this.#skyBoxRenderPassDescriptor = {
             label: 'skybox render pass',
             colorAttachments: [
                 {
                     // static: the sky composites into the HDR target, which the
                     // tonemap pass then reads
-                    view: this._gBuffer.litColor,
+                    view: this.#gBuffer.litColor,
                     loadOp: 'load', // lighting result is already on the target
                     storeOp: 'store',
                 },
             ],
             depthStencilAttachment: {
-                view: this._gBuffer.depth,
+                view: this.#gBuffer.depth,
                 depthLoadOp: 'load' as GPULoadOp,
                 depthStoreOp: 'store' as GPUStoreOp,
             },
         }
 
-        if (this._gpuTimingSupported) {
-            const querySet = this._timestampQuerySet!
-            this._geometryPassDescriptor.timestampWrites = {
+        if (this.#gpuTimingSupported) {
+            const querySet = this.#timestampQuerySet!
+            this.#geometryPassDescriptor.timestampWrites = {
                 querySet,
                 beginningOfPassWriteIndex: 0,
                 endOfPassWriteIndex: 1,
             }
-            this._shadowPassDescriptor.timestampWrites = {
+            this.#shadowPassDescriptor.timestampWrites = {
                 querySet,
                 beginningOfPassWriteIndex: 2,
                 endOfPassWriteIndex: 3,
             }
-            this._computePassDescriptor.timestampWrites = {
+            this.#computePassDescriptor.timestampWrites = {
                 querySet,
                 beginningOfPassWriteIndex: 4,
                 endOfPassWriteIndex: 5,
             }
-            this._lightingPassDescriptor.timestampWrites = {
+            this.#lightingPassDescriptor.timestampWrites = {
                 querySet,
                 beginningOfPassWriteIndex: 6,
                 endOfPassWriteIndex: 7,
             }
-            this._skyBoxRenderPassDescriptor.timestampWrites = {
+            this.#skyBoxRenderPassDescriptor.timestampWrites = {
                 querySet,
                 beginningOfPassWriteIndex: 8,
                 endOfPassWriteIndex: 9,
             }
-            this._postPassDescriptor.timestampWrites = {
+            this.#postPassDescriptor.timestampWrites = {
                 querySet,
                 beginningOfPassWriteIndex: 10,
                 endOfPassWriteIndex: 11,
             }
-            this._fxaaPassDescriptor.timestampWrites = {
+            this.#fxaaPassDescriptor.timestampWrites = {
                 querySet,
                 beginningOfPassWriteIndex: 12,
                 endOfPassWriteIndex: 13,
@@ -684,7 +682,7 @@ export class Renderer implements IRenderer {
 
         const sampleType = 'float'
 
-        this.materialBindGroupLayout = this.device.createBindGroupLayout({
+        this.#materialBindGroupLayout = this.device.createBindGroupLayout({
             label: 'materialBindGroupLayout',
             entries: [
                 {
@@ -770,7 +768,7 @@ export class Renderer implements IRenderer {
             ],
         })
 
-        this._lightsBindGroupLayout = this.device.createBindGroupLayout({
+        this.#lightsBindGroupLayout = this.device.createBindGroupLayout({
             entries: [
                 {
                     binding: 0,
@@ -799,7 +797,7 @@ export class Renderer implements IRenderer {
             ],
         })
 
-        this._gBufferBindGroupLayout = this.device.createBindGroupLayout({
+        this.#gBufferBindGroupLayout = this.device.createBindGroupLayout({
             label: 'gBufferBindGroupLayout',
             entries: [
                 {
@@ -831,29 +829,29 @@ export class Renderer implements IRenderer {
         })
 
         // static — G-buffer views never change (no resize support)
-        this._gBufferBindGroup = this.device.createBindGroup({
+        this.#gBufferBindGroup = this.device.createBindGroup({
             label: 'gBuffer bindgroup',
-            layout: this._gBufferBindGroupLayout,
+            layout: this.#gBufferBindGroupLayout,
             entries: [
-                { binding: 0, resource: this._gBuffer.albedo },
-                { binding: 1, resource: this._gBuffer.normal },
-                { binding: 2, resource: this._gBuffer.metallicRoughness },
-                { binding: 3, resource: this._gBuffer.emission },
-                { binding: 4, resource: this._gBuffer.depth },
+                { binding: 0, resource: this.#gBuffer.albedo },
+                { binding: 1, resource: this.#gBuffer.normal },
+                { binding: 2, resource: this.#gBuffer.metallicRoughness },
+                { binding: 3, resource: this.#gBuffer.emission },
+                { binding: 4, resource: this.#gBuffer.depth },
             ],
         })
 
-        this.geometryPipeline = this.device.createRenderPipeline({
+        this.#geometryPipeline = this.device.createRenderPipeline({
             label: 'geometry render pipeline',
             layout: this.device.createPipelineLayout({
                 bindGroupLayouts: [
-                    this._uniformsBGLayout,
-                    this._nodeParamsBGLayout,
-                    this.materialBindGroupLayout,
+                    this.#uniformsBGLayout,
+                    this.#nodeParamsBGLayout,
+                    this.#materialBindGroupLayout,
                 ],
             }),
             vertex: {
-                module: this._shaderModule,
+                module: this.#shaderModule,
                 entryPoint: 'vertex_main',
                 buffers: [
                     {
@@ -899,7 +897,7 @@ export class Renderer implements IRenderer {
                 ],
             },
             fragment: {
-                module: this._shaderModule,
+                module: this.#shaderModule,
                 entryPoint: 'fragment_main',
                 // order must match the geometry pass descriptor attachments
                 targets: [
@@ -921,23 +919,23 @@ export class Renderer implements IRenderer {
             },
         })
 
-        this.lightingPipeline = this.device.createRenderPipeline({
+        this.#lightingPipeline = this.device.createRenderPipeline({
             label: 'lighting render pipeline',
             layout: this.device.createPipelineLayout({
                 bindGroupLayouts: [
-                    this._uniformsBGLayout,
-                    this._gBufferBindGroupLayout,
-                    this._lightsBindGroupLayout,
-                    this._shadowBindGroupLayout,
+                    this.#uniformsBGLayout,
+                    this.#gBufferBindGroupLayout,
+                    this.#lightsBindGroupLayout,
+                    this.#shadowBindGroupLayout,
                 ],
             }),
             vertex: {
-                module: this._lightingShaderModule,
+                module: this.#lightingShaderModule,
                 entryPoint: 'vertex_main',
                 buffers: [],
             },
             fragment: {
-                module: this._lightingShaderModule,
+                module: this.#lightingShaderModule,
                 entryPoint: 'fragment_main',
                 // linear HDR — the post pass tonemaps this into the swapchain
                 targets: [{ format: HDR_TARGET_FORMAT }],
@@ -949,7 +947,7 @@ export class Renderer implements IRenderer {
 
         // group 0 is shared with the geometry/lighting passes (view + debug
         // params); group 1 carries only the HDR texture
-        this._postBindGroupLayout = this.device.createBindGroupLayout({
+        this.#postBindGroupLayout = this.device.createBindGroupLayout({
             label: 'post bind group layout',
             entries: [
                 {
@@ -960,27 +958,27 @@ export class Renderer implements IRenderer {
             ],
         })
 
-        this._postBindGroup = this.device.createBindGroup({
+        this.#postBindGroup = this.device.createBindGroup({
             label: 'post bind group',
-            layout: this._postBindGroupLayout,
-            entries: [{ binding: 0, resource: this._gBuffer.litColor }],
+            layout: this.#postBindGroupLayout,
+            entries: [{ binding: 0, resource: this.#gBuffer.litColor }],
         })
 
-        this.postPipeline = this.device.createRenderPipeline({
+        this.#postPipeline = this.device.createRenderPipeline({
             label: 'post render pipeline',
             layout: this.device.createPipelineLayout({
                 bindGroupLayouts: [
-                    this._uniformsBGLayout,
-                    this._postBindGroupLayout,
+                    this.#uniformsBGLayout,
+                    this.#postBindGroupLayout,
                 ],
             }),
             vertex: {
-                module: this._postShaderModule,
+                module: this.#postShaderModule,
                 entryPoint: 'vertex_main',
                 buffers: [],
             },
             fragment: {
-                module: this._postShaderModule,
+                module: this.#postShaderModule,
                 entryPoint: 'fragment_main',
                 targets: [{ format: this.swapChainFormat }],
             },
@@ -991,12 +989,12 @@ export class Renderer implements IRenderer {
 
         // FXAA reads the tonemapped LDR target; a filtering sampler is required
         // because its taps land between pixels
-        this._fxaaSampler = this.device.createSampler({
+        this.#fxaaSampler = this.device.createSampler({
             magFilter: 'linear',
             minFilter: 'linear',
         })
 
-        this._fxaaBindGroupLayout = this.device.createBindGroupLayout({
+        this.#fxaaBindGroupLayout = this.device.createBindGroupLayout({
             label: 'fxaa bind group layout',
             entries: [
                 {
@@ -1012,30 +1010,30 @@ export class Renderer implements IRenderer {
             ],
         })
 
-        this._fxaaBindGroup = this.device.createBindGroup({
+        this.#fxaaBindGroup = this.device.createBindGroup({
             label: 'fxaa bind group',
-            layout: this._fxaaBindGroupLayout,
+            layout: this.#fxaaBindGroupLayout,
             entries: [
-                { binding: 0, resource: this._gBuffer.postColor },
-                { binding: 1, resource: this._fxaaSampler },
+                { binding: 0, resource: this.#gBuffer.postColor },
+                { binding: 1, resource: this.#fxaaSampler },
             ],
         })
 
-        this.fxaaPipeline = this.device.createRenderPipeline({
+        this.#fxaaPipeline = this.device.createRenderPipeline({
             label: 'fxaa render pipeline',
             layout: this.device.createPipelineLayout({
                 bindGroupLayouts: [
-                    this._uniformsBGLayout,
-                    this._fxaaBindGroupLayout,
+                    this.#uniformsBGLayout,
+                    this.#fxaaBindGroupLayout,
                 ],
             }),
             vertex: {
-                module: this._fxaaShaderModule,
+                module: this.#fxaaShaderModule,
                 entryPoint: 'vertex_main',
                 buffers: [],
             },
             fragment: {
-                module: this._fxaaShaderModule,
+                module: this.#fxaaShaderModule,
                 entryPoint: 'fragment_main',
                 targets: [{ format: this.swapChainFormat }],
             },
@@ -1060,7 +1058,7 @@ export class Renderer implements IRenderer {
     }
 
     public setSkyBoxTexture(bitmaps: TSkyboxBitmaps) {
-        this._skyboxTexture = this._device.createTexture({
+        this.#skyboxTexture = this.#device.createTexture({
             dimension: '2d',
             size: [bitmaps[0].width, bitmaps[0].height, 6],
             format: 'rgba8unorm',
@@ -1072,32 +1070,32 @@ export class Renderer implements IRenderer {
 
         for (let i = 0; i < bitmaps.length; i++) {
             const imageBitmap = bitmaps[i]!
-            this._device.queue.copyExternalImageToTexture(
+            this.#device.queue.copyExternalImageToTexture(
                 { source: imageBitmap },
-                { texture: this._skyboxTexture, origin: [0, 0, i] },
+                { texture: this.#skyboxTexture, origin: [0, 0, i] },
                 [imageBitmap.width, imageBitmap.height]
             )
         }
 
-        this._skyBoxUniformBindGroup = this._device.createBindGroup({
+        this.#skyBoxUniformBindGroup = this.#device.createBindGroup({
             label: 'skybox uniform bindgroup',
-            layout: this._skyBoxPipeline.getBindGroupLayout(0),
+            layout: this.#skyBoxPipeline.getBindGroupLayout(0),
             entries: [
                 {
                     binding: 0,
                     resource: {
-                        buffer: this._skyBoxUniformBuffer,
+                        buffer: this.#skyBoxUniformBuffer,
                         offset: 0,
                         size: skyBoxUniformBufferSize,
                     },
                 },
                 {
                     binding: 1,
-                    resource: this._skyboxSampler,
+                    resource: this.#skyboxSampler,
                 },
                 {
                     binding: 2,
-                    resource: this._skyboxTexture.createView({
+                    resource: this.#skyboxTexture.createView({
                         dimension: 'cube',
                     }),
                 },
@@ -1105,19 +1103,19 @@ export class Renderer implements IRenderer {
         })
 
         // indirect light comes from this skybox, so it has to be re-convolved
-        this._prefilterEnvironment()
+        this.#prefilterEnvironment()
     }
 
     get device() {
-        return this._device
+        return this.#device
     }
 
     get adapter() {
-        return this._adapter
+        return this.#adapter
     }
 
     get context() {
-        return this._context
+        return this.#context
     }
 
     get swapChainFormat() {
@@ -1129,32 +1127,32 @@ export class Renderer implements IRenderer {
     }
 
     get lightsBindGroupLayout() {
-        return this._lightsBindGroupLayout
+        return this.#lightsBindGroupLayout
     }
 
-    private _initializeViewParams() {
-        this._viewParamsBuffer = this.device.createBuffer({
-            size: this._viewParamsBufferSize,
+    #initializeViewParams() {
+        this.#viewParamsBuffer = this.device.createBuffer({
+            size: this.#viewParamsBufferSize,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         })
 
-        this._debugParamsBuffer = this.device.createBuffer({
+        this.#debugParamsBuffer = this.device.createBuffer({
             size: 4 + 4,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         })
 
-        this._viewParamsBindGroup = this.device.createBindGroup({
-            layout: this._uniformsBGLayout,
+        this.#viewParamsBindGroup = this.device.createBindGroup({
+            layout: this.#uniformsBGLayout,
             entries: [
-                { binding: 0, resource: { buffer: this._viewParamsBuffer } },
-                { binding: 1, resource: { buffer: this._debugParamsBuffer } },
+                { binding: 0, resource: { buffer: this.#viewParamsBuffer } },
+                { binding: 1, resource: { buffer: this.#debugParamsBuffer } },
             ],
         })
     }
 
-    private _initializeBindGroupLayouts() {
+    #initializeBindGroupLayouts() {
         // COMPUTE visibility included: the light-culling pass reads the view params
-        this._uniformsBGLayout = this.device.createBindGroupLayout({
+        this.#uniformsBGLayout = this.device.createBindGroupLayout({
             entries: [
                 {
                     binding: 0,
@@ -1175,7 +1173,7 @@ export class Renderer implements IRenderer {
             ],
         })
 
-        this._nodeParamsBGLayout = this.device.createBindGroupLayout({
+        this.#nodeParamsBGLayout = this.device.createBindGroupLayout({
             entries: [
                 {
                     binding: 0,
@@ -1186,33 +1184,33 @@ export class Renderer implements IRenderer {
         })
     }
 
-    private _initializeClusteredCulling() {
+    #initializeClusteredCulling() {
         // grid sized from the canvas (fixed at init — no resize support, same
         // as the G-buffer)
-        this._clusterTilesX = Math.ceil(this._canvas.width / CLUSTER_TILE_SIZE)
-        this._clusterTilesY = Math.ceil(this._canvas.height / CLUSTER_TILE_SIZE)
-        this._clusterCount =
-            this._clusterTilesX * this._clusterTilesY * CLUSTER_DEPTH_SLICES
+        this.#clusterTilesX = Math.ceil(this.#canvas.width / CLUSTER_TILE_SIZE)
+        this.#clusterTilesY = Math.ceil(this.#canvas.height / CLUSTER_TILE_SIZE)
+        this.#clusterCount =
+            this.#clusterTilesX * this.#clusterTilesY * CLUSTER_DEPTH_SLICES
 
-        this._clusterCountsBuffer = this._device.createBuffer({
+        this.#clusterCountsBuffer = this.#device.createBuffer({
             label: 'cluster light counts',
-            size: this._clusterCount * 4,
+            size: this.#clusterCount * 4,
             usage: GPUBufferUsage.STORAGE,
         })
 
-        this._clusterIndicesBuffer = this._device.createBuffer({
+        this.#clusterIndicesBuffer = this.#device.createBuffer({
             label: 'cluster light indices',
-            size: this._clusterCount * CLUSTER_MAX_LIGHTS * 4,
+            size: this.#clusterCount * CLUSTER_MAX_LIGHTS * 4,
             usage: GPUBufferUsage.STORAGE,
         })
 
-        this._cullLightsBuffer = this._device.createBuffer({
+        this.#cullLightsBuffer = this.#device.createBuffer({
             label: 'cull lights buffer',
             size: CULL_LIGHTS_BUFFER_SIZE,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         })
 
-        this._cullLightsBGLayout = this._device.createBindGroupLayout({
+        this.#cullLightsBGLayout = this.#device.createBindGroupLayout({
             label: 'cull lights bind group layout',
             entries: [
                 {
@@ -1223,15 +1221,15 @@ export class Renderer implements IRenderer {
             ],
         })
 
-        this._cullLightsBindGroup = this._device.createBindGroup({
+        this.#cullLightsBindGroup = this.#device.createBindGroup({
             label: 'cull lights bind group',
-            layout: this._cullLightsBGLayout,
+            layout: this.#cullLightsBGLayout,
             entries: [
-                { binding: 0, resource: { buffer: this._cullLightsBuffer } },
+                { binding: 0, resource: { buffer: this.#cullLightsBuffer } },
             ],
         })
 
-        this._clusterComputeBGLayout = this._device.createBindGroupLayout({
+        this.#clusterComputeBGLayout = this.#device.createBindGroupLayout({
             label: 'cluster compute bind group layout',
             entries: [
                 {
@@ -1247,104 +1245,104 @@ export class Renderer implements IRenderer {
             ],
         })
 
-        this._clusterComputeBindGroup = this._device.createBindGroup({
+        this.#clusterComputeBindGroup = this.#device.createBindGroup({
             label: 'cluster compute bind group',
-            layout: this._clusterComputeBGLayout,
+            layout: this.#clusterComputeBGLayout,
             entries: [
-                { binding: 0, resource: { buffer: this._clusterCountsBuffer } },
+                { binding: 0, resource: { buffer: this.#clusterCountsBuffer } },
                 {
                     binding: 1,
-                    resource: { buffer: this._clusterIndicesBuffer },
+                    resource: { buffer: this.#clusterIndicesBuffer },
                 },
             ],
         })
 
-        this._cullingShaderModule = this._device.createShaderModule({
+        this.#cullingShaderModule = this.#device.createShaderModule({
             label: 'light culling shader',
             code: lightCullingShaderCode,
         })
 
-        const cullingPipelineLayout = this._device.createPipelineLayout({
+        const cullingPipelineLayout = this.#device.createPipelineLayout({
             label: 'light culling pipeline layout',
             bindGroupLayouts: [
-                this._uniformsBGLayout,
-                this._cullLightsBGLayout,
-                this._clusterComputeBGLayout,
+                this.#uniformsBGLayout,
+                this.#cullLightsBGLayout,
+                this.#clusterComputeBGLayout,
             ],
         })
 
-        this._cullResetPipeline = this._device.createComputePipeline({
+        this.#cullResetPipeline = this.#device.createComputePipeline({
             label: 'cluster reset pipeline',
             layout: cullingPipelineLayout,
             compute: {
-                module: this._cullingShaderModule,
+                module: this.#cullingShaderModule,
                 entryPoint: 'reset_main',
             },
         })
 
-        this._cullPipeline = this._device.createComputePipeline({
+        this.#cullPipeline = this.#device.createComputePipeline({
             label: 'light culling pipeline',
             layout: cullingPipelineLayout,
             compute: {
-                module: this._cullingShaderModule,
+                module: this.#cullingShaderModule,
                 entryPoint: 'cull_main',
             },
         })
 
-        this._computePassDescriptor = {
+        this.#computePassDescriptor = {
             label: 'light culling compute pass',
         }
     }
 
-    private async _initializeContext(canvas: HTMLCanvasElement) {
+    async #initializeContext(canvas: HTMLCanvasElement) {
         const adapter = await navigator.gpu.requestAdapter()
 
         if (!adapter) {
             throw new Error('GPU Adapter Unavailable')
         }
 
-        this._gpuTimingSupported =
+        this.#gpuTimingSupported =
             Profiler.enabled && adapter.features.has('timestamp-query')
 
         const device = await adapter.requestDevice({
-            requiredFeatures: this._gpuTimingSupported
+            requiredFeatures: this.#gpuTimingSupported
                 ? ['timestamp-query']
                 : [],
         })
 
-        this._device = device
-        this._adapter = adapter
+        this.#device = device
+        this.#adapter = adapter
 
-        if (this._gpuTimingSupported) {
-            this._initializeGpuTiming()
+        if (this.#gpuTimingSupported) {
+            this.#initializeGpuTiming()
         }
 
         canvas.width = document.body.clientWidth * window.devicePixelRatio
         canvas.height = document.body.clientHeight * window.devicePixelRatio
 
-        this._context = canvas.getContext('webgpu') as GPUCanvasContext
+        this.#context = canvas.getContext('webgpu') as GPUCanvasContext
 
-        if (!this._context) {
+        if (!this.#context) {
             throw new Error('Failed to acquire GpuCanvasContext')
         }
     }
 
-    private _initializeGpuTiming() {
+    #initializeGpuTiming() {
         // 7 passes (geometry, shadow, culling compute, lighting, skybox,
         // tonemap, fxaa) x begin/end
-        this._timestampQuerySet = this._device.createQuerySet({
+        this.#timestampQuerySet = this.#device.createQuerySet({
             label: 'profiler timestamp query set',
             type: 'timestamp',
             count: 14,
         })
 
-        this._timestampResolveBuffer = this._device.createBuffer({
+        this.#timestampResolveBuffer = this.#device.createBuffer({
             label: 'profiler timestamp resolve buffer',
             size: 14 * 8,
             usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
         })
 
-        this._timestampReadbackBuffer = this._device.createBuffer({
+        this.#timestampReadbackBuffer = this.#device.createBuffer({
             label: 'profiler timestamp readback buffer',
             size: 14 * 8,
             usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
@@ -1358,13 +1356,13 @@ export class Renderer implements IRenderer {
      * group (group 3) samples these textures and must stay static: only their
      * contents are rewritten, in `_prefilterEnvironment()`.
      */
-    private _initializeIBL() {
-        this._iblShaderModule = this._device.createShaderModule({
+    #initializeIBL() {
+        this.#iblShaderModule = this.#device.createShaderModule({
             label: 'ibl shader',
             code: iblShaderCode,
         })
 
-        this._iblIrradianceTexture = this._device.createTexture({
+        this.#iblIrradianceTexture = this.#device.createTexture({
             label: 'ibl irradiance',
             dimension: '2d',
             size: [IBL_IRRADIANCE_SIZE, IBL_IRRADIANCE_SIZE, 6],
@@ -1374,7 +1372,7 @@ export class Renderer implements IRenderer {
                 GPUTextureUsage.STORAGE_BINDING,
         })
 
-        this._iblPrefilteredTexture = this._device.createTexture({
+        this.#iblPrefilteredTexture = this.#device.createTexture({
             label: 'ibl prefiltered',
             dimension: '2d',
             size: [IBL_PREFILTER_SIZE, IBL_PREFILTER_SIZE, 6],
@@ -1385,7 +1383,7 @@ export class Renderer implements IRenderer {
                 GPUTextureUsage.STORAGE_BINDING,
         })
 
-        this._iblBrdfLutTexture = this._device.createTexture({
+        this.#iblBrdfLutTexture = this.#device.createTexture({
             label: 'ibl brdf lut',
             dimension: '2d',
             size: [IBL_BRDF_LUT_SIZE, IBL_BRDF_LUT_SIZE],
@@ -1400,22 +1398,22 @@ export class Renderer implements IRenderer {
 
         // cube views for the lighting pass; the compute writes go through
         // 2d-array views because textureStore cannot target a cube view
-        this._iblIrradianceView = this._iblIrradianceTexture.createView({
+        this.#iblIrradianceView = this.#iblIrradianceTexture.createView({
             dimension: 'cube',
         })
-        this._iblPrefilteredView = this._iblPrefilteredTexture.createView({
+        this.#iblPrefilteredView = this.#iblPrefilteredTexture.createView({
             dimension: 'cube',
         })
-        this._iblBrdfLutView = this._iblBrdfLutTexture.createView()
+        this.#iblBrdfLutView = this.#iblBrdfLutTexture.createView()
 
         // trilinear, so roughness picks between the prefilter mip levels
-        this._iblSampler = this._device.createSampler({
+        this.#iblSampler = this.#device.createSampler({
             magFilter: 'linear',
             minFilter: 'linear',
             mipmapFilter: 'linear',
         })
 
-        this._iblEnvBGLayout = this._device.createBindGroupLayout({
+        this.#iblEnvBGLayout = this.#device.createBindGroupLayout({
             label: 'ibl env source layout',
             entries: [
                 {
@@ -1431,7 +1429,7 @@ export class Renderer implements IRenderer {
             ],
         })
 
-        this._iblCubeOutBGLayout = this._device.createBindGroupLayout({
+        this.#iblCubeOutBGLayout = this.#device.createBindGroupLayout({
             label: 'ibl cube output layout',
             entries: [
                 {
@@ -1446,7 +1444,7 @@ export class Renderer implements IRenderer {
             ],
         })
 
-        this._iblLutOutBGLayout = this._device.createBindGroupLayout({
+        this.#iblLutOutBGLayout = this.#device.createBindGroupLayout({
             label: 'ibl brdf lut output layout',
             entries: [
                 {
@@ -1461,13 +1459,13 @@ export class Renderer implements IRenderer {
             ],
         })
 
-        this._iblIrradianceOutBG = this._device.createBindGroup({
+        this.#iblIrradianceOutBG = this.#device.createBindGroup({
             label: 'ibl irradiance output',
-            layout: this._iblCubeOutBGLayout,
+            layout: this.#iblCubeOutBGLayout,
             entries: [
                 {
                     binding: 0,
-                    resource: this._iblIrradianceTexture.createView({
+                    resource: this.#iblIrradianceTexture.createView({
                         dimension: '2d-array',
                     }),
                 },
@@ -1476,16 +1474,16 @@ export class Renderer implements IRenderer {
 
         // one output bind group per prefilter mip: WGSL's textureStore has no
         // mip argument, so each level is written through its own single-mip view
-        this._iblPrefilterOutBGs = []
+        this.#iblPrefilterOutBGs = []
         for (let mip = 0; mip < IBL_PREFILTER_MIP_LEVELS; mip++) {
-            this._iblPrefilterOutBGs.push(
-                this._device.createBindGroup({
+            this.#iblPrefilterOutBGs.push(
+                this.#device.createBindGroup({
                     label: `ibl prefilter output mip ${mip}`,
-                    layout: this._iblCubeOutBGLayout,
+                    layout: this.#iblCubeOutBGLayout,
                     entries: [
                         {
                             binding: 0,
-                            resource: this._iblPrefilteredTexture.createView({
+                            resource: this.#iblPrefilteredTexture.createView({
                                 dimension: '2d-array',
                                 baseMipLevel: mip,
                                 mipLevelCount: 1,
@@ -1496,44 +1494,44 @@ export class Renderer implements IRenderer {
             )
         }
 
-        this._iblLutOutBG = this._device.createBindGroup({
+        this.#iblLutOutBG = this.#device.createBindGroup({
             label: 'ibl brdf lut output',
-            layout: this._iblLutOutBGLayout,
-            entries: [{ binding: 1, resource: this._iblBrdfLutView }],
+            layout: this.#iblLutOutBGLayout,
+            entries: [{ binding: 1, resource: this.#iblBrdfLutView }],
         })
 
         const cubePipeline = (label: string, entryPoint: string) =>
-            this._device.createComputePipeline({
+            this.#device.createComputePipeline({
                 label,
-                layout: this._device.createPipelineLayout({
+                layout: this.#device.createPipelineLayout({
                     bindGroupLayouts: [
-                        this._iblEnvBGLayout,
-                        this._iblCubeOutBGLayout,
+                        this.#iblEnvBGLayout,
+                        this.#iblCubeOutBGLayout,
                     ],
                 }),
-                compute: { module: this._iblShaderModule, entryPoint },
+                compute: { module: this.#iblShaderModule, entryPoint },
             })
 
-        this._iblIrradiancePipeline = cubePipeline(
+        this.#iblIrradiancePipeline = cubePipeline(
             'ibl irradiance pipeline',
             'irradiance_main'
         )
-        this._iblPrefilterPipeline = cubePipeline(
+        this.#iblPrefilterPipeline = cubePipeline(
             'ibl prefilter pipeline',
             'prefilter_main'
         )
         // the LUT needs no environment input, but group 0 is part of its layout
         // and must still be bound at dispatch time
-        this._iblBrdfLutPipeline = this._device.createComputePipeline({
+        this.#iblBrdfLutPipeline = this.#device.createComputePipeline({
             label: 'ibl brdf lut pipeline',
-            layout: this._device.createPipelineLayout({
+            layout: this.#device.createPipelineLayout({
                 bindGroupLayouts: [
-                    this._iblEnvBGLayout,
-                    this._iblLutOutBGLayout,
+                    this.#iblEnvBGLayout,
+                    this.#iblLutOutBGLayout,
                 ],
             }),
             compute: {
-                module: this._iblShaderModule,
+                module: this.#iblShaderModule,
                 entryPoint: 'brdf_lut_main',
             },
         })
@@ -1544,44 +1542,44 @@ export class Renderer implements IRenderer {
      * prefiltered specular map and the BRDF integration LUT. Runs once per
      * skybox assignment, not per frame.
      */
-    private _prefilterEnvironment() {
+    #prefilterEnvironment() {
         // the skybox texture is recreated on every assignment, so this group
         // cannot be built once at init
-        this._iblEnvBG = this._device.createBindGroup({
+        this.#iblEnvBG = this.#device.createBindGroup({
             label: 'ibl env source',
-            layout: this._iblEnvBGLayout,
+            layout: this.#iblEnvBGLayout,
             entries: [
                 {
                     binding: 0,
-                    resource: this._skyboxTexture.createView({
+                    resource: this.#skyboxTexture.createView({
                         dimension: 'cube',
                     }),
                 },
-                { binding: 1, resource: this._iblSampler },
+                { binding: 1, resource: this.#iblSampler },
             ],
         })
 
-        const encoder = this._device.createCommandEncoder({
+        const encoder = this.#device.createCommandEncoder({
             label: 'ibl prefilter encoder',
         })
         const pass = encoder.beginComputePass({
             label: 'ibl prefilter pass',
         })
 
-        pass.setBindGroup(0, this._iblEnvBG)
+        pass.setBindGroup(0, this.#iblEnvBG)
 
-        pass.setPipeline(this._iblIrradiancePipeline)
-        pass.setBindGroup(1, this._iblIrradianceOutBG)
+        pass.setPipeline(this.#iblIrradiancePipeline)
+        pass.setBindGroup(1, this.#iblIrradianceOutBG)
         pass.dispatchWorkgroups(
             IBL_IRRADIANCE_SIZE / 8,
             IBL_IRRADIANCE_SIZE / 8,
             6
         )
 
-        pass.setPipeline(this._iblPrefilterPipeline)
+        pass.setPipeline(this.#iblPrefilterPipeline)
         for (let mip = 0; mip < IBL_PREFILTER_MIP_LEVELS; mip++) {
             const size = IBL_PREFILTER_SIZE >> mip
-            pass.setBindGroup(1, this._iblPrefilterOutBGs[mip]!)
+            pass.setBindGroup(1, this.#iblPrefilterOutBGs[mip]!)
             pass.dispatchWorkgroups(
                 Math.max(1, size / 8),
                 Math.max(1, size / 8),
@@ -1589,15 +1587,15 @@ export class Renderer implements IRenderer {
             )
         }
 
-        pass.setPipeline(this._iblBrdfLutPipeline)
-        pass.setBindGroup(1, this._iblLutOutBG)
+        pass.setPipeline(this.#iblBrdfLutPipeline)
+        pass.setBindGroup(1, this.#iblLutOutBG)
         pass.dispatchWorkgroups(IBL_BRDF_LUT_SIZE / 8, IBL_BRDF_LUT_SIZE / 8, 1)
 
         pass.end()
-        this._device.queue.submit([encoder.finish()])
+        this.#device.queue.submit([encoder.finish()])
     }
 
-    private _createMeshBuffer(accessor: GLTFAccessor, scene: IScene) {
+    #createMeshBuffer(accessor: GLTFAccessor, scene: IScene) {
         const view = new Uint8Array(
             scene.bufferStorage.buffers.get(accessor.bufferId) as ArrayBuffer,
             accessor.byteOffset,
@@ -1645,7 +1643,7 @@ export class Renderer implements IRenderer {
 
         meshDataEntry.materialBindGroup = this.device.createBindGroup({
             label: 'material and sampler bindgroup',
-            layout: this.materialBindGroupLayout,
+            layout: this.#materialBindGroupLayout,
             entries: [
                 {
                     binding: 0,
@@ -1672,7 +1670,7 @@ export class Renderer implements IRenderer {
                 },
                 {
                     binding: 6,
-                    resource: this._skyboxTexture.createView({
+                    resource: this.#skyboxTexture.createView({
                         dimension: 'cube',
                     }),
                 },
@@ -1698,7 +1696,7 @@ export class Renderer implements IRenderer {
                 },
                 {
                     binding: 13,
-                    resource: this._skyboxSampler,
+                    resource: this.#skyboxSampler,
                 },
                 {
                     binding: 14,
@@ -1710,19 +1708,19 @@ export class Renderer implements IRenderer {
         // shadow pipelines are cached per position vertex format — meshes almost
         // always share `float32x3` positions, so this is ~1 pipeline per scene
         const shadowPipelineKey = `${mesh.positions.elementType}:${mesh.positions.byteStride}`
-        let shadowPipeline = this._shadowPipelineCache.get(shadowPipelineKey)
+        let shadowPipeline = this.#shadowPipelineCache.get(shadowPipelineKey)
         if (!shadowPipeline) {
             shadowPipeline = this.device.createRenderPipeline({
                 label: 'shadow render pipeline',
                 layout: this.device.createPipelineLayout({
                     label: 'shadow render pipeline layout',
                     bindGroupLayouts: [
-                        this._shadowDataBGLayout,
-                        this._nodeParamsBGLayout,
+                        this.#shadowDataBGLayout,
+                        this.#nodeParamsBGLayout,
                     ],
                 }),
                 vertex: {
-                    module: this._shadowShaderModule,
+                    module: this.#shadowShaderModule,
                     buffers: [
                         {
                             arrayStride: mesh.positions.byteStride,
@@ -1743,31 +1741,31 @@ export class Renderer implements IRenderer {
                 },
                 primitive,
             })
-            this._shadowPipelineCache.set(shadowPipelineKey, shadowPipeline)
+            this.#shadowPipelineCache.set(shadowPipelineKey, shadowPipeline)
         }
         meshDataEntry.shadowRenderPipeline = shadowPipeline
 
-        meshDataEntry.positionsBuffer = this._createMeshBuffer(
+        meshDataEntry.positionsBuffer = this.#createMeshBuffer(
             mesh.positions,
             scene
         )
 
-        meshDataEntry.textureCoordinatesBuffer = this._createMeshBuffer(
+        meshDataEntry.textureCoordinatesBuffer = this.#createMeshBuffer(
             mesh.textureCoordinates,
             scene
         )
 
-        meshDataEntry.normalsBuffer = this._createMeshBuffer(
+        meshDataEntry.normalsBuffer = this.#createMeshBuffer(
             mesh.normals,
             scene
         )
 
-        meshDataEntry.tangentsBuffer = this._createMeshBuffer(
+        meshDataEntry.tangentsBuffer = this.#createMeshBuffer(
             mesh.tangents,
             scene
         )
 
-        meshDataEntry.indicesBuffer = this._createMeshBuffer(
+        meshDataEntry.indicesBuffer = this.#createMeshBuffer(
             mesh.indices,
             scene
         )
@@ -1776,7 +1774,7 @@ export class Renderer implements IRenderer {
         mesh.isPipelineBuilt = true
     }
 
-    private renderMesh(
+    #renderMesh(
         mesh: IMesh,
         scene: IScene,
         renderPassEncoder: GPURenderPassEncoder
@@ -1832,7 +1830,7 @@ export class Renderer implements IRenderer {
         renderPassEncoder.drawIndexed(mesh.indices.count)
     }
 
-    private _createLightsBuffer = (
+    #createLightsBuffer = (
         byteStride: number,
         elementCount: number,
         lights: ILightSourceV2[],
@@ -1878,7 +1876,7 @@ export class Renderer implements IRenderer {
      * shared fit target for directional shadow frusta and the relevance volume
      * for point-light face culling.
      */
-    private _cameraShadowSphere(
+    #cameraShadowSphere(
         cameraPosition: Vec3,
         inverseViewProjection: Mat4,
         maxDistance: number
@@ -1925,7 +1923,7 @@ export class Renderer implements IRenderer {
      * Distance at which a light's contribution drops below
      * LIGHT_RANGE_THRESHOLD — attenuation is `c + l·d + e·d²`.
      */
-    private _deriveLightRange(
+    #deriveLightRange(
         intensity: number,
         attenuationConstant: number,
         attenuationLinear: number,
@@ -1950,7 +1948,7 @@ export class Renderer implements IRenderer {
         return SHADOW_LOCAL_FAR
     }
 
-    private _directionalShadowVP(
+    #directionalShadowVP(
         lightDirection: Vec3,
         sphere: { center: Vec3; radius: number },
         tileSize: number
@@ -1982,7 +1980,7 @@ export class Renderer implements IRenderer {
         return mat4.mul(lightProjection, lightView)
     }
 
-    private _spotShadowVP(light: ISpotLight): Mat4 {
+    #spotShadowVP(light: ISpotLight): Mat4 {
         const direction = vec3.normalize(light.direction)
         const up =
             Math.abs(direction[1]!) > 0.99
@@ -1996,7 +1994,7 @@ export class Renderer implements IRenderer {
         // directly, and keeps the projection away from π where it degenerates
         const halfAngle = Math.acos(Math.min(1, Math.max(-1, light.cutoff)))
         const fov = Math.min(2 * halfAngle, 2 * SPOT_MAX_CONE_HALF_ANGLE)
-        const range = this._deriveLightRange(
+        const range = this.#deriveLightRange(
             light.intensity,
             light.attenuationConstant,
             light.attenuationLinear,
@@ -2007,11 +2005,7 @@ export class Renderer implements IRenderer {
         return mat4.mul(lightProjection, lightView)
     }
 
-    private _pointFaceShadowVP(
-        lightPosition: Vec3,
-        face: number,
-        far: number
-    ): Mat4 {
+    #pointFaceShadowVP(lightPosition: Vec3, face: number, far: number): Mat4 {
         const faceDirection = POINT_FACE_DIRECTIONS[face]!
         const target = vec3.add(lightPosition, faceDirection)
         const lightView = mat4.lookAt(
@@ -2027,7 +2021,7 @@ export class Renderer implements IRenderer {
      * Conservative cone/sphere test: does this cube face's 90° frustum see any
      * part of the camera bounding sphere?
      */
-    private _pointFaceVisible(
+    #pointFaceVisible(
         face: number,
         lightPosition: Vec3,
         sphere: { center: Vec3; radius: number }
@@ -2062,18 +2056,18 @@ export class Renderer implements IRenderer {
      * A point light occupies 6 consecutive entries (face order +X -X +Y -Y +Z -Z);
      * culled faces stay `enabled = 0` (the shader treats them as lit).
      */
-    private _allocateShadowCasters(
+    #allocateShadowCasters(
         scene: IScene,
         cameraPosition: Vec3,
         inverseViewProjection: Mat4
     ): Map<ILightSourceV2, number> {
         const casterBases = new Map<ILightSourceV2, number>()
-        const floats = new Float32Array(this._shadowDataUpload)
-        const ints = new Uint32Array(this._shadowDataUpload)
+        const floats = new Float32Array(this.#shadowDataUpload)
+        const ints = new Uint32Array(this.#shadowDataUpload)
         floats.fill(0)
-        this._frameTiles = []
+        this.#frameTiles = []
 
-        const sphere = this._cameraShadowSphere(
+        const sphere = this.#cameraShadowSphere(
             cameraPosition,
             inverseViewProjection,
             SHADOW_DISTANCE
@@ -2097,7 +2091,7 @@ export class Renderer implements IRenderer {
                 distance: 0,
                 tileSize: SHADOW_TILE_DIRECTIONAL,
                 vps: [
-                    this._directionalShadowVP(
+                    this.#directionalShadowVP(
                         light.direction,
                         sphere,
                         SHADOW_TILE_DIRECTIONAL
@@ -2110,11 +2104,11 @@ export class Renderer implements IRenderer {
                 light,
                 distance: vec3.distance(light.position, cameraPosition),
                 tileSize: SHADOW_TILE_SPOT,
-                vps: [this._spotShadowVP(light)],
+                vps: [this.#spotShadowVP(light)],
             })
         }
         for (const light of scene.pointLights) {
-            const range = this._deriveLightRange(
+            const range = this.#deriveLightRange(
                 light.intensity,
                 light.attenuationConstant,
                 light.attenuationLinear,
@@ -2126,8 +2120,8 @@ export class Renderer implements IRenderer {
                 distance: vec3.distance(light.position, cameraPosition),
                 tileSize: SHADOW_TILE_POINT_FACE,
                 vps: POINT_FACE_DIRECTIONS.map((_, face) =>
-                    this._pointFaceVisible(face, light.position, sphere)
-                        ? this._pointFaceShadowVP(light.position, face, far)
+                    this.#pointFaceVisible(face, light.position, sphere)
+                        ? this.#pointFaceShadowVP(light.position, face, far)
                         : null
                 ),
             })
@@ -2135,8 +2129,8 @@ export class Renderer implements IRenderer {
 
         // hysteresis: lights that held tiles last frame first, then relevance
         candidates.sort((a, b) => {
-            const prevA = this._prevShadowedLights.has(a.light) ? 0 : 1
-            const prevB = this._prevShadowedLights.has(b.light) ? 0 : 1
+            const prevA = this.#prevShadowedLights.has(a.light) ? 0 : 1
+            const prevB = this.#prevShadowedLights.has(b.light) ? 0 : 1
             if (prevA !== prevB) {
                 return prevA - prevB
             }
@@ -2148,12 +2142,12 @@ export class Renderer implements IRenderer {
         let shelfY = 0
         let shelfHeight = 0
         const placeTile = (size: number): { x: number; y: number } | null => {
-            if (shelfX + size > this._shadowDepthTextureSize) {
+            if (shelfX + size > this.#shadowDepthTextureSize) {
                 shelfX = 0
                 shelfY += shelfHeight
                 shelfHeight = 0
             }
-            if (shelfY + size > this._shadowDepthTextureSize) {
+            if (shelfY + size > this.#shadowDepthTextureSize) {
                 return null
             }
             const position = { x: shelfX, y: shelfY }
@@ -2197,7 +2191,7 @@ export class Renderer implements IRenderer {
             }
 
             const base = casterCount
-            const atlasSize = this._shadowDepthTextureSize
+            const atlasSize = this.#shadowDepthTextureSize
             for (let i = 0; i < entryCount; i++) {
                 const vp = candidate.vps[i]!
                 const rect = rects[i]!
@@ -2219,7 +2213,7 @@ export class Renderer implements IRenderer {
                     entry + 16
                 )
                 ints[entry + 20] = 1 // enabled
-                this._frameTiles.push({
+                this.#frameTiles.push({
                     x: rect.x,
                     y: rect.y,
                     size: candidate.tileSize,
@@ -2233,11 +2227,11 @@ export class Renderer implements IRenderer {
         }
 
         ints[0] = casterCount
-        this._prevShadowedLights = assigned
+        this.#prevShadowedLights = assigned
         this.device.queue.writeBuffer(
-            this._shadowDataBuffer,
+            this.#shadowDataBuffer,
             0,
-            this._shadowDataUpload
+            this.#shadowDataUpload
         )
         return casterBases
     }
@@ -2246,9 +2240,9 @@ export class Renderer implements IRenderer {
      * Fills the compact culling buffer for the clustered light-culling compute
      * pass: all point (type 0) and spot (type 1) lights with derived ranges.
      */
-    private _updateCullLights(scene: IScene) {
-        const floats = new Float32Array(this._cullLightsUpload)
-        const ints = new Uint32Array(this._cullLightsUpload)
+    #updateCullLights(scene: IScene) {
+        const floats = new Float32Array(this.#cullLightsUpload)
+        const ints = new Uint32Array(this.#cullLightsUpload)
         floats.fill(0)
 
         let count = 0
@@ -2278,7 +2272,7 @@ export class Renderer implements IRenderer {
         scene.pointLights.forEach((light, index) => {
             addLight(
                 light.position,
-                this._deriveLightRange(
+                this.#deriveLightRange(
                     light.intensity,
                     light.attenuationConstant,
                     light.attenuationLinear,
@@ -2293,7 +2287,7 @@ export class Renderer implements IRenderer {
         scene.spotLights.forEach((light, index) => {
             addLight(
                 light.position,
-                this._deriveLightRange(
+                this.#deriveLightRange(
                     light.intensity,
                     light.attenuationConstant,
                     light.attenuationLinear,
@@ -2308,13 +2302,13 @@ export class Renderer implements IRenderer {
 
         ints[0] = count
         this.device.queue.writeBuffer(
-            this._cullLightsBuffer,
+            this.#cullLightsBuffer,
             0,
-            this._cullLightsUpload
+            this.#cullLightsUpload
         )
     }
 
-    private renderMeshShadows(
+    #renderMeshShadows(
         mesh: IMesh,
         scene: IScene,
         renderPassEncoder: GPURenderPassEncoder
@@ -2369,7 +2363,7 @@ export class Renderer implements IRenderer {
         debugInfoView.setUint32(0, this.outputSource, true)
 
         const viewParamsUploadBuffer = this.device.createBuffer({
-            size: this._viewParamsBufferSize,
+            size: this.#viewParamsBufferSize,
             usage: GPUBufferUsage.COPY_SRC,
             mappedAtCreation: true,
         })
@@ -2396,17 +2390,17 @@ export class Renderer implements IRenderer {
         // (floats 56/57 as f32, 58–61 as u32 — see ViewParams in lightCulling.wgsl)
         viewMap.set([scene.camera.zNear, scene.camera.zFar], 56)
         const viewInts = new Uint32Array(viewParamsMapped)
-        viewInts[58] = this._clusterTilesX
-        viewInts[59] = this._clusterTilesY
-        viewInts[60] = this._canvas.width
-        viewInts[61] = this._canvas.height
+        viewInts[58] = this.#clusterTilesX
+        viewInts[59] = this.#clusterTilesY
+        viewInts[60] = this.#canvas.width
+        viewInts[61] = this.#canvas.height
         // post-pass exposure (float 62 — see ViewParams in post.wgsl)
         viewMap[62] = this.exposure
 
         viewParamsUploadBuffer.unmap()
 
         const skyBoxViewParamsUploadBuffer = this.device.createBuffer({
-            size: this._skyBoxUniformBufferSize,
+            size: this.#skyBoxUniformBufferSize,
             usage: GPUBufferUsage.COPY_SRC,
             mappedAtCreation: true,
         })
@@ -2415,14 +2409,14 @@ export class Renderer implements IRenderer {
             skyBoxViewParamsUploadBuffer.getMappedRange()
         )
 
-        skyboxViewMap.set(this._skyBoxModelMatrix)
+        skyboxViewMap.set(this.#skyBoxModelMatrix)
         skyboxViewMap.set(scene.camera.projectionMatrix, 16)
         skyboxViewMap.set(scene.camera.view, 32)
         skyboxViewMap.set(scene.camera.position, 48)
 
         skyBoxViewParamsUploadBuffer.unmap()
 
-        const debugParamsArray = new ArrayBuffer(this._debugParamsBuffer.size)
+        const debugParamsArray = new ArrayBuffer(this.#debugParamsBuffer.size)
         const debugParamsView = new DataView(
             debugParamsArray,
             0,
@@ -2432,14 +2426,14 @@ export class Renderer implements IRenderer {
         debugParamsView.setUint32(4, 0)
 
         this.device.queue.writeBuffer(
-            this._debugParamsBuffer,
+            this.#debugParamsBuffer,
             0,
             debugInfoArray
         )
 
         // shadow atlas allocation must run before the lights buffers: their
         // `shadow_caster` pad slots are patched with the caster base indices
-        const casterBases = this._allocateShadowCasters(
+        const casterBases = this.#allocateShadowCasters(
             scene,
             scene.camera.position,
             inverseViewProjection
@@ -2452,7 +2446,7 @@ export class Renderer implements IRenderer {
         for (const light of [...scene.pointLights, ...scene.spotLights]) {
             lightRanges.set(
                 light,
-                this._deriveLightRange(
+                this.#deriveLightRange(
                     light.intensity,
                     light.attenuationConstant,
                     light.attenuationLinear,
@@ -2461,14 +2455,14 @@ export class Renderer implements IRenderer {
             )
         }
 
-        const directionalLightsBuffer = this._createLightsBuffer(
+        const directionalLightsBuffer = this.#createLightsBuffer(
             DIRECTIONAL_LIGHT_BYTESTRIDE,
             DIRECTIONAL_LIGHT_ELEMENT_COUNT,
             scene.directionalLights,
             DIRECTIONAL_CASTER_SLOT,
             casterBases
         )
-        const pointLightsBuffer = this._createLightsBuffer(
+        const pointLightsBuffer = this.#createLightsBuffer(
             POINT_LIGHT_BYTESTRIDE,
             POINT_LIGHT_ELEMENT_COUNT,
             scene.pointLights,
@@ -2476,7 +2470,7 @@ export class Renderer implements IRenderer {
             casterBases,
             { slot: POINT_RANGE_SLOT, ranges: lightRanges }
         )
-        const spotLightsBuffer = this._createLightsBuffer(
+        const spotLightsBuffer = this.#createLightsBuffer(
             SPOT_LIGHT_BYTESTRIDE,
             SPOT_LIGHT_ELEMENT_COUNT,
             scene.spotLights,
@@ -2485,7 +2479,7 @@ export class Renderer implements IRenderer {
             { slot: SPOT_RANGE_SLOT, ranges: lightRanges }
         )
 
-        this._updateCullLights(scene)
+        this.#updateCullLights(scene)
 
         const lightsBindGroup = this.device.createBindGroup({
             layout: this.lightsBindGroupLayout,
@@ -2533,7 +2527,7 @@ export class Renderer implements IRenderer {
             nodeParamsUploadBuffer.unmap()
 
             const nodeParamsBindGroup = this.device.createBindGroup({
-                layout: this._nodeParamsBGLayout,
+                layout: this.#nodeParamsBGLayout,
                 entries: [
                     {
                         binding: 0,
@@ -2576,42 +2570,42 @@ export class Renderer implements IRenderer {
         commandEncoder.copyBufferToBuffer(
             viewParamsUploadBuffer,
             0,
-            this._viewParamsBuffer,
+            this.#viewParamsBuffer,
             0,
-            this._viewParamsBufferSize
+            this.#viewParamsBufferSize
         )
 
         commandEncoder.copyBufferToBuffer(
             skyBoxViewParamsUploadBuffer,
             0,
-            this._skyBoxUniformBuffer,
+            this.#skyBoxUniformBuffer,
             0,
-            this._skyBoxUniformBufferSize
+            this.#skyBoxUniformBufferSize
         )
         const currentTextureView = this.context.getCurrentTexture().createView()
         const fxaaEnabled = this.antiAliasing === 'fxaa'
         // tonemap writes the LDR target when FXAA follows it, otherwise straight
         // to the swapchain — so disabling AA skips a pass instead of running it
-        ;(this._postPassDescriptor as any).colorAttachments[0].view =
-            fxaaEnabled ? this._gBuffer.postColor : currentTextureView
-        ;(this._fxaaPassDescriptor as any).colorAttachments[0].view =
+        ;(this.#postPassDescriptor as any).colorAttachments[0].view =
+            fxaaEnabled ? this.#gBuffer.postColor : currentTextureView
+        ;(this.#fxaaPassDescriptor as any).colorAttachments[0].view =
             currentTextureView
 
         const gpuTimingThisFrame =
-            this._gpuTimingSupported && !this._timestampReadbackPending
+            this.#gpuTimingSupported && !this.#timestampReadbackPending
 
         // pass order: geometry (G-buffer) → shadow (atlas tiles) → culling
         // (compute) → lighting (HDR) → skybox (into HDR) → tonemap (LDR) → fxaa
 
         const geometryPass = commandEncoder.beginRenderPass(
-            this._geometryPassDescriptor
+            this.#geometryPassDescriptor
         )
 
-        geometryPass.setBindGroup(0, this._viewParamsBindGroup)
-        geometryPass.setPipeline(this.geometryPipeline)
+        geometryPass.setBindGroup(0, this.#viewParamsBindGroup)
+        geometryPass.setPipeline(this.#geometryPipeline)
 
         meshesToRender.forEach((mesh) => {
-            this.renderMesh(mesh, scene, geometryPass)
+            this.#renderMesh(mesh, scene, geometryPass)
         })
 
         geometryPass.end()
@@ -2622,49 +2616,49 @@ export class Renderer implements IRenderer {
         // one pass over the whole atlas; each tile gets its viewport/scissor and
         // selects its caster entry via the dynamic bind-group offset
         const shadowPass = commandEncoder.beginRenderPass(
-            this._shadowPassDescriptor
+            this.#shadowPassDescriptor
         )
 
-        for (const tile of this._frameTiles) {
+        for (const tile of this.#frameTiles) {
             shadowPass.setViewport(tile.x, tile.y, tile.size, tile.size, 0, 1)
             shadowPass.setScissorRect(tile.x, tile.y, tile.size, tile.size)
-            shadowPass.setBindGroup(0, this._shadowDataBindGroup, [
+            shadowPass.setBindGroup(0, this.#shadowDataBindGroup, [
                 tile.casterIndex * SHADOW_INDEX_SLOT_SIZE,
             ])
 
             shadowCasters.forEach((mesh) => {
-                this.renderMeshShadows(mesh, scene, shadowPass)
+                this.#renderMeshShadows(mesh, scene, shadowPass)
             })
         }
 
         shadowPass.end()
 
         const cullingPass = commandEncoder.beginComputePass(
-            this._computePassDescriptor
+            this.#computePassDescriptor
         )
 
-        cullingPass.setBindGroup(0, this._viewParamsBindGroup)
-        cullingPass.setBindGroup(1, this._cullLightsBindGroup)
-        cullingPass.setBindGroup(2, this._clusterComputeBindGroup)
+        cullingPass.setBindGroup(0, this.#viewParamsBindGroup)
+        cullingPass.setBindGroup(1, this.#cullLightsBindGroup)
+        cullingPass.setBindGroup(2, this.#clusterComputeBindGroup)
 
-        const cullingWorkgroups = Math.ceil(this._clusterCount / 64)
-        cullingPass.setPipeline(this._cullResetPipeline)
+        const cullingWorkgroups = Math.ceil(this.#clusterCount / 64)
+        cullingPass.setPipeline(this.#cullResetPipeline)
         cullingPass.dispatchWorkgroups(cullingWorkgroups)
         // dispatches within a compute pass are ordered with memory barriers
-        cullingPass.setPipeline(this._cullPipeline)
+        cullingPass.setPipeline(this.#cullPipeline)
         cullingPass.dispatchWorkgroups(cullingWorkgroups)
 
         cullingPass.end()
 
         const lightingPass = commandEncoder.beginRenderPass(
-            this._lightingPassDescriptor
+            this.#lightingPassDescriptor
         )
 
-        lightingPass.setBindGroup(0, this._viewParamsBindGroup)
-        lightingPass.setBindGroup(1, this._gBufferBindGroup)
+        lightingPass.setBindGroup(0, this.#viewParamsBindGroup)
+        lightingPass.setBindGroup(1, this.#gBufferBindGroup)
         lightingPass.setBindGroup(2, lightsBindGroup)
-        lightingPass.setBindGroup(3, this._shadowBindGroup)
-        lightingPass.setPipeline(this.lightingPipeline)
+        lightingPass.setBindGroup(3, this.#shadowBindGroup)
+        lightingPass.setPipeline(this.#lightingPipeline)
         lightingPass.draw(3) // fullscreen triangle
 
         lightingPass.end()
@@ -2672,35 +2666,35 @@ export class Renderer implements IRenderer {
         // composited into the HDR target so the post chain sees the sky and the
         // geometry/sky silhouette gets antialiased too
         const skyBoxPass = commandEncoder.beginRenderPass(
-            this._skyBoxRenderPassDescriptor
+            this.#skyBoxRenderPassDescriptor
         )
-        skyBoxPass.setPipeline(this._skyBoxPipeline)
-        skyBoxPass.setVertexBuffer(0, this._skyBoxVerticesBuffer)
-        skyBoxPass.setBindGroup(0, this._skyBoxUniformBindGroup)
+        skyBoxPass.setPipeline(this.#skyBoxPipeline)
+        skyBoxPass.setVertexBuffer(0, this.#skyBoxVerticesBuffer)
+        skyBoxPass.setBindGroup(0, this.#skyBoxUniformBindGroup)
         skyBoxPass.draw(cubeVertexCount)
         skyBoxPass.end()
 
         // exposure → ACES tonemap → sRGB; the debug channel views pass through
         // this shader untouched
         const postPass = commandEncoder.beginRenderPass(
-            this._postPassDescriptor
+            this.#postPassDescriptor
         )
 
-        postPass.setBindGroup(0, this._viewParamsBindGroup)
-        postPass.setBindGroup(1, this._postBindGroup)
-        postPass.setPipeline(this.postPipeline)
+        postPass.setBindGroup(0, this.#viewParamsBindGroup)
+        postPass.setBindGroup(1, this.#postBindGroup)
+        postPass.setPipeline(this.#postPipeline)
         postPass.draw(3) // fullscreen triangle
 
         postPass.end()
 
         if (fxaaEnabled) {
             const fxaaPass = commandEncoder.beginRenderPass(
-                this._fxaaPassDescriptor
+                this.#fxaaPassDescriptor
             )
 
-            fxaaPass.setBindGroup(0, this._viewParamsBindGroup)
-            fxaaPass.setBindGroup(1, this._fxaaBindGroup)
-            fxaaPass.setPipeline(this.fxaaPipeline)
+            fxaaPass.setBindGroup(0, this.#viewParamsBindGroup)
+            fxaaPass.setBindGroup(1, this.#fxaaBindGroup)
+            fxaaPass.setPipeline(this.#fxaaPipeline)
             fxaaPass.draw(3) // fullscreen triangle
 
             fxaaPass.end()
@@ -2712,20 +2706,20 @@ export class Renderer implements IRenderer {
 
         if (gpuTimingThisFrame) {
             commandEncoder.resolveQuerySet(
-                this._timestampQuerySet!,
+                this.#timestampQuerySet!,
                 0,
                 gpuQueryCount,
-                this._timestampResolveBuffer!,
+                this.#timestampResolveBuffer!,
                 0
             )
             commandEncoder.copyBufferToBuffer(
-                this._timestampResolveBuffer!,
+                this.#timestampResolveBuffer!,
                 0,
-                this._timestampReadbackBuffer!,
+                this.#timestampReadbackBuffer!,
                 0,
                 gpuQueryCount * 8
             )
-            this._timestampReadbackPending = true
+            this.#timestampReadbackPending = true
         }
 
         const afterEncode = performance.now()
@@ -2735,15 +2729,15 @@ export class Renderer implements IRenderer {
         Profiler.sample('submit', performance.now() - afterEncode)
 
         if (gpuTimingThisFrame) {
-            this._readTimestamps(fxaaEnabled)
+            this.#readTimestamps(fxaaEnabled)
         }
 
         viewParamsUploadBuffer.destroy()
         skyBoxViewParamsUploadBuffer.destroy()
     }
 
-    private _readTimestamps(fxaaTimed: boolean) {
-        const readbackBuffer = this._timestampReadbackBuffer!
+    #readTimestamps(fxaaTimed: boolean) {
+        const readbackBuffer = this.#timestampReadbackBuffer!
 
         readbackBuffer
             .mapAsync(GPUMapMode.READ)
@@ -2767,10 +2761,10 @@ export class Renderer implements IRenderer {
                 }
 
                 readbackBuffer.unmap()
-                this._timestampReadbackPending = false
+                this.#timestampReadbackPending = false
             })
             .catch(() => {
-                this._timestampReadbackPending = false
+                this.#timestampReadbackPending = false
             })
     }
 }

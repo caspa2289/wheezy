@@ -13,96 +13,94 @@ export interface ICameraProps {
 }
 
 export class Camera extends Entity<EntityTypes.camera> implements ICamera {
-    private readonly _view = mat4.create()
+    readonly #view = mat4.create()
 
-    private _matrix = new Float32Array([
-        1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
-    ])
-    private _right = new Float32Array(this._matrix.buffer, 4 * 0, 4)
-    private _up = new Float32Array(this._matrix.buffer, 4 * 4, 4)
-    private _back = new Float32Array(this._matrix.buffer, 4 * 8, 4)
-    private _position = new Float32Array(this._matrix.buffer, 4 * 12, 4)
+    #matrix = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
+    #right = new Float32Array(this.#matrix.buffer, 4 * 0, 4)
+    #up = new Float32Array(this.#matrix.buffer, 4 * 4, 4)
+    #back = new Float32Array(this.#matrix.buffer, 4 * 8, 4)
+    #position = new Float32Array(this.#matrix.buffer, 4 * 12, 4)
 
-    private _zFar: number
-    private _zNear: number
-    private _aspectRatio: number
-    private _projectionMatrix
+    #zFar: number
+    #zNear: number
+    #aspectRatio: number
+    #projectionMatrix
 
     constructor(props: ICameraProps) {
         super(EntityTypes.camera)
 
-        this._zFar = props?.zFar ?? 1000
-        this._zNear = props?.zNear ?? 0.1
-        this._aspectRatio = props.canvasWidth / props.canvasHeight
-        this._projectionMatrix = mat4.perspective(
+        this.#zFar = props?.zFar ?? 1000
+        this.#zNear = props?.zNear ?? 0.1
+        this.#aspectRatio = props.canvasWidth / props.canvasHeight
+        this.#projectionMatrix = mat4.perspective(
             (2 * Math.PI) / 5,
-            this._aspectRatio,
-            this._zNear,
-            this._zFar
+            this.#aspectRatio,
+            this.#zNear,
+            this.#zFar
         )
     }
 
     get aspectRatio() {
-        return this._aspectRatio
+        return this.#aspectRatio
     }
 
     get zFar() {
-        return this._zFar
+        return this.#zFar
     }
 
     get zNear() {
-        return this._zNear
+        return this.#zNear
     }
 
     get projectionMatrix() {
-        return this._projectionMatrix
+        return this.#projectionMatrix
     }
 
     get view() {
-        return this._view
+        return this.#view
     }
 
     set view(mat: Mat4) {
-        mat4.copy(mat, this._view)
+        mat4.copy(mat, this.#view)
     }
 
     get right() {
-        return this._right
+        return this.#right
     }
 
     set right(vec: Vec3) {
-        vec3.copy(vec, this._right)
+        vec3.copy(vec, this.#right)
     }
 
     get up() {
-        return this._up
+        return this.#up
     }
 
     set up(vec: Vec3) {
-        vec3.copy(vec, this._up)
+        vec3.copy(vec, this.#up)
     }
 
     get back() {
-        return this._back
+        return this.#back
     }
 
     set back(vec: Vec3) {
-        vec3.copy(vec, this._back)
+        vec3.copy(vec, this.#back)
     }
 
     get matrix() {
-        return this._matrix
+        return this.#matrix
     }
 
     set matrix(value: Mat4) {
-        this._matrix = mat4.copy(value, this._matrix)
+        this.#matrix = mat4.copy(value, this.#matrix)
     }
 
     get position() {
-        return this._position
+        return this.#position
     }
 
     set position(value: Vec3) {
-        vec3.copy(value, this._position)
+        vec3.copy(value, this.#position)
     }
 }

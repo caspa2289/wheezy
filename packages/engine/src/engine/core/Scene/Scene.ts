@@ -25,19 +25,19 @@ import { type IDirectionalLight } from '../lights/DirectionalLightV2'
 import { type IPointLight, type ISpotLight } from '../lights'
 
 export class Scene implements IScene {
-    private _objectManager: IObjectManager = new ObjectManager()
-    private _bufferStorage: IBufferStorage = new BufferStorage()
-    private _imageStorage: IImageStorage = new ImageStorage()
-    private _samplerStorage: ISamplerStorage
-    private _textureStorage = new TextureStorage()
-    private _materialStorage = new MaterialStorage()
-    private _meshRenderDataStorage = new MeshRenderDataStorage()
+    #objectManager: IObjectManager = new ObjectManager()
+    #bufferStorage: IBufferStorage = new BufferStorage()
+    #imageStorage: IImageStorage = new ImageStorage()
+    #samplerStorage: ISamplerStorage
+    #textureStorage = new TextureStorage()
+    #materialStorage = new MaterialStorage()
+    #meshRenderDataStorage = new MeshRenderDataStorage()
 
-    private _camera!: ICamera
+    #camera!: ICamera
 
     protected _engine?: IEngine
 
-    private _root: IGameObject
+    #root: IGameObject
 
     directionalLights: IDirectionalLight[] = []
     pointLights: IPointLight[] = []
@@ -54,11 +54,11 @@ export class Scene implements IScene {
             )
         }
 
-        this._samplerStorage = new SamplerStorage(this._engine.renderer.device)
+        this.#samplerStorage = new SamplerStorage(this._engine.renderer.device)
 
-        this._root = new GameObject()
+        this.#root = new GameObject()
 
-        this._objectManager.addObject(this._root)
+        this.#objectManager.addObject(this.#root)
 
         this.camera =
             camera ??
@@ -76,43 +76,43 @@ export class Scene implements IScene {
     }
 
     get objectManager() {
-        return this._objectManager
+        return this.#objectManager
     }
 
     get root() {
-        return this._root
+        return this.#root
     }
 
     get textureStorage() {
-        return this._textureStorage
+        return this.#textureStorage
     }
 
     get meshRenderDataStorage() {
-        return this._meshRenderDataStorage
+        return this.#meshRenderDataStorage
     }
 
     get materialStorage() {
-        return this._materialStorage
+        return this.#materialStorage
     }
 
     get bufferStorage() {
-        return this._bufferStorage
+        return this.#bufferStorage
     }
 
     get imageStorage() {
-        return this._imageStorage
+        return this.#imageStorage
     }
 
     get samplerStorage() {
-        return this._samplerStorage
+        return this.#samplerStorage
     }
 
     get camera() {
-        return this._camera
+        return this.#camera
     }
 
     set camera(value) {
-        this._camera = value
+        this.#camera = value
     }
 
     get engine() {
@@ -130,13 +130,13 @@ export class Scene implements IScene {
 
         return ModelUploader.uploadModel(
             props.modelData,
-            this._objectManager,
-            this._bufferStorage,
-            this._imageStorage,
-            this._samplerStorage,
-            this._materialStorage,
-            this._textureStorage,
-            this._root,
+            this.#objectManager,
+            this.#bufferStorage,
+            this.#imageStorage,
+            this.#samplerStorage,
+            this.#materialStorage,
+            this.#textureStorage,
+            this.#root,
             this._engine.renderer.device
         )
     }

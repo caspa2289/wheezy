@@ -15,11 +15,11 @@ export class PerspectiveCamera extends Camera implements IPerspectiveCamera {
         const positionVec = props?.position ?? vec3.create(0, 0, 0)
         const targetVec = props?.target ?? vec3.copy(positionVec)
         const back = vec3.normalize(vec3.sub(positionVec, targetVec))
-        this._recalculateAngles(back)
+        this.#recalculateAngles(back)
         super.position = positionVec
     }
 
-    private _recalculateAngles(direction: Vec3) {
+    #recalculateAngles(direction: Vec3) {
         this.yaw = Math.atan2(direction[0]!, direction[2]!)
         this.pitch = -Math.asin(direction[1]!)
     }

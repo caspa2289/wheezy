@@ -32,7 +32,7 @@ export interface ISpotLight extends ILightSourceV2 {
 export class SpotLight extends LightSourceV2 implements ISpotLight {
     position: Vec3
     direction: Vec3
-    _cutoff!: number
+    #cutoff!: number
     attenuationConstant: number
     attenuationLinear: number
     attenuationExponential: number
@@ -48,7 +48,7 @@ export class SpotLight extends LightSourceV2 implements ISpotLight {
     }
 
     get cutoff() {
-        return this._cutoff
+        return this.#cutoff
     }
 
     set cutoff(eulerDegrees) {
@@ -58,7 +58,7 @@ export class SpotLight extends LightSourceV2 implements ISpotLight {
             eulerDegrees * 0.01745329252,
             SPOT_MAX_CONE_HALF_ANGLE
         )
-        this._cutoff = Math.cos(halfAngle)
+        this.#cutoff = Math.cos(halfAngle)
     }
 
     /**

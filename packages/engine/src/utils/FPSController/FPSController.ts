@@ -94,14 +94,14 @@ export class FPSController {
         })
     }
 
-    private getSign = (positive: boolean, negative: boolean) =>
+    #getSign = (positive: boolean, negative: boolean) =>
         (positive ? 1 : 0) - (negative ? 1 : 0)
 
     update(deltaTime: number) {
         const targetVelocity = vec3.create()
-        const deltaRight = this.getSign(this.moveRight, this.moveLeft)
-        const deltaBack = this.getSign(this.moveBack, this.moveForward)
-        const deltaUp = this.getSign(this.moveUp, this.moveDown)
+        const deltaRight = this.#getSign(this.moveRight, this.moveLeft)
+        const deltaBack = this.#getSign(this.moveBack, this.moveForward)
+        const deltaUp = this.#getSign(this.moveUp, this.moveDown)
         this.camera.yaw -= this.rotationSpeed * this.analogX * deltaTime
         this.camera.pitch -= this.rotationSpeed * this.analogY * deltaTime
         this.analogX = 0

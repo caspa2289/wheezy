@@ -15,28 +15,28 @@ import { ArcBallController } from '@wheezy/engine/src/utils/ArcBallController'
 
 //This is supposed to demonstrate basic workflow
 export class Demo0 extends Scene implements IScene {
-    private sun!: IGameObject
+    #sun!: IGameObject
 
-    private mercury!: IGameObject
-    private mercuryHook: IGameObject = this._createTransformObject()
-    private venus!: IGameObject
-    private venusHook: IGameObject = this._createTransformObject()
-    private earth!: IGameObject
-    private earthHook: IGameObject = this._createTransformObject()
-    private mars!: IGameObject
-    private marsHook: IGameObject = this._createTransformObject()
-    private jupiter!: IGameObject
-    private jupiterHook: IGameObject = this._createTransformObject()
-    private saturn!: IGameObject
-    private saturnHook: IGameObject = this._createTransformObject()
-    private uranus!: IGameObject
-    private uranusHook: IGameObject = this._createTransformObject()
-    private neptune!: IGameObject
-    private neptuneHook: IGameObject = this._createTransformObject()
+    #mercury!: IGameObject
+    #mercuryHook: IGameObject = this.#createTransformObject()
+    #venus!: IGameObject
+    #venusHook: IGameObject = this.#createTransformObject()
+    #earth!: IGameObject
+    #earthHook: IGameObject = this.#createTransformObject()
+    #mars!: IGameObject
+    #marsHook: IGameObject = this.#createTransformObject()
+    #jupiter!: IGameObject
+    #jupiterHook: IGameObject = this.#createTransformObject()
+    #saturn!: IGameObject
+    #saturnHook: IGameObject = this.#createTransformObject()
+    #uranus!: IGameObject
+    #uranusHook: IGameObject = this.#createTransformObject()
+    #neptune!: IGameObject
+    #neptuneHook: IGameObject = this.#createTransformObject()
 
     public yearsPerMinute = 1
 
-    private controller: ArcBallController
+    #controller: ArcBallController
 
     constructor() {
         super()
@@ -48,7 +48,7 @@ export class Demo0 extends Scene implements IScene {
             position: vec3.create(0, 4, 5),
         })
 
-        this.controller = new ArcBallController({
+        this.#controller = new ArcBallController({
             camera: this.camera as ArcBallCamera,
             canvas: this._engine?.renderer.context.canvas as HTMLCanvasElement,
         })
@@ -71,10 +71,10 @@ export class Demo0 extends Scene implements IScene {
             })
         )
 
-        this._setupSkyBox()
+        this.#setupSkyBox()
     }
 
-    private async _setupSkyBox() {
+    async #setupSkyBox() {
         const imgSrcs = [
             'static/cubemaps/space/posx.png',
             'static/cubemaps/space/negx.png',
@@ -93,7 +93,7 @@ export class Demo0 extends Scene implements IScene {
         this._engine?.renderer.setSkyBoxTexture(imageBitmaps)
     }
 
-    private _createTransformObject(): GameObject {
+    #createTransformObject(): GameObject {
         const gameObject = new GameObject()
 
         this.objectManager.addObject(gameObject, this.root)
@@ -103,163 +103,163 @@ export class Demo0 extends Scene implements IScene {
         return gameObject
     }
 
-    private async _setupSun() {
+    async #setupSun() {
         const planetMD = await WheezyGLBLoader.loadFromUrl(
             'static/models/planets/sun.glb'
         )
-        this.sun = await this.uploadModel({
+        this.#sun = await this.uploadModel({
             modelData: planetMD,
         })
 
-        this.sun.transform.scale(vec3.create(0.12, 0.12, 0.12))
+        this.#sun.transform.scale(vec3.create(0.12, 0.12, 0.12))
     }
 
-    private async _setupMercury() {
+    async #setupMercury() {
         const planetMD = await WheezyGLBLoader.loadFromUrl(
             'static/models/planets/mercury.glb'
         )
-        this.mercury = await this.uploadModel({
+        this.#mercury = await this.uploadModel({
             modelData: planetMD,
         })
 
-        this.objectManager.reparentObject(this.mercury, this.mercuryHook)
+        this.objectManager.reparentObject(this.#mercury, this.#mercuryHook)
 
-        this.mercuryHook.transform.rotateDegreesEuler({ y: 80 })
+        this.#mercuryHook.transform.rotateDegreesEuler({ y: 80 })
 
-        this.mercury.transform.scale(vec3.create(0.08, 0.08, 0.08))
-        this.mercury.transform.translate(vec3.create(1.4))
+        this.#mercury.transform.scale(vec3.create(0.08, 0.08, 0.08))
+        this.#mercury.transform.translate(vec3.create(1.4))
     }
 
-    private async _setupVenus() {
+    async #setupVenus() {
         const planetMD = await WheezyGLBLoader.loadFromUrl(
             'static/models/planets/venus.glb'
         )
-        this.venus = await this.uploadModel({
+        this.#venus = await this.uploadModel({
             modelData: planetMD,
         })
 
-        this.objectManager.reparentObject(this.venus, this.venusHook)
+        this.objectManager.reparentObject(this.#venus, this.#venusHook)
 
-        this.venusHook.transform.rotateDegreesEuler({ y: 160 })
+        this.#venusHook.transform.rotateDegreesEuler({ y: 160 })
 
-        this.venus.transform.scale(vec3.create(0.12, 0.12, 0.12))
-        this.venus.transform.translate(vec3.create(1.7, 0, 0))
+        this.#venus.transform.scale(vec3.create(0.12, 0.12, 0.12))
+        this.#venus.transform.translate(vec3.create(1.7, 0, 0))
     }
 
-    private async _setupEarth() {
+    async #setupEarth() {
         const planetMD = await WheezyGLBLoader.loadFromUrl(
             'static/models/planets/earth.glb'
         )
-        this.earth = await this.uploadModel({
+        this.#earth = await this.uploadModel({
             modelData: planetMD,
         })
 
-        this.objectManager.reparentObject(this.earth, this.earthHook)
+        this.objectManager.reparentObject(this.#earth, this.#earthHook)
 
-        this.earthHook.transform.rotateDegreesEuler({ y: 10 })
+        this.#earthHook.transform.rotateDegreesEuler({ y: 10 })
 
-        this.earth.transform.rotateDegreesEuler({ x: -90 })
+        this.#earth.transform.rotateDegreesEuler({ x: -90 })
 
-        this.earth.transform.scale(vec3.create(0.16, 0.16, 0.16))
-        this.earth.transform.translate(vec3.create(2.2, 0, 0))
+        this.#earth.transform.scale(vec3.create(0.16, 0.16, 0.16))
+        this.#earth.transform.translate(vec3.create(2.2, 0, 0))
     }
 
-    private async _setupMars() {
+    async #setupMars() {
         const planetMD = await WheezyGLBLoader.loadFromUrl(
             'static/models/planets/mars.glb'
         )
-        this.mars = await this.uploadModel({
+        this.#mars = await this.uploadModel({
             modelData: planetMD,
         })
 
-        this.objectManager.reparentObject(this.mars, this.marsHook)
+        this.objectManager.reparentObject(this.#mars, this.#marsHook)
 
-        this.marsHook.transform.rotateDegreesEuler({ y: 50 })
+        this.#marsHook.transform.rotateDegreesEuler({ y: 50 })
 
-        this.mars.transform.scale(vec3.create(0.14, 0.14, 0.14))
-        this.mars.transform.translate(vec3.create(2.7, 0, 0))
+        this.#mars.transform.scale(vec3.create(0.14, 0.14, 0.14))
+        this.#mars.transform.translate(vec3.create(2.7, 0, 0))
     }
 
-    private async _setupJupiter() {
+    async #setupJupiter() {
         const planetMD = await WheezyGLBLoader.loadFromUrl(
             'static/models/planets/jupiter.glb'
         )
-        this.jupiter = await this.uploadModel({
+        this.#jupiter = await this.uploadModel({
             modelData: planetMD,
         })
 
-        this.objectManager.reparentObject(this.jupiter, this.jupiterHook)
+        this.objectManager.reparentObject(this.#jupiter, this.#jupiterHook)
 
-        this.jupiterHook.transform.rotateDegreesEuler({ y: 150 })
+        this.#jupiterHook.transform.rotateDegreesEuler({ y: 150 })
 
-        this.jupiter.transform.scale(vec3.create(0.15, 0.15, 0.15))
-        this.jupiter.transform.rotateDegreesEuler({ x: 90 })
-        this.jupiter.transform.translate(vec3.create(3.4, 0, 0))
+        this.#jupiter.transform.scale(vec3.create(0.15, 0.15, 0.15))
+        this.#jupiter.transform.rotateDegreesEuler({ x: 90 })
+        this.#jupiter.transform.translate(vec3.create(3.4, 0, 0))
     }
 
-    private async _setupSaturn() {
+    async #setupSaturn() {
         const planetMD = await WheezyGLBLoader.loadFromUrl(
             'static/models/planets/saturn.glb'
         )
-        this.saturn = await this.uploadModel({
+        this.#saturn = await this.uploadModel({
             modelData: planetMD,
         })
 
-        this.objectManager.reparentObject(this.saturn, this.saturnHook)
+        this.objectManager.reparentObject(this.#saturn, this.#saturnHook)
 
-        this.saturnHook.transform.rotateDegreesEuler({ y: 210 })
+        this.#saturnHook.transform.rotateDegreesEuler({ y: 210 })
 
-        this.saturn.transform.scale(vec3.create(0.0012, 0.0012, 0.0012))
-        this.saturn.transform.rotateDegreesEuler({ x: 76 })
-        this.saturn.transform.translate(vec3.create(4.3, 0, 0))
+        this.#saturn.transform.scale(vec3.create(0.0012, 0.0012, 0.0012))
+        this.#saturn.transform.rotateDegreesEuler({ x: 76 })
+        this.#saturn.transform.translate(vec3.create(4.3, 0, 0))
     }
 
-    private async _setupUranus() {
+    async #setupUranus() {
         const planetMD = await WheezyGLBLoader.loadFromUrl(
             'static/models/planets/uranus.glb'
         )
-        this.uranus = await this.uploadModel({
+        this.#uranus = await this.uploadModel({
             modelData: planetMD,
         })
 
-        this.objectManager.reparentObject(this.uranus, this.uranusHook)
+        this.objectManager.reparentObject(this.#uranus, this.#uranusHook)
 
-        this.uranusHook.transform.rotateDegreesEuler({ y: 270 })
+        this.#uranusHook.transform.rotateDegreesEuler({ y: 270 })
 
-        this.uranus.transform.scale(vec3.create(0.2, 0.2, 0.2))
-        this.uranus.transform.rotateDegreesEuler({ x: 90 })
-        this.uranus.transform.translate(vec3.create(5.2, 0, 0))
+        this.#uranus.transform.scale(vec3.create(0.2, 0.2, 0.2))
+        this.#uranus.transform.rotateDegreesEuler({ x: 90 })
+        this.#uranus.transform.translate(vec3.create(5.2, 0, 0))
     }
 
-    private async _setupNeptune() {
+    async #setupNeptune() {
         const planetMD = await WheezyGLBLoader.loadFromUrl(
             'static/models/planets/neptune.glb'
         )
-        this.neptune = await this.uploadModel({
+        this.#neptune = await this.uploadModel({
             modelData: planetMD,
         })
 
-        this.objectManager.reparentObject(this.neptune, this.neptuneHook)
+        this.objectManager.reparentObject(this.#neptune, this.#neptuneHook)
 
-        this.neptuneHook.transform.rotateDegreesEuler({ y: 100 })
+        this.#neptuneHook.transform.rotateDegreesEuler({ y: 100 })
 
-        this.neptune.transform.scale(vec3.create(0.2, 0.2, 0.2))
-        this.neptune.transform.rotateDegreesEuler({ x: 90 })
-        this.neptune.transform.translate(vec3.create(5.8, 0, 0))
+        this.#neptune.transform.scale(vec3.create(0.2, 0.2, 0.2))
+        this.#neptune.transform.rotateDegreesEuler({ x: 90 })
+        this.#neptune.transform.translate(vec3.create(5.8, 0, 0))
     }
 
     public override async init() {
         await super.init()
 
-        await this._setupSun()
-        await this._setupMercury()
-        await this._setupVenus()
-        await this._setupEarth()
-        await this._setupMars()
-        await this._setupJupiter()
-        await this._setupSaturn()
-        await this._setupUranus()
-        await this._setupNeptune()
+        await this.#setupSun()
+        await this.#setupMercury()
+        await this.#setupVenus()
+        await this.#setupEarth()
+        await this.#setupMars()
+        await this.#setupJupiter()
+        await this.#setupSaturn()
+        await this.#setupUranus()
+        await this.#setupNeptune()
 
         const wrapper = document.createElement('div')
         wrapper.style.position = 'absolute'
@@ -287,7 +287,7 @@ export class Demo0 extends Scene implements IScene {
         document.body.appendChild(wrapper)
     }
 
-    private getOrbitRotationPerFrame(name: string) {
+    #getOrbitRotationPerFrame(name: string) {
         const commonDivider = 3600 / this.yearsPerMinute
 
         switch (name) {
@@ -312,7 +312,7 @@ export class Demo0 extends Scene implements IScene {
         }
     }
 
-    private getSelfRotationPerFrame(name: string) {
+    #getSelfRotationPerFrame(name: string) {
         const commonDivider = 3600 / this.yearsPerMinute
 
         switch (name) {
@@ -340,58 +340,58 @@ export class Demo0 extends Scene implements IScene {
     }
 
     public override onRender(deltaTime: number): void {
-        this.controller.update(deltaTime)
+        this.#controller.update(deltaTime)
         //FYI: Always remember to reset orientation in blender :/
-        this.sun.transform.rotateDegreesEuler({
-            y: this.getSelfRotationPerFrame('sun'),
+        this.#sun.transform.rotateDegreesEuler({
+            y: this.#getSelfRotationPerFrame('sun'),
         })
-        this.mercury.transform.rotateDegreesEuler({
-            y: this.getSelfRotationPerFrame('mercury'),
+        this.#mercury.transform.rotateDegreesEuler({
+            y: this.#getSelfRotationPerFrame('mercury'),
         })
-        this.mercuryHook.transform.rotateDegreesEuler({
-            y: this.getOrbitRotationPerFrame('mercury'),
+        this.#mercuryHook.transform.rotateDegreesEuler({
+            y: this.#getOrbitRotationPerFrame('mercury'),
         })
-        this.venus.transform.rotateDegreesEuler({
-            y: this.getSelfRotationPerFrame('venus'),
+        this.#venus.transform.rotateDegreesEuler({
+            y: this.#getSelfRotationPerFrame('venus'),
         })
-        this.venusHook.transform.rotateDegreesEuler({
-            y: this.getOrbitRotationPerFrame('venus'),
+        this.#venusHook.transform.rotateDegreesEuler({
+            y: this.#getOrbitRotationPerFrame('venus'),
         })
-        this.earth.transform.rotateDegreesEuler({
-            z: this.getSelfRotationPerFrame('earth'),
+        this.#earth.transform.rotateDegreesEuler({
+            z: this.#getSelfRotationPerFrame('earth'),
         })
-        this.earthHook.transform.rotateDegreesEuler({
-            y: this.getOrbitRotationPerFrame('earth'),
+        this.#earthHook.transform.rotateDegreesEuler({
+            y: this.#getOrbitRotationPerFrame('earth'),
         })
-        this.mars.transform.rotateDegreesEuler({
-            y: this.getSelfRotationPerFrame('mars'),
+        this.#mars.transform.rotateDegreesEuler({
+            y: this.#getSelfRotationPerFrame('mars'),
         })
-        this.marsHook.transform.rotateDegreesEuler({
-            y: this.getOrbitRotationPerFrame('mars'),
+        this.#marsHook.transform.rotateDegreesEuler({
+            y: this.#getOrbitRotationPerFrame('mars'),
         })
-        this.jupiter.transform.rotateDegreesEuler({
-            z: -this.getSelfRotationPerFrame('jupiter'),
+        this.#jupiter.transform.rotateDegreesEuler({
+            z: -this.#getSelfRotationPerFrame('jupiter'),
         })
-        this.jupiterHook.transform.rotateDegreesEuler({
-            y: this.getOrbitRotationPerFrame('jupiter'),
+        this.#jupiterHook.transform.rotateDegreesEuler({
+            y: this.#getOrbitRotationPerFrame('jupiter'),
         })
-        this.saturn.transform.rotateDegreesEuler({
-            z: -this.getSelfRotationPerFrame('saturn'),
+        this.#saturn.transform.rotateDegreesEuler({
+            z: -this.#getSelfRotationPerFrame('saturn'),
         })
-        this.saturnHook.transform.rotateDegreesEuler({
-            y: this.getOrbitRotationPerFrame('saturn'),
+        this.#saturnHook.transform.rotateDegreesEuler({
+            y: this.#getOrbitRotationPerFrame('saturn'),
         })
-        this.uranus.transform.rotateDegreesEuler({
-            z: -this.getSelfRotationPerFrame('uranus'),
+        this.#uranus.transform.rotateDegreesEuler({
+            z: -this.#getSelfRotationPerFrame('uranus'),
         })
-        this.uranusHook.transform.rotateDegreesEuler({
-            y: this.getOrbitRotationPerFrame('uranus'),
+        this.#uranusHook.transform.rotateDegreesEuler({
+            y: this.#getOrbitRotationPerFrame('uranus'),
         })
-        this.neptune.transform.rotateDegreesEuler({
-            z: -this.getSelfRotationPerFrame('neptune'),
+        this.#neptune.transform.rotateDegreesEuler({
+            z: -this.#getSelfRotationPerFrame('neptune'),
         })
-        this.neptuneHook.transform.rotateDegreesEuler({
-            y: this.getOrbitRotationPerFrame('neptune'),
+        this.#neptuneHook.transform.rotateDegreesEuler({
+            y: this.#getOrbitRotationPerFrame('neptune'),
         })
     }
 }

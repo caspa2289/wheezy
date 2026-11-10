@@ -15,8 +15,8 @@ export class ArcBallController {
     rotationSpeed = 0.3
     zoomSpeed = 0.1
     frictionCoefficient = 0.999
-    private _angularVelocity = 0
-    private _isTouching = false
+    #angularVelocity = 0
+    #isTouching = false
 
     analogX = 0
     analogY = 0
@@ -32,11 +32,11 @@ export class ArcBallController {
         this.canvas = canvas
 
         this.canvas.addEventListener('pointerdown', () => {
-            this._isTouching = true
+            this.#isTouching = true
         })
 
         this.canvas.addEventListener('pointerup', () => {
-            this._isTouching = false
+            this.#isTouching = false
             // this.touchX = 0
             // this.touchY = 0
         })
@@ -85,10 +85,10 @@ export class ArcBallController {
     update(deltaTime: number) {
         const epsilon = 0.0000001
 
-        if (this._isTouching) {
-            this._angularVelocity = 0
+        if (this.#isTouching) {
+            this.#angularVelocity = 0
         } else {
-            this._angularVelocity *= Math.pow(
+            this.#angularVelocity *= Math.pow(
                 1 - this.frictionCoefficient,
                 deltaTime
             )
@@ -106,10 +106,10 @@ export class ArcBallController {
 
         if (magnitude > epsilon) {
             this.camera.axis = vec3.scale(crossProduct, 1 / magnitude)
-            this._angularVelocity = magnitude * this.rotationSpeed
+            this.#angularVelocity = magnitude * this.rotationSpeed
         }
 
-        const rotationAngle = this._angularVelocity * deltaTime
+        const rotationAngle = this.#angularVelocity * deltaTime
 
         if (rotationAngle > epsilon) {
             this.camera.back = vec3.normalize(

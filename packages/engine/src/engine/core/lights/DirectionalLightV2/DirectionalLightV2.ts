@@ -26,7 +26,7 @@ export class DirectionalLightV2
     extends LightSourceV2
     implements IDirectionalLight
 {
-    private _direction!: Vec3
+    #direction!: Vec3
 
     constructor(props: IDirectionalLightProps) {
         super({ ...props, lightType: LIGHT_SOURCE_TYPES.directional })
@@ -35,11 +35,11 @@ export class DirectionalLightV2
     }
 
     set direction(value) {
-        this._direction = vec3.normalize(value)
+        this.#direction = vec3.normalize(value)
     }
 
     get direction() {
-        return this._direction
+        return this.#direction
     }
 
     /**

@@ -20,7 +20,7 @@ import { Mesh } from '../Mesh'
 import { Transform } from '../Transform'
 
 export class ModelUploader {
-    private static getTextureFilterMode(filter?: GLTFTextureFilter) {
+    static #getTextureFilterMode(filter?: GLTFTextureFilter) {
         switch (filter) {
             case GLTFTextureFilter.NEAREST_MIPMAP_NEAREST:
             case GLTFTextureFilter.NEAREST_MIPMAP_LINEAR:
@@ -35,7 +35,7 @@ export class ModelUploader {
         }
     }
 
-    private static getTextureMipMapMode(filter: GLTFTextureFilter) {
+    static #getTextureMipMapMode(filter: GLTFTextureFilter) {
         switch (filter) {
             case GLTFTextureFilter.NEAREST_MIPMAP_NEAREST:
             case GLTFTextureFilter.LINEAR_MIPMAP_NEAREST:
@@ -48,7 +48,7 @@ export class ModelUploader {
         }
     }
 
-    private static getTextureAddressMode(mode?: GLTFTextureWrap) {
+    static #getTextureAddressMode(mode?: GLTFTextureWrap) {
         switch (mode) {
             case GLTFTextureWrap.REPEAT:
                 return 'repeat' as GPUAddressMode
@@ -61,7 +61,7 @@ export class ModelUploader {
         }
     }
 
-    private static async uploadImages(
+    static async #uploadImages(
         modelData: IModelPreloadData,
         bufferStorage: IBufferStorage,
         imageStorage: IImageStorage
@@ -84,7 +84,7 @@ export class ModelUploader {
         }
     }
 
-    private static uploadBuffers(
+    static #uploadBuffers(
         modelData: IModelPreloadData,
         bufferStorage: IBufferStorage
     ) {
@@ -93,17 +93,17 @@ export class ModelUploader {
         })
     }
 
-    private static uploadSamplers(
+    static #uploadSamplers(
         modelData: IModelPreloadData,
         samplerStorage: ISamplerStorage,
         device: GPUDevice
     ) {
         modelData.samplers.forEach((value, key) => {
             const gpuSampler = device.createSampler({
-                magFilter: this.getTextureFilterMode(value?.magFilter),
-                minFilter: this.getTextureFilterMode(value?.minFilter),
-                addressModeU: this.getTextureAddressMode(value?.wrapS),
-                addressModeV: this.getTextureAddressMode(value?.wrapT),
+                magFilter: this.#getTextureFilterMode(value?.magFilter),
+                minFilter: this.#getTextureFilterMode(value?.minFilter),
+                addressModeU: this.#getTextureAddressMode(value?.wrapS),
+                addressModeV: this.#getTextureAddressMode(value?.wrapT),
                 //FIXME: use mipmap filtration
                 mipmapFilter: 'nearest',
             })
@@ -111,7 +111,7 @@ export class ModelUploader {
         })
     }
 
-    private static uploadTextures(
+    static #uploadTextures(
         modelData: IModelPreloadData,
         textureStorage: ITextureStorage
     ) {
@@ -120,7 +120,7 @@ export class ModelUploader {
         })
     }
 
-    private static createGPUTexture(
+    static #createGPUTexture(
         device: GPUDevice,
         format: GPUTextureFormat,
         samplerStorage: ISamplerStorage,
@@ -172,7 +172,7 @@ export class ModelUploader {
         return { view: textureView, sampler: textureSampler }
     }
 
-    private static uploadMaterials(
+    static #uploadMaterials(
         modelData: IModelPreloadData,
         textureStorage: ITextureStorage,
         samplerStorage: ISamplerStorage,
@@ -191,35 +191,35 @@ export class ModelUploader {
                 metallicFactor: 1,
                 roughnessFactor: 1,
                 baseColorFactor: vec4.create(1, 1, 1, 1),
-                baseColorTexture: this.createGPUTexture(
+                baseColorTexture: this.#createGPUTexture(
                     device,
                     'rgba8unorm-srgb',
                     samplerStorage,
                     imageStorage,
                     textureStorage.defaultBaseColor
                 ),
-                metallicRoughnessTexture: this.createGPUTexture(
+                metallicRoughnessTexture: this.#createGPUTexture(
                     device,
                     'rgba8unorm',
                     samplerStorage,
                     imageStorage,
                     textureStorage.defaultMetallicRoughness
                 ),
-                normalTexture: this.createGPUTexture(
+                normalTexture: this.#createGPUTexture(
                     device,
                     'rgba8unorm',
                     samplerStorage,
                     imageStorage,
                     textureStorage.defaultNormal
                 ),
-                occlusionTexture: this.createGPUTexture(
+                occlusionTexture: this.#createGPUTexture(
                     device,
                     'rgba8unorm',
                     samplerStorage,
                     imageStorage,
                     textureStorage.defaultOcclusion
                 ),
-                emissiveTexture: this.createGPUTexture(
+                emissiveTexture: this.#createGPUTexture(
                     device,
                     'rgba8unorm',
                     samplerStorage,
@@ -242,7 +242,7 @@ export class ModelUploader {
                 baseColorFactor:
                     value?.baseColorFactor ?? defaultMaterial.baseColorFactor,
                 baseColorTexture: value.baseColorTextureId
-                    ? this.createGPUTexture(
+                    ? this.#createGPUTexture(
                           device,
                           'rgba8unorm-srgb',
                           samplerStorage,
@@ -251,7 +251,7 @@ export class ModelUploader {
                       )
                     : defaultMaterial.baseColorTexture,
                 metallicRoughnessTexture: value.metallicRoughnessTextureId
-                    ? this.createGPUTexture(
+                    ? this.#createGPUTexture(
                           device,
                           'rgba8unorm',
                           samplerStorage,
@@ -262,7 +262,7 @@ export class ModelUploader {
                       )
                     : defaultMaterial.metallicRoughnessTexture,
                 normalTexture: value.normalTextureId
-                    ? this.createGPUTexture(
+                    ? this.#createGPUTexture(
                           device,
                           'rgba8unorm',
                           samplerStorage,
@@ -271,7 +271,7 @@ export class ModelUploader {
                       )
                     : defaultMaterial.normalTexture,
                 occlusionTexture: value.occlusionTextureId
-                    ? this.createGPUTexture(
+                    ? this.#createGPUTexture(
                           device,
                           'rgba8unorm',
                           samplerStorage,
@@ -280,7 +280,7 @@ export class ModelUploader {
                       )
                     : defaultMaterial.occlusionTexture,
                 emissiveTexture: value.emissiveTextureId
-                    ? this.createGPUTexture(
+                    ? this.#createGPUTexture(
                           device,
                           'rgba8unorm',
                           samplerStorage,
@@ -294,7 +294,7 @@ export class ModelUploader {
         })
     }
 
-    private static traversePreloadNode(
+    static #traversePreloadNode(
         node: IPreloadEntity,
         parentGameObject: IGameObject,
         objectManager: IObjectManager,
@@ -323,7 +323,7 @@ export class ModelUploader {
         })
 
         children.forEach((child) => {
-            this.traversePreloadNode(
+            this.#traversePreloadNode(
                 child,
                 gameObject,
                 objectManager,
@@ -345,11 +345,11 @@ export class ModelUploader {
         sceneObject: IGameObject,
         device: GPUDevice
     ) {
-        this.uploadBuffers(modelData, bufferStorage)
-        await this.uploadImages(modelData, bufferStorage, imageStorage)
-        this.uploadSamplers(modelData, samplerStorage, device)
-        this.uploadTextures(modelData, textureStorage)
-        this.uploadMaterials(
+        this.#uploadBuffers(modelData, bufferStorage)
+        await this.#uploadImages(modelData, bufferStorage, imageStorage)
+        this.#uploadSamplers(modelData, samplerStorage, device)
+        this.#uploadTextures(modelData, textureStorage)
+        this.#uploadMaterials(
             modelData,
             textureStorage,
             samplerStorage,
@@ -379,7 +379,7 @@ export class ModelUploader {
         })
 
         children.forEach((child) => {
-            this.traversePreloadNode(
+            this.#traversePreloadNode(
                 child,
                 meshObject,
                 objectManager,

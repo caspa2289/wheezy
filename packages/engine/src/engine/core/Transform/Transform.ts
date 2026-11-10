@@ -14,20 +14,20 @@ export class Transform
 {
     matrix: TransformationMatrix
 
-    private _position: Float32Array
+    #position: Float32Array
 
     constructor(parent: IGameObject, matrix?: TransformationMatrix) {
         super(parent, EntityTypes.transform)
         this.matrix = matrix ? mat4.copy(matrix) : mat4.identity()
-        this._position = new Float32Array(this.matrix.buffer, 4 * 12, 4)
+        this.#position = new Float32Array(this.matrix.buffer, 4 * 12, 4)
     }
 
     get position() {
-        return this._position
+        return this.#position
     }
 
     set position(value: Vec4) {
-        vec4.copy(value, this._position)
+        vec4.copy(value, this.#position)
     }
 
     scale(value: Vec3) {
@@ -35,7 +35,7 @@ export class Transform
     }
 
     translate(value: Vec3) {
-        this._position = vec3.copy(value, this._position)
+        this.#position = vec3.copy(value, this.#position)
     }
 
     rotateRadians({ x, y, z }: IRotateRadiansProps) {

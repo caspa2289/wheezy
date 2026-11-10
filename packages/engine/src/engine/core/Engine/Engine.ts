@@ -8,17 +8,17 @@ import { Renderer } from '../Renderer'
 import { Profiler } from '../Profiler'
 
 export class Engine implements IEngine {
-    private _renderer!: IRenderer
+    #renderer!: IRenderer
 
-    private _prevFrameTime: number = 0
+    #prevFrameTime: number = 0
 
-    private _frameScheduled = false
+    #frameScheduled = false
 
-    private _scene?: IScene
+    #scene?: IScene
 
     public async initRenderer(canvas: HTMLCanvasElement) {
-        this._renderer = new Renderer({ canvas })
-        await this._renderer.init()
+        this.#renderer = new Renderer({ canvas })
+        await this.#renderer.init()
         Profiler.start()
     }
 
@@ -43,15 +43,15 @@ export class Engine implements IEngine {
     }
 
     get renderer() {
-        return this._renderer
+        return this.#renderer
     }
 
     get scene() {
-        return this._scene
+        return this.#scene
     }
 
     set scene(scene: IScene | undefined) {
-        this._scene = scene
+        this.#scene = scene
     }
 
     public render(time: number = 0) {
@@ -61,22 +61,22 @@ export class Engine implements IEngine {
         // an exception in a scene's onRender or in the renderer must not kill the
         // loop (a dead chain looks like a frozen tab with one console error), and
         // an external render() call must not start a second chain
-        if (!this._frameScheduled) {
-            this._frameScheduled = true
+        if (!this.#frameScheduled) {
+            this.#frameScheduled = true
             requestAnimationFrame((t: number) => {
-                this._frameScheduled = false
+                this.#frameScheduled = false
                 this.render(t)
             })
         }
 
-        const frameDelta = time - this._prevFrameTime
+        const frameDelta = time - this.#prevFrameTime
         const dt = frameDelta / 100
-        if (this._prevFrameTime && frameDelta > 0) {
+        if (this.#prevFrameTime && frameDelta > 0) {
             Profiler.sample('frame', frameDelta)
             Profiler.sample('fps', 1000 / frameDelta)
         }
-        this._prevFrameTime = time
+        this.#prevFrameTime = time
 
-        this._renderer.render(dt, this.scene)
+        this.#renderer.render(dt, this.scene)
     }
 }

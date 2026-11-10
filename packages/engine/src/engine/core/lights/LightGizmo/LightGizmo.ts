@@ -201,19 +201,19 @@ function createGizmoCone() {
  */
 export class LightGizmo {
     // per-scene shared geometry (buffer data registered in scene.bufferStorage)
-    private static _geometry = new WeakMap<IScene, GizmoGeometry>()
+    static #geometry = new WeakMap<IScene, GizmoGeometry>()
     // per-light gizmo parts + attachment state
-    private static _parts = new WeakMap<ILightSourceV2, GizmoParts>()
+    static #parts = new WeakMap<ILightSourceV2, GizmoParts>()
     // shared 1×1 white texture + sampler for the non-emissive material slots
-    private static _white?: IMaterialTexture
+    static #white?: IMaterialTexture
 
     public static sync(scene: IScene, enabled: boolean) {
         for (const light of scene.pointLights) {
-            this._syncLight(scene, light, enabled, null)
+            this.#syncLight(scene, light, enabled, null)
         }
         for (const light of scene.spotLights) {
             // cutoff is stored pre-cosined (see SpotLight)
-            this._syncLight(
+            this.#syncLight(
                 scene,
                 light,
                 enabled,
@@ -222,7 +222,7 @@ export class LightGizmo {
             )
         }
         for (const light of scene.directionalLights) {
-            this._syncLight(
+            this.#syncLight(
                 scene,
                 light,
                 enabled,
@@ -232,7 +232,7 @@ export class LightGizmo {
         }
     }
 
-    private static _syncLight(
+    static #syncLight(
         scene: IScene,
         light: ILightSourceV2,
         enabled: boolean,
@@ -245,12 +245,12 @@ export class LightGizmo {
             return
         }
 
-        const parts = this._parts.get(light)
+        const parts = this.#parts.get(light)
 
         if (enabled) {
             const gizmo =
                 parts ??
-                this._create(scene, light, position, direction !== null)
+                this.#create(scene, light, position, direction !== null)
             if (!gizmo.attached) {
                 scene.objectManager.addObject(gizmo.sphere, scene.root)
                 if (gizmo.cone) {
@@ -262,7 +262,7 @@ export class LightGizmo {
             // translate writes the matrix position column, scale is untouched
             gizmo.sphere.transform.translate(position)
             if (gizmo.coneTransform && direction) {
-                this._updateConeTransform(
+                this.#updateConeTransform(
                     gizmo.coneTransform,
                     position,
                     direction,
@@ -281,15 +281,15 @@ export class LightGizmo {
         }
     }
 
-    private static _create(
+    static #create(
         scene: IScene,
         light: ILightSourceV2,
         position: Vec3,
         withCone: boolean
     ): GizmoParts {
-        const geometry = this._ensureGeometry(scene)
+        const geometry = this.#ensureGeometry(scene)
         // one material shared by both parts of this light
-        const material = this._createMaterial(
+        const material = this.#createMaterial(
             scene.engine.renderer.device,
             light.color
         )
@@ -329,7 +329,7 @@ export class LightGizmo {
             parts.cone = cone
         }
 
-        this._parts.set(light, parts)
+        this.#parts.set(light, parts)
         return parts
     }
 
@@ -339,7 +339,7 @@ export class LightGizmo {
      * reassigning `transform.matrix` would orphan Transform's `_position`
      * view, which aliases that buffer.
      */
-    private static _updateConeTransform(
+    static #updateConeTransform(
         transform: Transform,
         position: Vec3,
         direction: Vec3,
@@ -375,8 +375,8 @@ export class LightGizmo {
         mat4.copy(scratchComposed, transform.matrix)
     }
 
-    private static _ensureGeometry(scene: IScene): GizmoGeometry {
-        const cached = this._geometry.get(scene)
+    static #ensureGeometry(scene: IScene): GizmoGeometry {
+        const cached = this.#geometry.get(scene)
         if (cached) {
             return cached
         }
@@ -458,13 +458,13 @@ export class LightGizmo {
             sphere: registerMesh('sphere', createGizmoSphere()),
             cone: registerMesh('cone', createGizmoCone()),
         }
-        this._geometry.set(scene, geometry)
+        this.#geometry.set(scene, geometry)
         return geometry
     }
 
-    private static _createMaterial(device: GPUDevice, color: Vec3): IMaterial {
-        const white = (this._white ??= {
-            view: this._createSolidTexture(device, [255, 255, 255, 255]),
+    static #createMaterial(device: GPUDevice, color: Vec3): IMaterial {
+        const white = (this.#white ??= {
+            view: this.#createSolidTexture(device, [255, 255, 255, 255]),
             sampler: device.createSampler({
                 magFilter: 'nearest',
                 minFilter: 'nearest',
@@ -490,7 +490,7 @@ export class LightGizmo {
             normalTexture: white,
             occlusionTexture: white,
             emissiveTexture: {
-                view: this._createSolidTexture(device, [
+                view: this.#createSolidTexture(device, [
                     Math.round((color[0] ?? 0) * GIZMO_EMISSION * 255),
                     Math.round((color[1] ?? 0) * GIZMO_EMISSION * 255),
                     Math.round((color[2] ?? 0) * GIZMO_EMISSION * 255),
@@ -501,7 +501,7 @@ export class LightGizmo {
         }
     }
 
-    private static _createSolidTexture(
+    static #createSolidTexture(
         device: GPUDevice,
         rgba: number[]
     ): GPUTextureView {
