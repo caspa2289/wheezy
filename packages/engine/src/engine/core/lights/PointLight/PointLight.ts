@@ -37,17 +37,21 @@ export class PointLight extends LightSourceV2 implements IPointLight {
         this.attenuationExponential = props?.attenuationExponential ?? 0.25
     }
 
-    getLightData() {
-        return [
-            ...this.color,
-            this.intensity,
-            ...this.position,
-            this.attenuationConstant,
-            this.attenuationLinear,
-            this.attenuationExponential,
-            0,
-            0,
-        ]
+    fillLightData(dst: Float32Array, offset: number) {
+        // layout: color(3) intensity position(3) attenuation(3) + 2 pad slots
+        // (shadow_caster and range, patched by the LightUploader)
+        dst[offset] = this.color[0]!
+        dst[offset + 1] = this.color[1]!
+        dst[offset + 2] = this.color[2]!
+        dst[offset + 3] = this.intensity
+        dst[offset + 4] = this.position[0]!
+        dst[offset + 5] = this.position[1]!
+        dst[offset + 6] = this.position[2]!
+        dst[offset + 7] = this.attenuationConstant
+        dst[offset + 8] = this.attenuationLinear
+        dst[offset + 9] = this.attenuationExponential
+        dst[offset + 10] = 0
+        dst[offset + 11] = 0
     }
 
     override get gizmoPosition(): Vec3 {

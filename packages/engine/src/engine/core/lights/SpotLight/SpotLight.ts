@@ -75,19 +75,26 @@ export class SpotLight extends LightSourceV2 implements ISpotLight {
         }
     }
 
-    getLightData() {
-        return [
-            ...this.color,
-            0,
-            ...this.position,
-            0,
-            ...this.direction,
-            this.cutoff,
-            this.intensity,
-            this.attenuationConstant,
-            this.attenuationLinear,
-            this.attenuationExponential,
-        ]
+    fillLightData(dst: Float32Array, offset: number) {
+        // layout: color(3) + shadow_caster pad, position(3) + range pad,
+        // direction(3) cutoff intensity attenuation(3) — the two pad slots
+        // are patched by the LightUploader
+        dst[offset] = this.color[0]!
+        dst[offset + 1] = this.color[1]!
+        dst[offset + 2] = this.color[2]!
+        dst[offset + 3] = 0
+        dst[offset + 4] = this.position[0]!
+        dst[offset + 5] = this.position[1]!
+        dst[offset + 6] = this.position[2]!
+        dst[offset + 7] = 0
+        dst[offset + 8] = this.direction[0]!
+        dst[offset + 9] = this.direction[1]!
+        dst[offset + 10] = this.direction[2]!
+        dst[offset + 11] = this.cutoff
+        dst[offset + 12] = this.intensity
+        dst[offset + 13] = this.attenuationConstant
+        dst[offset + 14] = this.attenuationLinear
+        dst[offset + 15] = this.attenuationExponential
     }
 
     override get gizmoPosition(): Vec3 {

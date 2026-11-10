@@ -41,6 +41,12 @@ struct ViewParams {
     cluster_tiles_y: u32,
     viewport_width: u32,
     viewport_height: u32,
+    exposure: f32, // consumed by post.wgsl; declared here to keep the offsets aligned
+    // per-frame light counts bounding the loops over the fixed-capacity
+    // light buffers (see MAX_*_LIGHTS in Renderer/constants.ts)
+    directional_light_count: u32,
+    point_light_count: u32,
+    spot_light_count: u32,
 };
 
 struct DebugParams {
@@ -516,8 +522,9 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
             // outgoing radiance, accumulated per light
             var lo = float3(0.0);
 
-            // directional lights are global — always looped in full
-            for (var i = 0u; i < arrayLength(&directionalLightsBuffer.lights); i++) {
+            // directional lights are global — always looped in full (the
+            // buffer is fixed-capacity; the count comes from the view params)
+            for (var i = 0u; i < view_params.directional_light_count; i++) {
                 var directional = calculateDirectionalLight(directionalLightsBuffer.lights[i], fragment_normal, world_position, albedo.rgb, metallic, roughness);
                 if (directionalLightsBuffer.lights[i].shadow_caster >= 0) {
                     directional *= calculateShadowFactor(directionalLightsBuffer.lights[i].shadow_caster, world_position);

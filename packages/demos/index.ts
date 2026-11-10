@@ -1,11 +1,11 @@
-import { Engine, type IEngine } from '@wheezy/engine'
+import { engine, initEngine, renderer } from '@wheezy/engine'
 import { Demo0 } from './src/Demo0'
 import { Demo1 } from './src/Demo1'
 import { DemoRTC } from './src/DemoRTC'
 
 const canvas = document.getElementById('webgpu-canvas') as HTMLCanvasElement
 
-const initDebugControls = (engine: IEngine) => {
+const initDebugControls = () => {
     const defaultOutputSource = 0
     const defaultScene = 1
 
@@ -34,12 +34,12 @@ const initDebugControls = (engine: IEngine) => {
     })
 
     sceneSelector.addEventListener('change', (event) => {
-        setScene(engine, Number((event.target as HTMLSelectElement).value))
+        setScene(Number((event.target as HTMLSelectElement).value))
     })
 
     const outputSourceDropDown = document.createElement('select')
     outputSourceDropDown.addEventListener('change', (event) => {
-        engine.renderer.outputSource = Number(
+        renderer.outputSource = Number(
             (event.target as HTMLSelectElement).value
         )
     })
@@ -65,13 +65,13 @@ const initDebugControls = (engine: IEngine) => {
         outputSourceDropDown.appendChild(option)
     })
 
-    engine.renderer.outputSource = defaultOutputSource
-    setScene(engine, defaultScene)
+    renderer.outputSource = defaultOutputSource
+    setScene(defaultScene)
 
     debugContainer.appendChild(outputSourceDropDown)
 }
 
-const setScene = async (engine: IEngine, index: number) => {
+const setScene = async (index: number) => {
     const loader = document.getElementById('loader') as HTMLDivElement
 
     switch (index) {
@@ -113,9 +113,9 @@ const setScene = async (engine: IEngine, index: number) => {
 }
 
 const run = async () => {
-    const engine = (await Engine.getOrInit({ canvas })) as Engine
+    await initEngine({ canvas })
 
-    initDebugControls(engine)
+    initDebugControls()
 }
 
 run()

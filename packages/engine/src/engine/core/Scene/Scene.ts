@@ -1,7 +1,6 @@
 import { vec3 } from 'wgpu-matrix'
 import {
     type IBufferStorage,
-    type IEngine,
     type IGameObject,
     type IImageStorage,
     type IObjectManager,
@@ -13,6 +12,7 @@ import {
 import { type ICamera } from '../../types/core/Camera'
 import { BufferStorage } from '../BufferStorage'
 import { ArcBallCamera } from '../cameras/ArcBallCamera'
+import { isEngineReady, renderer } from '../globals'
 import { ImageStorage } from '../ImageStorage'
 import { MaterialStorage } from '../MaterialStorage'
 import { ModelUploader } from '../ModelUploader'
@@ -35,8 +35,6 @@ export class Scene implements IScene {
 
     #camera!: ICamera
 
-    protected _engine?: IEngine
-
     #root: IGameObject
 
     directionalLights: IDirectionalLight[] = []
@@ -45,16 +43,14 @@ export class Scene implements IScene {
 
     constructor(props?: ISceneProps) {
         const { camera } = props ?? {}
-        //FIXME: types
-        this._engine = (window as any).WheezyEngine as IEngine | undefined
 
-        if (!this._engine) {
+        if (!isEngineReady()) {
             throw new Error(
                 'Failed to initialize scene as no instance of Wheezy Engine is found'
             )
         }
 
-        this.#samplerStorage = new SamplerStorage(this._engine.renderer.device)
+        this.#samplerStorage = new SamplerStorage(renderer.device)
 
         this.#root = new GameObject()
 
@@ -65,8 +61,8 @@ export class Scene implements IScene {
             new ArcBallCamera({
                 zFar: 1000,
                 zNear: 0.1,
-                canvasWidth: this._engine.renderer.context.canvas.width,
-                canvasHeight: this._engine.renderer.context.canvas.height,
+                canvasWidth: renderer.context.canvas.width,
+                canvasHeight: renderer.context.canvas.height,
                 position: vec3.create(0, 0, 5),
             })
     }
@@ -115,19 +111,9 @@ export class Scene implements IScene {
         this.#camera = value
     }
 
-    get engine() {
-        return this._engine as IEngine
-    }
-
     public async uploadModel(
         props: ISceneUploadModelProps
     ): Promise<IGameObject> {
-        if (!this._engine) {
-            throw new Error(
-                'Failed to upload model as no instance of Wheezy Engine is found'
-            )
-        }
-
         return ModelUploader.uploadModel(
             props.modelData,
             this.#objectManager,
@@ -137,7 +123,7 @@ export class Scene implements IScene {
             this.#materialStorage,
             this.#textureStorage,
             this.#root,
-            this._engine.renderer.device
+            renderer.device
         )
     }
 

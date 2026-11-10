@@ -19,6 +19,30 @@ export const IBL_PREFILTER_SAMPLES = 256
 export const IBL_BRDF_SAMPLES = 512
 export const VIEW_PARAMS_BUFFER_SIZE: number =
     16 * 4 + 16 * 4 + 4 * 4 + 4 * 4 + 16 * 4 + 16 * 4 + 16 + 16 * 3 + 4 + 4
+// view-params float slots (see ViewParams in lighting.wgsl): 62 carries the
+// exposure, 63–65 the directional/point/spot light counts that bound the
+// shader's loops over the fixed-capacity light buffers
+export const VIEW_PARAMS_EXPOSURE_SLOT = 62
+export const VIEW_PARAMS_DIRECTIONAL_COUNT_SLOT = 63
+export const VIEW_PARAMS_POINT_COUNT_SLOT = 64
+export const VIEW_PARAMS_SPOT_COUNT_SLOT = 65
+// skybox uniforms: model, projection and view matrices + camera position
+export const SKYBOX_UNIFORM_BUFFER_SIZE = 4 * 16 * 3 + 4 * 4
+// fixed capacities of the persistent light storage buffers — the per-frame
+// counts travel in the view params instead of buffer sizes, so the buffers
+// and the lights bind group stay static; point + spot sum to MAX_CULL_LIGHTS
+export const MAX_DIRECTIONAL_LIGHTS = 16
+export const MAX_POINT_LIGHTS = 128
+export const MAX_SPOT_LIGHTS = 128
+// node world matrices: one mat4 per scene node in a single storage buffer,
+// written once per frame; each draw selects its slot through a dynamic-offset
+// index uniform (the same mechanism as the shadow caster index)
+export const MAX_SCENE_NODES = 4096
+export const NODE_MATRIX_SIZE = 16 * 4
+export const NODE_MATRICES_BUFFER_SIZE = MAX_SCENE_NODES * NODE_MATRIX_SIZE
+// dynamic-offset stride for the per-draw node index
+// (WebGPU min uniform buffer offset alignment)
+export const NODE_INDEX_SLOT_SIZE = 256
 export const DIRECTIONAL_LIGHT_ELEMENT_COUNT = 8 // 7 floats and 1 pad
 export const POINT_LIGHT_ELEMENT_COUNT = 12 // 10 floats and 2 pads
 export const SPOT_LIGHT_ELEMENT_COUNT = 16 // 14 real floats and 2 pads

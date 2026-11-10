@@ -1,11 +1,7 @@
-import {
-    type IScene,
-    type IEngine,
-    type IEngineProps,
-    type IRenderer,
-} from '../../types'
+import { type IScene, type IEngine, type IRenderer } from '../../types'
 import { Renderer } from '../Renderer'
 import { Profiler } from '../Profiler'
+import { setSceneGlobal } from '../globals'
 
 export class Engine implements IEngine {
     #renderer!: IRenderer
@@ -22,26 +18,6 @@ export class Engine implements IEngine {
         Profiler.start()
     }
 
-    public static async getOrInit({
-        canvas,
-    }: IEngineProps): Promise<Engine | undefined> {
-        //FIXME: types
-        try {
-            if ((window as any).WheezyEngine) {
-                console.warn('Engine has already been instanced')
-                return (window as any).WheezyEngine as Engine
-            }
-
-            const engineInstance = new Engine()
-            await engineInstance.initRenderer(canvas)
-            ;(window as any).WheezyEngine = engineInstance
-
-            return engineInstance
-        } catch (err) {
-            alert(err)
-        }
-    }
-
     get renderer() {
         return this.#renderer
     }
@@ -52,6 +28,7 @@ export class Engine implements IEngine {
 
     set scene(scene: IScene | undefined) {
         this.#scene = scene
+        setSceneGlobal(scene)
     }
 
     public render(time: number = 0) {

@@ -7,6 +7,7 @@ import {
     type IScene,
 } from '../../../types'
 import { GameObject } from '../../GameObject'
+import { renderer } from '../../globals'
 import { Mesh } from '../../Mesh'
 import { Transform } from '../../Transform'
 import { type ILightSourceV2 } from '../LightSourceV2'
@@ -289,10 +290,7 @@ export class LightGizmo {
     ): GizmoParts {
         const geometry = this.#ensureGeometry(scene)
         // one material shared by both parts of this light
-        const material = this.#createMaterial(
-            scene.engine.renderer.device,
-            light.color
-        )
+        const material = this.#createMaterial(renderer.device, light.color)
 
         const sphere = new GameObject()
         const sphereTransform = new Transform(sphere)

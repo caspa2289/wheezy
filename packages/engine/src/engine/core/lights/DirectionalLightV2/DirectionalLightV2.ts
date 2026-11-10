@@ -58,7 +58,16 @@ export class DirectionalLightV2
         return WORLD_ORIGIN
     }
 
-    getLightData() {
-        return [...this.color, this.intensity, ...this.direction, 0]
+    fillLightData(dst: Float32Array, offset: number) {
+        // layout: color(3) intensity direction(3) + 1 pad slot
+        // (shadow_caster, patched by the LightUploader)
+        dst[offset] = this.color[0]!
+        dst[offset + 1] = this.color[1]!
+        dst[offset + 2] = this.color[2]!
+        dst[offset + 3] = this.intensity
+        dst[offset + 4] = this.direction[0]!
+        dst[offset + 5] = this.direction[1]!
+        dst[offset + 6] = this.direction[2]!
+        dst[offset + 7] = 0
     }
 }

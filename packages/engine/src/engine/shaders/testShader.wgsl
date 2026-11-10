@@ -32,8 +32,15 @@ struct ViewParams {
     camera_view_matrix: mat4x4<f32>,
 };
 
-struct NodeParams {
-    transform: mat4x4<f32>,
+// per-draw node index, selected via a dynamic bind-group offset
+// (slot i of the index buffer holds the value i — see SceneTraversal)
+struct NodeIndex {
+    index: u32,
+};
+
+// world matrix of every scene node, written once per frame by the traversal
+struct NodeMatrices {
+    matrices: array<mat4x4<f32>>,
 };
 
 struct MaterialParams {
@@ -46,7 +53,10 @@ struct MaterialParams {
 var<uniform> view_params: ViewParams;
 
 @group(1) @binding(0)
-var<uniform> node_params: NodeParams;
+var<uniform> node_index: NodeIndex;
+
+@group(1) @binding(1)
+var<storage, read> node_matrices: NodeMatrices;
 
 @group(2) @binding(0)
 var<uniform> material_params: MaterialParams;
@@ -85,11 +95,12 @@ var emission_texture: texture_2d<f32>;
 fn vertex_main(vert: VertexInput) -> VertexOutput {
     var out: VertexOutput;
 
+    let node_transform = node_matrices.matrices[node_index.index];
     let camera_view_projection_matrix = view_params.camera_projection_matrix * view_params.camera_view_matrix;
-    out.position = camera_view_projection_matrix * node_params.transform * float4(vert.position, 1.0);
+    out.position = camera_view_projection_matrix * node_transform * float4(vert.position, 1.0);
     out.texcoords = vert.texcoords;
-    out.vertex_normal = normalize(node_params.transform * float4(vert.vertex_normal, 0.0)).xyz;
-    out.vertex_tangent = normalize(node_params.transform * float4(vert.vertex_tangent, 0.0)).xyz;
+    out.vertex_normal = normalize(node_transform * float4(vert.vertex_normal, 0.0)).xyz;
+    out.vertex_tangent = normalize(node_transform * float4(vert.vertex_tangent, 0.0)).xyz;
 
     return out;
 };

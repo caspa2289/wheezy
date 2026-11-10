@@ -23,7 +23,13 @@ export interface ILightSourceV2 {
      */
     gizmoPosition: Vec3 | null
 
-    getLightData(): number[]
+    /**
+     * Writes the flat float layout uploaded to the GPU into `dst` at `offset`
+     * (elementCount floats — see the light byte strides in
+     * Renderer/constants.ts). Called once per light per frame by the
+     * LightUploader; the shadow-caster and range pad slots are patched after.
+     */
+    fillLightData: (dst: Float32Array, offset: number) => void
 }
 
 export interface ILightSourceV2Props {
@@ -59,5 +65,5 @@ export abstract class LightSourceV2
         return null
     }
 
-    abstract getLightData(): number[]
+    abstract fillLightData(dst: Float32Array, offset: number): void
 }

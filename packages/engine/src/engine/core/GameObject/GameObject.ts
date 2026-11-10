@@ -38,9 +38,14 @@ export class GameObject
             return this.#transform
         }
 
-        return [...this.components.values()].find(
-            (component) => component.type === EntityTypes.transform
-        ) as ITransform
+        // for-of, not spread+find: the renderer traversal reads this per node
+        // per frame and must not allocate
+        for (const component of this.components.values()) {
+            if (component.type === EntityTypes.transform) {
+                return component as ITransform
+            }
+        }
+        return undefined as unknown as ITransform
     }
 
     public addComponent(component: IComponent<EntityTypes>) {

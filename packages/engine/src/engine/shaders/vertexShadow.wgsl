@@ -5,8 +5,15 @@ struct VertexInput {
     @location(0) position: float3,
 };
 
-struct NodeParams {
-    transform: mat4x4<f32>,
+// per-draw node index, selected via a dynamic bind-group offset
+// (slot i of the index buffer holds the value i — see SceneTraversal)
+struct NodeIndex {
+    index: u32,
+};
+
+// world matrix of every scene node, written once per frame by the traversal
+struct NodeMatrices {
+    matrices: array<mat4x4<f32>>,
 };
 
 // per-draw caster index, selected via a dynamic bind-group offset
@@ -40,9 +47,12 @@ var<uniform> caster_index: CasterIndex;
 var<storage, read> shadow_data: ShadowDataBuffer;
 
 @group(1) @binding(0)
-var<uniform> node_params: NodeParams;
+var<uniform> node_index: NodeIndex;
+
+@group(1) @binding(1)
+var<storage, read> node_matrices: NodeMatrices;
 
 @vertex
 fn vertex_main(vert: VertexInput) -> @builtin(position) vec4f {
-    return shadow_data.casters[caster_index.index].light_view_projection * node_params.transform * float4(vert.position, 1.0);
+    return shadow_data.casters[caster_index.index].light_view_projection * node_matrices.matrices[node_index.index] * float4(vert.position, 1.0);
 };

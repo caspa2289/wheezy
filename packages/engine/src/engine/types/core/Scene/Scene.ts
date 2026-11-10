@@ -1,4 +1,4 @@
-import { type IEngine, type IModelPreloadData } from '../..'
+import { type IModelPreloadData } from '../..'
 import { type IPointLight, type ISpotLight } from '../../../core'
 import { type IDirectionalLight } from '../../../core/lights/DirectionalLightV2'
 import { type IBufferStorage } from '../BufferStorage'
@@ -24,7 +24,6 @@ export interface IScene {
     textureStorage: ITextureStorage
     materialStorage: IMaterialStorage
     meshRenderDataStorage: IMeshRenderDataStorage
-    engine: IEngine
     root: IGameObject
     directionalLights: IDirectionalLight[]
     pointLights: IPointLight[]

@@ -6,6 +6,7 @@ import {
     SpotLight,
     type TSkyboxBitmaps,
     WheezyGLBLoader,
+    renderer,
 } from '@wheezy/engine'
 import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCamera'
 import { ArcBallController } from '@wheezy/engine/src/utils/ArcBallController'
@@ -57,14 +58,14 @@ export class Demo1 extends Scene implements IScene {
         super()
 
         this.camera = new ArcBallCamera({
-            canvasHeight: this.engine.renderer.context.canvas.height,
-            canvasWidth: this.engine.renderer.context.canvas.width,
+            canvasHeight: renderer.context.canvas.height,
+            canvasWidth: renderer.context.canvas.width,
             position: vec3.create(-8, 0, 0),
         })
 
         this.#controller = new ArcBallController({
             camera: this.camera as ArcBallCamera,
-            canvas: this.engine.renderer.context.canvas as HTMLCanvasElement,
+            canvas: renderer.context.canvas as HTMLCanvasElement,
         })
     }
 
@@ -122,7 +123,7 @@ export class Demo1 extends Scene implements IScene {
         })
         const imageBitmaps = (await Promise.all(promises)) as TSkyboxBitmaps
 
-        this._engine?.renderer.setSkyBoxTexture(imageBitmaps)
+        renderer.setSkyBoxTexture(imageBitmaps)
     }
 
     #setupLights() {
@@ -155,7 +156,7 @@ export class Demo1 extends Scene implements IScene {
     public override onRender(dt: number): void {
         this.#controller.update(dt)
 
-        this.#helmet.transform.rotateDegreesEuler({ z: 0.1 })
+        this.#helmet.transform.rotateDegreesEuler({ z: 0.5 })
         // dt is frameDelta / 100, not seconds — the engine-wide contract
         this.#orbitAngle += dt * 0.05
 

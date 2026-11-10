@@ -5,6 +5,7 @@ import {
     Scene,
     SpotLight,
     WheezyGLBLoader,
+    renderer,
 } from '@wheezy/engine'
 import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCamera'
 import { mat4, vec3 } from 'wgpu-matrix'
@@ -19,8 +20,8 @@ export class DemoRTC extends Scene implements IScene {
         super()
 
         this.camera = new ArcBallCamera({
-            canvasHeight: this.engine.renderer.context.canvas.height,
-            canvasWidth: this.engine.renderer.context.canvas.width,
+            canvasHeight: renderer.context.canvas.height,
+            canvasWidth: renderer.context.canvas.width,
             position: vec3.create(0, 4, 1),
         })
     }

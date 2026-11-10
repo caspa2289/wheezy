@@ -9,6 +9,7 @@ import {
     type IScene,
     DirectionalLightV2,
     PointLight,
+    renderer,
 } from '@wheezy/engine'
 import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCamera'
 import { ArcBallController } from '@wheezy/engine/src/utils/ArcBallController'
@@ -43,14 +44,14 @@ export class Demo0 extends Scene implements IScene {
         this.camera = new ArcBallCamera({
             zFar: 1000,
             zNear: 0.1,
-            canvasWidth: this._engine!.renderer.context.canvas.width,
-            canvasHeight: this._engine!.renderer.context.canvas.height,
+            canvasWidth: renderer.context.canvas.width,
+            canvasHeight: renderer.context.canvas.height,
             position: vec3.create(0, 4, 5),
         })
 
         this.#controller = new ArcBallController({
             camera: this.camera as ArcBallCamera,
-            canvas: this._engine?.renderer.context.canvas as HTMLCanvasElement,
+            canvas: renderer.context.canvas as HTMLCanvasElement,
         })
 
         // this.directionalLights.push(
@@ -90,7 +91,7 @@ export class Demo0 extends Scene implements IScene {
         })
         const imageBitmaps = (await Promise.all(promises)) as TSkyboxBitmaps
 
-        this._engine?.renderer.setSkyBoxTexture(imageBitmaps)
+        renderer.setSkyBoxTexture(imageBitmaps)
     }
 
     #createTransformObject(): GameObject {
