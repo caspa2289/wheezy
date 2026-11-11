@@ -10,6 +10,8 @@ import { type IMeshRenderDataStorage } from '../MeshRenderDataStorage'
 import { type IObjectManager } from '../ObjectManager'
 import { type ISamplerStorage } from '../SamplerStorage'
 import { type ITextureStorage } from '../TextureStorage'
+import { type IAnimationSystem } from '../animation'
+import { type ISkin } from '../Mesh'
 
 export interface ISceneUploadModelProps {
     modelData: IModelPreloadData
@@ -28,6 +30,10 @@ export interface IScene {
     directionalLights: IDirectionalLight[]
     pointLights: IPointLight[]
     spotLights: ISpotLight[]
+    /** every skin uploaded into this scene — read by the renderer's skinning uploader */
+    skins: ISkin[]
+    /** animation playback director — updated once per frame before the traversal */
+    animations: IAnimationSystem
 
     init: () => Promise<void>
     uploadModel: (props: ISceneUploadModelProps) => Promise<IGameObject>

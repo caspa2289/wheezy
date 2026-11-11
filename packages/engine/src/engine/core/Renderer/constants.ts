@@ -103,3 +103,23 @@ export const CULL_LIGHTS_HEADER_SIZE = 16
 export const CULL_LIGHT_STRIDE = 48
 export const CULL_LIGHTS_BUFFER_SIZE =
     CULL_LIGHTS_HEADER_SIZE + MAX_CULL_LIGHTS * CULL_LIGHT_STRIDE
+
+// --- mesh skinning & morph targets ---
+// joint palettes of every skin in a scene share one storage buffer; each
+// skin owns a contiguous run of mat4 slots (paletteOffset), and each draw
+// selects its run through a dynamic-offset anim-draw slot (the node-matrix /
+// shadow-caster idiom). Layouts must match testShader.wgsl / vertexShadow.wgsl.
+export const MAX_SKIN_JOINTS = 2048
+export const SKIN_JOINT_MATRIX_SIZE = 16 * 4
+export const SKIN_PALETTE_BUFFER_SIZE = MAX_SKIN_JOINTS * SKIN_JOINT_MATRIX_SIZE
+// one 256-byte dynamic-offset slot per skinned/morph mesh; the first 8 bytes
+// hold { palette_base: u32, morph_base: u32 }
+export const MAX_ANIM_DRAW_SLOTS = 256
+export const ANIM_DRAW_SLOT_SIZE = 256
+// morph target weights: one block of MAX_MORPH_TARGETS floats (2 × vec4 in
+// WGSL) per morph mesh in a shared storage buffer, written every frame
+export const MAX_MORPH_TARGETS = 8
+export const MAX_MORPH_MESHES = 256
+export const MORPH_WEIGHT_FLOATS_PER_MESH = 8
+export const MORPH_WEIGHTS_BUFFER_SIZE =
+    MAX_MORPH_MESHES * MORPH_WEIGHT_FLOATS_PER_MESH * 4

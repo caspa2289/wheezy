@@ -22,8 +22,10 @@ import { RenderTargets } from './RenderTargets'
 import { RendererContext } from './RendererContext'
 import { SceneTraversal } from './SceneTraversal'
 import { ShadowCasters } from './ShadowCasters'
+import { SkinningUploader } from './SkinningUploader'
 import { StagingBuffers } from './StagingBuffers'
 import {
+    ANIM_DRAW_SLOT_SIZE,
     NODE_INDEX_SLOT_SIZE,
     SHADOW_INDEX_SLOT_SIZE,
     VIEW_PARAMS_EXPOSURE_SLOT,
@@ -51,6 +53,7 @@ export class Renderer implements IRenderer {
     #environment!: Environment
     #lightUploader!: LightUploader
     #shadowCasters!: ShadowCasters
+    #skinning!: SkinningUploader
     #meshGpuData!: MeshGpuData
     #traversal!: SceneTraversal
     #framePlan!: FramePlan
@@ -106,16 +109,23 @@ export class Renderer implements IRenderer {
             this.#layouts,
             this.#staging
         )
+        this.#skinning = new SkinningUploader(
+            device,
+            this.#layouts,
+            this.#staging
+        )
         this.#meshGpuData = new MeshGpuData(
             device,
             this.#layouts,
             this.#pipelines,
-            this.#environment
+            this.#environment,
+            this.#skinning
         )
         this.#traversal = new SceneTraversal(
             device,
             this.#layouts,
-            this.#staging
+            this.#staging,
+            this.#skinning
         )
         this.#framePlan = new FramePlan(
             device,
@@ -236,6 +246,13 @@ export class Renderer implements IRenderer {
         const afterSceneUpdate = performance.now()
         Profiler.sample('sceneUpdate', afterSceneUpdate - frameStart)
 
+        // animation playback runs right after the scene's game loop and
+        // before the traversal, so play/stop/tweaks made in onRender apply
+        // within the same frame (poses land on the Transforms directly)
+        scene.animations.update(deltaTime)
+        const afterAnimation = performance.now()
+        Profiler.sample('animation', afterAnimation - afterSceneUpdate)
+
         // attach/detach/re-pin the debug light gizmos before the traversal so
         // a profiler-HUD toggle takes effect this frame (dev-only: the
         // Profiler is disabled in production builds)
@@ -301,9 +318,12 @@ export class Renderer implements IRenderer {
         this.#environment.updateFrameParams(scene.camera)
 
         const afterUploads = performance.now()
-        Profiler.sample('uploads', afterUploads - afterSceneUpdate)
+        Profiler.sample('uploads', afterUploads - afterAnimation)
 
         this.#traversal.traverse(scene, this.#meshGpuData)
+        // joint palettes (jointWorld × inverseBind from the traversal
+        // staging) and morph weights — one writeBuffer each
+        this.#skinning.upload(this.#staging)
 
         const afterTraverse = performance.now()
         Profiler.sample('traverse', afterTraverse - afterUploads)
@@ -342,14 +362,15 @@ export class Renderer implements IRenderer {
         )
 
         pass.setBindGroup(0, this.#framePlan.viewParamsBindGroup)
-        pass.setPipeline(this.#pipelines.geometry)
 
         const nodeParams = this.#traversal.nodeParamsBindGroup
         const offsets = this.#dynamicOffsets
         const meshes = this.#traversal.drawMeshes
         // the list is sorted by material, so the material bind group only
-        // changes at group boundaries
+        // changes at group boundaries; pipeline variants (skinning/morph
+        // overrides) are hoisted the same way
         let lastMaterial: GPUBindGroup | null = null
+        let lastPipeline: GPURenderPipeline | null = null
 
         for (let i = 0; i < meshes.length; i++) {
             const mesh = meshes[i]!
@@ -359,6 +380,12 @@ export class Renderer implements IRenderer {
             if (entry.materialBindGroup !== lastMaterial) {
                 pass.setBindGroup(2, entry.materialBindGroup)
                 lastMaterial = entry.materialBindGroup
+            }
+            offsets[0] = entry.animSlotIndex * ANIM_DRAW_SLOT_SIZE
+            pass.setBindGroup(3, entry.skinParamsBindGroup, offsets, 0, 1)
+            if (entry.geometryPipeline !== lastPipeline) {
+                pass.setPipeline(entry.geometryPipeline)
+                lastPipeline = entry.geometryPipeline
             }
             this.#meshGpuData.encodeMesh(mesh, entry, pass)
         }
@@ -390,13 +417,15 @@ export class Renderer implements IRenderer {
             pass.setBindGroup(0, shadowCasters.dataBindGroup, offsets, 0, 1)
 
             // the caster list is sorted by shadow pipeline (the cache is keyed
-            // by vertex format, usually one entry), so this rarely changes
+            // by vertex format plus skinning/morph variant), so this rarely changes
             let lastPipeline: GPURenderPipeline | null = null
             for (let i = 0; i < meshes.length; i++) {
                 const mesh = meshes[i]!
                 const entry = meshData.get(mesh.id)!
                 offsets[0] = entry.nodeIndex * NODE_INDEX_SLOT_SIZE
                 pass.setBindGroup(1, nodeParams, offsets, 0, 1)
+                offsets[0] = entry.animSlotIndex * ANIM_DRAW_SLOT_SIZE
+                pass.setBindGroup(2, entry.skinParamsBindGroup, offsets, 0, 1)
                 if (entry.shadowRenderPipeline !== lastPipeline) {
                     pass.setPipeline(entry.shadowRenderPipeline)
                     lastPipeline = entry.shadowRenderPipeline

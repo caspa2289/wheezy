@@ -7,6 +7,7 @@ export enum EntityTypes {
     collider = 'collider',
     physicsObject = 'physicsObject',
     light = 'light',
+    animator = 'animator',
 }
 
 export type EntityType = keyof typeof EntityTypes

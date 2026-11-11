@@ -14,6 +14,7 @@ export class BindGroupLayouts {
     readonly uniforms: GPUBindGroupLayout
     readonly nodeParams: GPUBindGroupLayout
     readonly material: GPUBindGroupLayout
+    readonly skinParams: GPUBindGroupLayout
     readonly lights: GPUBindGroupLayout
     readonly gBuffer: GPUBindGroupLayout
     readonly post: GPUBindGroupLayout
@@ -81,6 +82,48 @@ export class BindGroupLayouts {
         })
 
         const sampleType = 'float'
+
+        // group 3 of the geometry pipeline / group 2 of the shadow pipelines:
+        // skinning + morph-target data of one draw. Binding 0 is the
+        // dynamic-offset anim-draw slot ({palette_base, morph_base}); the
+        // palette and morph-weight storages are shared scene-wide, the morph
+        // deltas and mesh params are per mesh. Meshes that are neither
+        // skinned nor morph never bind this group (the shader variants do not
+        // statically use it — see the SKINNING/MORPH_COUNT overrides).
+        this.skinParams = device.createBindGroupLayout({
+            label: 'skin params bind group layout',
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.VERTEX,
+                    buffer: {
+                        type: 'uniform',
+                        hasDynamicOffset: true,
+                        minBindingSize: 8,
+                    },
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.VERTEX,
+                    buffer: { type: 'read-only-storage' },
+                },
+                {
+                    binding: 2,
+                    visibility: GPUShaderStage.VERTEX,
+                    buffer: { type: 'read-only-storage' },
+                },
+                {
+                    binding: 3,
+                    visibility: GPUShaderStage.VERTEX,
+                    buffer: { type: 'read-only-storage' },
+                },
+                {
+                    binding: 4,
+                    visibility: GPUShaderStage.VERTEX,
+                    buffer: { type: 'uniform', minBindingSize: 16 },
+                },
+            ],
+        })
 
         this.material = device.createBindGroupLayout({
             entries: [
@@ -408,7 +451,12 @@ export class BindGroupLayouts {
         })
 
         this.geometryPipelineLayout = device.createPipelineLayout({
-            bindGroupLayouts: [this.uniforms, this.nodeParams, this.material],
+            bindGroupLayouts: [
+                this.uniforms,
+                this.nodeParams,
+                this.material,
+                this.skinParams,
+            ],
         })
 
         this.lightingPipelineLayout = device.createPipelineLayout({
@@ -430,7 +478,11 @@ export class BindGroupLayouts {
 
         this.shadowPipelineLayout = device.createPipelineLayout({
             label: 'shadow render pipeline layout',
-            bindGroupLayouts: [this.shadowData, this.nodeParams],
+            bindGroupLayouts: [
+                this.shadowData,
+                this.nodeParams,
+                this.skinParams,
+            ],
         })
 
         this.cullingPipelineLayout = device.createPipelineLayout({

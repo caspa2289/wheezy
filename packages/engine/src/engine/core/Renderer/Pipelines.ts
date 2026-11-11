@@ -1,6 +1,7 @@
 import { type BindGroupLayouts } from './BindGroupLayouts'
 import { type RenderTargets } from './RenderTargets'
 import { HDR_TARGET_FORMAT } from './constants'
+import { type GLTFAccessor } from '../../types'
 import shaderCode from '../../shaders/testShader.wgsl'
 import lightingShaderCode from '../../shaders/lighting.wgsl'
 import lightCullingShaderCode from '../../shaders/lightCulling.wgsl'
@@ -22,13 +23,76 @@ export interface ShadowPipelineEntry {
 }
 
 /**
- * Every shader module and pipeline of the renderer, including the shadow
- * pipeline cache keyed by position vertex format (`elementType:byteStride`) —
- * meshes almost always share `float32x3` positions, so that cache holds ~1
- * entry per scene.
+ * Skinning/morph variant selector shared by the geometry and shadow
+ * pipelines — both compile the same WGSL override constants
+ * (SKINNING, MORPH_COUNT) into per-mesh pipeline variants.
+ */
+export interface AnimPipelineOptions {
+    skinning: boolean
+    morphCount: number
+    joints?: GLTFAccessor
+    weights?: GLTFAccessor
+}
+
+// Dawn's static-use analysis does not fold the SKINNING override, so the
+// joints/weights vertex attributes are statically used by every variant —
+// every pipeline declares both slots and unskinned meshes bind zero-filled
+// dummy buffers (out-of-range vertex fetches read as zero).
+const DUMMY_JOINTS_FORMAT: GPUVertexFormat = 'uint8x4'
+const DUMMY_WEIGHTS_FORMAT: GPUVertexFormat = 'unorm8x4'
+
+const skinVertexBuffers = (
+    options: AnimPipelineOptions | undefined,
+    firstLocation: number
+): GPUVertexBufferLayout[] => {
+    const skinning = options?.skinning ?? false
+    return [
+        {
+            arrayStride: skinning ? options!.joints!.byteStride : 4,
+            attributes: [
+                {
+                    format: skinning
+                        ? options!.joints!.elementType
+                        : DUMMY_JOINTS_FORMAT,
+                    offset: 0,
+                    shaderLocation: firstLocation,
+                },
+            ],
+        },
+        {
+            arrayStride: skinning ? options!.weights!.byteStride : 4,
+            attributes: [
+                {
+                    format: skinning
+                        ? options!.weights!.elementType
+                        : DUMMY_WEIGHTS_FORMAT,
+                    offset: 0,
+                    shaderLocation: firstLocation + 1,
+                },
+            ],
+        },
+    ]
+}
+
+const animVariantKey = (options?: AnimPipelineOptions) => {
+    const [joints, weights] = skinVertexBuffers(options, 4) as [
+        GPUVertexBufferLayout,
+        GPUVertexBufferLayout,
+    ]
+    return `${options?.skinning ? 1 : 0}:${options?.morphCount ?? 0}:${
+        joints.arrayStride
+    }:${joints.attributes[0]!.format}:${weights.arrayStride}:${
+        weights.attributes[0]!.format
+    }`
+}
+
+/**
+ * Every shader module and pipeline of the renderer. The geometry and shadow
+ * pipelines are variant caches keyed by vertex format plus the skinning /
+ * morph-target overrides — meshes almost always share `float32x3` positions
+ * and are unskinned, so in practice each cache holds ~1 entry per scene.
  */
 export class Pipelines {
-    readonly geometry: GPURenderPipeline
     readonly lighting: GPURenderPipeline
     readonly post: GPURenderPipeline
     readonly fxaa: GPURenderPipeline
@@ -41,7 +105,10 @@ export class Pipelines {
 
     #device: GPUDevice
     #layouts: BindGroupLayouts
+    #targets: RenderTargets
+    #geometryShaderModule: GPUShaderModule
     #shadowShaderModule: GPUShaderModule
+    #geometryPipelineCache = new Map<string, GPURenderPipeline>()
     #shadowPipelineCache = new Map<string, ShadowPipelineEntry>()
 
     constructor(
@@ -51,8 +118,9 @@ export class Pipelines {
     ) {
         this.#device = device
         this.#layouts = layouts
+        this.#targets = targets
 
-        const geometryShaderModule = device.createShaderModule({
+        this.#geometryShaderModule = device.createShaderModule({
             label: 'geometry shader',
             code: shaderCode,
         })
@@ -83,78 +151,6 @@ export class Pipelines {
         this.#shadowShaderModule = device.createShaderModule({
             label: 'shadow shader module',
             code: shadowShaderCode,
-        })
-
-        this.geometry = device.createRenderPipeline({
-            label: 'geometry render pipeline',
-            layout: layouts.geometryPipelineLayout,
-            vertex: {
-                module: geometryShaderModule,
-                entryPoint: 'vertex_main',
-                buffers: [
-                    {
-                        arrayStride: 12,
-                        attributes: [
-                            {
-                                format: 'float32x3',
-                                offset: 0,
-                                shaderLocation: 0,
-                            },
-                        ],
-                    },
-                    {
-                        arrayStride: 8,
-                        attributes: [
-                            {
-                                format: 'float32x2',
-                                offset: 0,
-                                shaderLocation: 1,
-                            },
-                        ],
-                    },
-                    {
-                        arrayStride: 12,
-                        attributes: [
-                            {
-                                format: 'float32x3',
-                                offset: 0,
-                                shaderLocation: 2,
-                            },
-                        ],
-                    },
-                    {
-                        arrayStride: 12,
-                        attributes: [
-                            {
-                                format: 'float32x3',
-                                offset: 0,
-                                shaderLocation: 3,
-                            },
-                        ],
-                    },
-                ],
-            },
-            fragment: {
-                module: geometryShaderModule,
-                entryPoint: 'fragment_main',
-                // order must match the geometry pass descriptor attachments
-                targets: [
-                    { format: targets.swapChainFormat }, // albedo
-                    { format: 'rgba16float' }, // normal
-                    { format: targets.swapChainFormat }, // metallicRoughness (+ occlusion in .r)
-                    { format: targets.swapChainFormat }, // emission
-                ],
-            },
-            primitive: {
-                topology: 'triangle-list',
-                stripIndexFormat: undefined,
-                cullMode: 'back',
-            },
-            depthStencil: {
-                format: targets.depthTextureFormat,
-                depthWriteEnabled: true,
-                depthCompare: 'less',
-            },
         })
 
         this.lighting = device.createRenderPipeline({
@@ -293,15 +289,114 @@ export class Pipelines {
         })
     }
 
+    /**
+     * Geometry-pass pipeline variant for one mesh: base 4 vertex buffers plus
+     * JOINTS_0/WEIGHTS_0 at slots 4/5 (zero-filled dummies when unskinned —
+     * the attributes are statically used in every variant), and the
+     * SKINNING/MORPH_COUNT override constants baked in.
+     */
+    getGeometryPipeline(options?: AnimPipelineOptions): GPURenderPipeline {
+        const key = animVariantKey(options)
+        const cached = this.#geometryPipelineCache.get(key)
+        if (cached) {
+            return cached
+        }
+
+        const skinning = options?.skinning ?? false
+        const morphCount = options?.morphCount ?? 0
+
+        const buffers: GPUVertexBufferLayout[] = [
+            {
+                arrayStride: 12,
+                attributes: [
+                    { format: 'float32x3', offset: 0, shaderLocation: 0 },
+                ],
+            },
+            {
+                arrayStride: 8,
+                attributes: [
+                    { format: 'float32x2', offset: 0, shaderLocation: 1 },
+                ],
+            },
+            {
+                arrayStride: 12,
+                attributes: [
+                    { format: 'float32x3', offset: 0, shaderLocation: 2 },
+                ],
+            },
+            {
+                arrayStride: 12,
+                attributes: [
+                    { format: 'float32x3', offset: 0, shaderLocation: 3 },
+                ],
+            },
+            ...skinVertexBuffers(options, 4),
+        ]
+
+        const targets = this.#targets
+        const pipeline = this.#device.createRenderPipeline({
+            label: 'geometry render pipeline',
+            layout: this.#layouts.geometryPipelineLayout,
+            vertex: {
+                module: this.#geometryShaderModule,
+                entryPoint: 'vertex_main',
+                buffers,
+                constants: {
+                    SKINNING: skinning ? 1 : 0,
+                    MORPH_COUNT: morphCount,
+                },
+            },
+            fragment: {
+                module: this.#geometryShaderModule,
+                entryPoint: 'fragment_main',
+                // order must match the geometry pass descriptor attachments
+                targets: [
+                    { format: targets.swapChainFormat }, // albedo
+                    { format: 'rgba16float' }, // normal
+                    { format: targets.swapChainFormat }, // metallicRoughness (+ occlusion in .r)
+                    { format: targets.swapChainFormat }, // emission
+                ],
+            },
+            primitive: {
+                topology: 'triangle-list',
+                stripIndexFormat: undefined,
+                cullMode: 'back',
+            },
+            depthStencil: {
+                format: targets.depthTextureFormat,
+                depthWriteEnabled: true,
+                depthCompare: 'less',
+            },
+        })
+        this.#geometryPipelineCache.set(key, pipeline)
+        return pipeline
+    }
+
     getShadowPipeline(
         elementType: GPUVertexFormat,
-        byteStride: number
+        byteStride: number,
+        options?: AnimPipelineOptions
     ): ShadowPipelineEntry {
-        const key = `${elementType}:${byteStride}`
+        const key = `${elementType}:${byteStride}:${animVariantKey(options)}`
         const cached = this.#shadowPipelineCache.get(key)
         if (cached) {
             return cached
         }
+
+        const skinning = options?.skinning ?? false
+        const morphCount = options?.morphCount ?? 0
+
+        const buffers: GPUVertexBufferLayout[] = [
+            {
+                arrayStride: byteStride,
+                attributes: [
+                    { format: elementType, offset: 0, shaderLocation: 0 },
+                ],
+            },
+            // joints/weights at slots 1/2 (matching vertexShadow.wgsl);
+            // dummies when unskinned, see skinVertexBuffers
+            ...skinVertexBuffers(options, 1),
+        ]
 
         const entry: ShadowPipelineEntry = {
             pipeline: this.#device.createRenderPipeline({
@@ -309,18 +404,12 @@ export class Pipelines {
                 layout: this.#layouts.shadowPipelineLayout,
                 vertex: {
                     module: this.#shadowShaderModule,
-                    buffers: [
-                        {
-                            arrayStride: byteStride,
-                            attributes: [
-                                {
-                                    format: elementType,
-                                    offset: 0,
-                                    shaderLocation: 0,
-                                },
-                            ],
-                        },
-                    ],
+                    entryPoint: 'vertex_main',
+                    buffers,
+                    constants: {
+                        SKINNING: skinning ? 1 : 0,
+                        MORPH_COUNT: morphCount,
+                    },
                 },
                 depthStencil: {
                     depthWriteEnabled: true,

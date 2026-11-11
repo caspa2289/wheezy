@@ -2,6 +2,7 @@ export const PROFILER_METRICS = [
     'fps',
     'frame',
     'sceneUpdate',
+    'animation',
     'uploads',
     'traverse',
     'encode',

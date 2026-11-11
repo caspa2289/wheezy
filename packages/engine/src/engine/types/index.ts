@@ -1,5 +1,9 @@
 import { type Mat4, type Vec3, type Vec4 } from 'wgpu-matrix'
 import { type GLTFAccessor } from './core/Mesh'
+import {
+    type TAnimationInterpolation,
+    type TAnimationTargetPath,
+} from './core/animation'
 
 export * from './core/Entity'
 export * from './core/GameObject'
@@ -15,6 +19,7 @@ export * from './core/TextureStorage'
 export * from './core/Scene'
 export * from './core/Engine'
 export * from './core/Renderer'
+export * from './core/animation'
 
 //FIXME: move this somewhere else
 export interface IPreloadMesh {
@@ -25,13 +30,58 @@ export interface IPreloadMesh {
     textureCoordinates: GLTFAccessor
     materialId: string
     mode: number
+    /** JOINTS_0 — skinned primitives only */
+    joints?: GLTFAccessor
+    /** WEIGHTS_0 — skinned primitives only */
+    weights?: GLTFAccessor
+    /** key into IModelPreloadData.skins */
+    skinId?: string
+    /** glTF morph targets, in target order */
+    morphTargets?: IPreloadMorphTarget[]
+    /** default morph weights, one per target */
+    morphWeights?: number[]
+}
+
+export interface IPreloadMorphTarget {
+    positions: GLTFAccessor
+    normals?: GLTFAccessor
 }
 
 export interface IPreloadEntity {
+    /** stable id of this node — skins and animations reference nodes through it */
+    nodeId: string
     trsMatrix: Mat4
     meshes: IPreloadMesh[]
     name?: string
     children: IPreloadEntity[]
+}
+
+export interface IPreloadSkin {
+    name?: string
+    /** preload node ids of the joints, in joint-index order */
+    jointNodeIds: string[]
+    /** jointCount × 16 floats, column-major mat4 per joint */
+    inverseBindMatrices: Float32Array
+}
+
+export interface IPreloadAnimationTrack {
+    /** preload node id of the channel target */
+    targetNodeId: string
+    path: TAnimationTargetPath
+    interpolation: TAnimationInterpolation
+    /** keyframe times in seconds, ascending */
+    input: Float32Array
+    /**
+     * flat values: 3 floats per key (translation/scale), 4 (rotation
+     * quaternion xyzw), morph-target count (weights); CUBICSPLINE stores
+     * (in-tangent, value, out-tangent) triples per key
+     */
+    output: Float32Array
+}
+
+export interface IPreloadAnimation {
+    name: string
+    tracks: IPreloadAnimationTrack[]
 }
 
 export interface IModelPreloadData {
@@ -40,6 +90,8 @@ export interface IModelPreloadData {
     samplers: SamplerMap
     textures: TextureMap
     materials: MaterialMap
+    skins: SkinMap
+    animations: IPreloadAnimation[]
     model: IPreloadEntity
 }
 
@@ -100,3 +152,4 @@ export type ImageMap = Map<string, IImagePreloadData>
 export type SamplerMap = Map<string, ISamplerPreloadData>
 export type TextureMap = Map<string, ITexturePreloadData>
 export type MaterialMap = Map<string, IMaterialPreloadData>
+export type SkinMap = Map<string, IPreloadSkin>

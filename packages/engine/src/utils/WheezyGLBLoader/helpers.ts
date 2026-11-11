@@ -32,21 +32,22 @@ export const getTypeComponentsAmount = (type: string) => {
 
 export const getVertexType = (
     componentType: number,
-    type: string
+    type: string,
+    normalized = false
 ): GPUVertexFormat => {
     let typeStr: string | null = null
     switch (componentType) {
         case GLTFComponentType.BYTE:
-            typeStr = 'sint8'
+            typeStr = normalized ? 'snorm8' : 'sint8'
             break
         case GLTFComponentType.UNSIGNED_BYTE:
-            typeStr = 'uint8'
+            typeStr = normalized ? 'unorm8' : 'uint8'
             break
         case GLTFComponentType.SHORT:
-            typeStr = 'sint16'
+            typeStr = normalized ? 'snorm16' : 'sint16'
             break
         case GLTFComponentType.UNSIGNED_SHORT:
-            typeStr = 'uint16'
+            typeStr = normalized ? 'unorm16' : 'uint16'
             break
         case GLTFComponentType.INT:
             typeStr = 'int32'

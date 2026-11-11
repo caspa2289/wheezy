@@ -10,7 +10,7 @@ export class Entity<T extends EntityTypes> implements IEntity<T> {
     }
 
     #generateId() {
-        return String(Math.random())
+        return crypto.randomUUID()
     }
 
     get id() {

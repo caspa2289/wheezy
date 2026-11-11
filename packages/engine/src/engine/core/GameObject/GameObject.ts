@@ -1,6 +1,7 @@
 import {
     type EntityID,
     EntityTypes,
+    type IAnimator,
     type IComponent,
     type IGameObject,
     type ITransform,
@@ -46,6 +47,15 @@ export class GameObject
             }
         }
         return undefined as unknown as ITransform
+    }
+
+    get animator(): IAnimator | undefined {
+        for (const component of this.components.values()) {
+            if (component.type === EntityTypes.animator) {
+                return component as IAnimator
+            }
+        }
+        return undefined
     }
 
     public addComponent(component: IComponent<EntityTypes>) {

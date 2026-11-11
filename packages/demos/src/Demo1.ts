@@ -1,6 +1,9 @@
 import {
+    AnimationDebugger,
+    EntityTypes,
     GameObject,
     type IGameObject,
+    type IMesh,
     type IScene,
     Scene,
     SpotLight,
@@ -12,20 +15,7 @@ import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCam
 import { ArcBallController } from '@wheezy/engine/src/utils/ArcBallController'
 import { vec3 } from 'wgpu-matrix'
 
-/**
- * Lighting test scene. Placements derive from the models' real bounds (parsed
- * from the GLB POSITION accessors), not from guesses:
- *
- * - `Wall.glb` — 5.00 x 2.16 x 0.13 once its node chain's net +90° X rotation
- *   is applied, i.e. a wall standing in the XY plane. Scaled x3 and dropped by
- *   half its height it becomes a 15 x 6.5 backdrop centered on the view axis.
- * - `DamagedHelmet.glb` — 1.89 x 2.00 x 1.80, centered near its own origin.
- *
- * Every light sits on the x = LIGHT_X plane between the camera and the helmet,
- * so all of them throw the helmet's shadow onto the wall and those shadows
- * overlap around the middle of it.
- */
-const WALL_SCALE = 3
+const WALL_SCALE = 6
 // raw POSITION max.z, which the node rotation turns into world +Y
 const WALL_HEIGHT = 2.158
 const WALL_X = 5
@@ -36,14 +26,28 @@ const COLORED_ORBIT_RADIUS = 2.8
 // the PBR diffuse term divides by π, so intensities need roughly π× the value
 // that looked right under the old Phong shading
 const SPOT_INTENSITY = 3
-const SPOT_CUTOFF = 15
 // wide enough that each lit pool on the wall is larger than the helmet's
 // shadow, so shadow edges and the colored overlaps stay readable
-const SPOT_CUTOFF_POOL = 25
+const SPOT_CUTOFF_POOL = 40
 // past the widest cone the shadow frustum can represent (~83°, see
 // SPOT_MAX_CONE_HALF_ANGLE) — the toggle shows the cutoff being clamped, so
 // the lit cone and its shadowed cone stay the same width
-const SPOT_CUTOFF_WIDE = 85
+
+// --- skinned animation test subjects ---
+// All three stand on the wall's lower half; scales/heights derive from the
+// models' POSITION accessor bounds (Shrek is authored in centimeters).
+const CHARACTER_BASE_Y = -3.2
+// Shrek.glb — 226.67 tall, 112 joints, ~100 clips; geometry dips 0.47 below
+// its origin, so the origin sits that much (scaled) above the base plane
+const SHREK_SCALE = 1.8
+const SHREK_POSITION = vec3.create(3, CHARACTER_BASE_Y, -3.5)
+// BabyShrek.glb — 0.82 tall, 50 joints, one mixamo clip; small enough to sit
+// in the helmet's column without reaching it (top ends ~1.2 above the base)
+const BABY_SHREK_SCALE = 1
+const BABY_SHREK_POSITION = vec3.create(0, CHARACTER_BASE_Y, 0)
+// SkibidiToilet.glb — 2.58 tall, 5 joints, one clip; dips 0.04 below origin
+const SKIBIDI_TOILET_SCALE = 2.4 / 2.58
+const SKIBIDI_TOILET_POSITION = vec3.create(3, CHARACTER_BASE_Y, 3.5)
 
 export class Demo1 extends Scene implements IScene {
     #controller: ArcBallController
@@ -52,7 +56,7 @@ export class Demo1 extends Scene implements IScene {
     #coloredSpots: SpotLight[] = []
     #orbitAngle = 0
 
-    #helmet!: IGameObject
+    // #helmet!: IGameObject
 
     constructor() {
         super()
@@ -76,35 +80,90 @@ export class Demo1 extends Scene implements IScene {
             'static/models/Wall.glb'
         )
 
-        const modelData1 = await WheezyGLBLoader.loadFromUrl(
-            'static/models/DamagedHelmet.glb'
-        )
+        // const modelData1 = await WheezyGLBLoader.loadFromUrl(
+        //     'static/models/DamagedHelmet.glb'
+        // )
 
         const modelGO0 = await this.uploadModel({
             modelData: modelData,
         })
 
-        this.#helmet = await this.uploadModel({
-            modelData: modelData1,
-        })
+        // this.#helmet = await this.uploadModel({
+        //     modelData: modelData1,
+        // })
 
         this.#testHook = new GameObject()
         this.objectManager.addObject(this.#testHook, this.root)
         this.objectManager.reparentObject(modelGO0, this.#testHook)
 
-        this.#helmet.transform.translate(HELMET_POSITION)
-        this.#helmet.transform.rotateDegreesEuler({ x: 90, z: 90 })
+        // this.#helmet.transform.translate(HELMET_POSITION)
+        // this.#helmet.transform.rotateDegreesEuler({ x: 90, z: 90 })
 
         modelGO0.transform.rotateDegreesEuler({ y: -90 })
         modelGO0.transform.translate(
-            vec3.create(WALL_X, (-WALL_HEIGHT * WALL_SCALE) / 2, 0)
+            vec3.create(WALL_X, (-WALL_HEIGHT * WALL_SCALE) / 3, 0)
         )
         modelGO0.transform.scale(
             vec3.create(WALL_SCALE, WALL_SCALE, WALL_SCALE)
         )
 
-        // this.#setupLights()
+        await this.#setupSkinnedModels()
+
+        this.#setupLights()
         await this.#setupSkyBox()
+    }
+
+    /**
+     * Skinned-animation subjects: Shrek, BabyShrek and the SkibidiToilet —
+     * playback (including the default clips) is owned entirely by the
+     * AnimationDebugger panel. Placement follows the wall pattern:
+     * rotate → translate → scale.
+     */
+    async #setupSkinnedModels() {
+        const shrekData = await WheezyGLBLoader.loadFromUrl(
+            'static/models/Shrek.glb'
+        )
+        const shrek = await this.uploadModel({ modelData: shrekData })
+        shrek.name = 'Shrek'
+        shrek.transform.rotateDegreesEuler({ y: 90 })
+        shrek.transform.translate(SHREK_POSITION)
+        shrek.transform.scale(
+            vec3.create(SHREK_SCALE, SHREK_SCALE, SHREK_SCALE)
+        )
+
+        const babyShrekData = await WheezyGLBLoader.loadFromUrl(
+            'static/models/BabyShrek.glb'
+        )
+        const babyShrek = await this.uploadModel({ modelData: babyShrekData })
+        babyShrek.name = 'BabyShrek'
+        babyShrek.transform.rotateDegreesEuler({ y: -90 })
+        babyShrek.transform.translate(BABY_SHREK_POSITION)
+        babyShrek.transform.scale(
+            vec3.create(BABY_SHREK_SCALE, BABY_SHREK_SCALE, BABY_SHREK_SCALE)
+        )
+
+        const skibidiData = await WheezyGLBLoader.loadFromUrl(
+            'static/models/SkibidiToilet.glb'
+        )
+        const skibidi = await this.uploadModel({ modelData: skibidiData })
+        skibidi.name = 'SkibidiToilet'
+        skibidi.transform.rotateDegreesEuler({ y: -90 })
+        skibidi.transform.translate(SKIBIDI_TOILET_POSITION)
+        skibidi.transform.scale(
+            vec3.create(
+                SKIBIDI_TOILET_SCALE,
+                SKIBIDI_TOILET_SCALE,
+                SKIBIDI_TOILET_SCALE
+            )
+        )
+
+        // live playback controls; defaultClip starts each subject, and
+        // entries without one would stay idle until a clip is picked
+        new AnimationDebugger([
+            { animator: shrek.animator!, defaultClip: 'm_Shrek_int_footTap2' },
+            { animator: babyShrek.animator!, defaultClip: 'mixamo.com' },
+            { animator: skibidi.animator!, defaultClip: 'Animation' },
+        ])
     }
 
     async #setupSkyBox() {
@@ -156,7 +215,7 @@ export class Demo1 extends Scene implements IScene {
     public override onRender(dt: number): void {
         this.#controller.update(dt)
 
-        this.#helmet.transform.rotateDegreesEuler({ z: 0.5 })
+        // this.#helmet.transform.rotateDegreesEuler({ z: 0.5 })
         // dt is frameDelta / 100, not seconds — the engine-wide contract
         this.#orbitAngle += dt * 0.05
 

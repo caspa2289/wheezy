@@ -3,20 +3,30 @@ import {
     type GLTFAccessor,
     GLTFTextureFilter,
     GLTFTextureWrap,
+    type IAnimationSystem,
+    type IAnimationTrackDescriptor,
     type IBufferStorage,
     type IGameObject,
     type IImageStorage,
     type IMaterial,
+    type IMesh,
     type IModelPreloadData,
+    type IMorphTargets,
     type IObjectManager,
     type IPreloadEntity,
+    type IPreloadMesh,
     type ISamplerStorage,
+    type ISkin,
     type ITexture,
     type ITextureStorage,
+    EntityTypes,
 } from '../../types'
 import { type IMaterialStorage } from '../../types/core/MaterialStorage'
+import { AnimationClip } from '../animation'
+import { Animator } from '../animation'
 import { GameObject } from '../GameObject'
 import { Mesh } from '../Mesh'
+import { MAX_MORPH_TARGETS } from '../Renderer/constants'
 import { Transform } from '../Transform'
 
 export class ModelUploader {
@@ -294,23 +304,36 @@ export class ModelUploader {
         })
     }
 
-    static #traversePreloadNode(
-        node: IPreloadEntity,
-        parentGameObject: IGameObject,
-        objectManager: IObjectManager,
-        bufferStorage: IBufferStorage,
+    /** creates the Mesh components of one preload node, incl. skinning/morph data */
+    static #createMeshes(
+        gameObject: IGameObject,
+        meshes: IPreloadMesh[],
         materialStorage: IMaterialStorage,
-        device: GPUDevice
+        skinMap: Map<string, ISkin>
     ) {
-        const { trsMatrix, meshes, children } = node
-
-        const gameObject = new GameObject()
-
-        objectManager.addObject(gameObject, parentGameObject)
-
-        new Transform(gameObject, trsMatrix)
-
         meshes.forEach((meshData) => {
+            let morphTargets: IMorphTargets | undefined
+            let morphWeights: Float32Array | undefined
+
+            if (meshData.morphTargets?.length) {
+                morphTargets = {
+                    positions: meshData.morphTargets.map(
+                        (target) => target.positions
+                    ),
+                    normals: meshData.morphTargets.map(
+                        (target) => target.normals
+                    ),
+                    targetCount: meshData.morphTargets.length,
+                    vertexCount: meshData.positions.count,
+                }
+                morphWeights = new Float32Array(MAX_MORPH_TARGETS)
+                meshData.morphWeights?.forEach((weight, index) => {
+                    if (index < MAX_MORPH_TARGETS) {
+                        morphWeights![index] = weight
+                    }
+                })
+            }
+
             new Mesh(
                 gameObject,
                 meshData.positions as GLTFAccessor,
@@ -318,9 +341,43 @@ export class ModelUploader {
                 meshData.normals,
                 meshData.textureCoordinates,
                 meshData.tangents,
-                materialStorage.materials.get(meshData.materialId) as IMaterial
+                materialStorage.materials.get(meshData.materialId) as IMaterial,
+                {
+                    joints: meshData.joints,
+                    weights: meshData.weights,
+                    skin: meshData.skinId
+                        ? skinMap.get(meshData.skinId)
+                        : undefined,
+                    morphTargets,
+                    morphWeights,
+                }
             )
         })
+    }
+
+    static #traversePreloadNode(
+        node: IPreloadEntity,
+        parentGameObject: IGameObject,
+        objectManager: IObjectManager,
+        bufferStorage: IBufferStorage,
+        materialStorage: IMaterialStorage,
+        device: GPUDevice,
+        nodeIdMap: Map<string, IGameObject>,
+        skinMap: Map<string, ISkin>
+    ) {
+        const { nodeId, trsMatrix, meshes, children, name } = node
+
+        const gameObject = new GameObject()
+        if (name) {
+            gameObject.name = name
+        }
+
+        objectManager.addObject(gameObject, parentGameObject)
+        nodeIdMap.set(nodeId, gameObject)
+
+        new Transform(gameObject, trsMatrix)
+
+        this.#createMeshes(gameObject, meshes, materialStorage, skinMap)
 
         children.forEach((child) => {
             this.#traversePreloadNode(
@@ -329,9 +386,146 @@ export class ModelUploader {
                 objectManager,
                 bufferStorage,
                 materialStorage,
-                device
+                device,
+                nodeIdMap,
+                skinMap
             )
         })
+    }
+
+    /** builds the runtime skins (joints resolved after the node walk) */
+    static #createSkins(
+        modelData: IModelPreloadData,
+        sceneSkins: ISkin[]
+    ): Map<string, ISkin> {
+        const skinMap = new Map<string, ISkin>()
+
+        modelData.skins?.forEach((preloadSkin, skinId) => {
+            const jointCount = preloadSkin.jointNodeIds.length
+            const skin: ISkin = {
+                name: preloadSkin.name,
+                joints: [],
+                jointIds: preloadSkin.jointNodeIds.slice(),
+                inverseBindMatrices: preloadSkin.inverseBindMatrices,
+                jointCount,
+                paletteOffset: -1,
+            }
+            skinMap.set(skinId, skin)
+            sceneSkins.push(skin)
+        })
+
+        return skinMap
+    }
+
+    /** resolves skin joints against the built node map */
+    static #resolveSkins(
+        skinMap: Map<string, ISkin>,
+        modelData: IModelPreloadData,
+        nodeIdMap: Map<string, IGameObject>
+    ) {
+        modelData.skins?.forEach((preloadSkin, skinId) => {
+            const skin = skinMap.get(skinId)
+            if (!skin) {
+                return
+            }
+            // jointIds must hold the live GameObject ids — the traversal
+            // records node indices by entity id, not by preload node id
+            const jointIds: string[] = []
+            for (const jointNodeId of preloadSkin.jointNodeIds) {
+                const joint = nodeIdMap.get(jointNodeId)
+                if (!joint) {
+                    console.warn(
+                        `wheezy: skin "${skin.name}" references a missing joint node — the joint keeps its last palette entry`
+                    )
+                    skin.joints.push(undefined as unknown as IGameObject)
+                    jointIds.push('')
+                    continue
+                }
+                skin.joints.push(joint)
+                jointIds.push(joint.id)
+            }
+            skin.jointIds = jointIds
+        })
+    }
+
+    /**
+     * Builds runtime clips from the preload animations and attaches an
+     * Animator to the model root when the file carries any.
+     */
+    static #createAnimator(
+        modelData: IModelPreloadData,
+        rootObject: IGameObject,
+        nodeIdMap: Map<string, IGameObject>,
+        animations: IAnimationSystem
+    ) {
+        if (!modelData.animations?.length) {
+            return
+        }
+
+        const clips: AnimationClip[] = []
+
+        for (const preloadAnimation of modelData.animations) {
+            const trackDescriptors: IAnimationTrackDescriptor[] = []
+
+            for (const preloadTrack of preloadAnimation.tracks) {
+                const target = nodeIdMap.get(preloadTrack.targetNodeId)
+                if (!target) {
+                    console.warn(
+                        `wheezy: animation "${preloadAnimation.name}" targets a missing node — track skipped`
+                    )
+                    continue
+                }
+
+                if (preloadTrack.path === 'weights') {
+                    // morph-weight channels apply to every morph-capable mesh
+                    // primitive of the target node
+                    let hasMorphMesh = false
+                    for (const component of target.components.values()) {
+                        if (component.type !== EntityTypes.mesh) {
+                            continue
+                        }
+                        const mesh = component as IMesh
+                        if (!mesh.morphWeights) {
+                            continue
+                        }
+                        hasMorphMesh = true
+                        trackDescriptors.push({
+                            mesh,
+                            path: 'weights',
+                            interpolation: preloadTrack.interpolation,
+                            times: preloadTrack.input,
+                            values: preloadTrack.output,
+                        })
+                    }
+                    if (!hasMorphMesh) {
+                        console.warn(
+                            `wheezy: animation "${preloadAnimation.name}" targets node "${target.name}" with no morph meshes — track skipped`
+                        )
+                    }
+                } else {
+                    trackDescriptors.push({
+                        target,
+                        path: preloadTrack.path,
+                        interpolation: preloadTrack.interpolation,
+                        times: preloadTrack.input,
+                        values: preloadTrack.output,
+                    })
+                }
+            }
+
+            if (trackDescriptors.length > 0) {
+                clips.push(
+                    new AnimationClip({
+                        name: preloadAnimation.name,
+                        tracks: trackDescriptors,
+                    })
+                )
+            }
+        }
+
+        if (clips.length > 0) {
+            new Animator(rootObject, animations, clips)
+        }
     }
 
     public static async uploadModel(
@@ -343,7 +537,9 @@ export class ModelUploader {
         materialStorage: IMaterialStorage,
         textureStorage: ITextureStorage,
         sceneObject: IGameObject,
-        device: GPUDevice
+        device: GPUDevice,
+        sceneSkins: ISkin[],
+        animations: IAnimationSystem
     ) {
         this.#uploadBuffers(modelData, bufferStorage)
         await this.#uploadImages(modelData, bufferStorage, imageStorage)
@@ -358,25 +554,19 @@ export class ModelUploader {
             device
         )
 
+        const skinMap = this.#createSkins(modelData, sceneSkins)
+        const nodeIdMap = new Map<string, IGameObject>()
+
         const { trsMatrix, meshes, children } = modelData.model
 
         const meshObject = new GameObject()
 
         objectManager.addObject(meshObject, sceneObject)
+        nodeIdMap.set(modelData.model.nodeId, meshObject)
 
         new Transform(meshObject, trsMatrix)
 
-        meshes.forEach((meshData) => {
-            new Mesh(
-                meshObject,
-                meshData.positions as GLTFAccessor,
-                meshData.indices,
-                meshData.normals,
-                meshData.textureCoordinates,
-                meshData.tangents,
-                materialStorage.materials.get(meshData.materialId) as IMaterial
-            )
-        })
+        this.#createMeshes(meshObject, meshes, materialStorage, skinMap)
 
         children.forEach((child) => {
             this.#traversePreloadNode(
@@ -385,9 +575,14 @@ export class ModelUploader {
                 objectManager,
                 bufferStorage,
                 materialStorage,
-                device
+                device,
+                nodeIdMap,
+                skinMap
             )
         })
+
+        this.#resolveSkins(skinMap, modelData, nodeIdMap)
+        this.#createAnimator(modelData, meshObject, nodeIdMap, animations)
 
         return meshObject
     }

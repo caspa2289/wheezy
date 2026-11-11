@@ -1,5 +1,6 @@
 import { vec3 } from 'wgpu-matrix'
 import {
+    type IAnimationSystem,
     type IBufferStorage,
     type IGameObject,
     type IImageStorage,
@@ -8,6 +9,7 @@ import {
     type IScene,
     type ISceneProps,
     type ISceneUploadModelProps,
+    type ISkin,
 } from '../../types'
 import { type ICamera } from '../../types/core/Camera'
 import { BufferStorage } from '../BufferStorage'
@@ -23,6 +25,7 @@ import { GameObject } from '../GameObject'
 import { MeshRenderDataStorage } from '../MeshRenderDataStorage'
 import { type IDirectionalLight } from '../lights/DirectionalLightV2'
 import { type IPointLight, type ISpotLight } from '../lights'
+import { AnimationSystem } from '../animation'
 
 export class Scene implements IScene {
     #objectManager: IObjectManager = new ObjectManager()
@@ -40,6 +43,8 @@ export class Scene implements IScene {
     directionalLights: IDirectionalLight[] = []
     pointLights: IPointLight[] = []
     spotLights: ISpotLight[] = []
+    skins: ISkin[] = []
+    readonly animations: IAnimationSystem = new AnimationSystem()
 
     constructor(props?: ISceneProps) {
         const { camera } = props ?? {}
@@ -123,7 +128,9 @@ export class Scene implements IScene {
             this.#materialStorage,
             this.#textureStorage,
             this.#root,
-            renderer.device
+            renderer.device,
+            this.skins,
+            this.animations
         )
     }
 

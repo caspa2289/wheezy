@@ -7,15 +7,27 @@ import {
     type ImageMap,
     type IMaterialPreloadData,
     type IModelPreloadData,
+    type IPreloadAnimation,
+    type IPreloadAnimationTrack,
     type IPreloadEntity,
     type IPreloadMesh,
+    type IPreloadMorphTarget,
+    type IPreloadSkin,
     type ISamplerPreloadData,
     type ITexturePreloadData,
     type MaterialMap,
     type SamplerMap,
+    type SkinMap,
+    type TAnimationInterpolation,
+    type TAnimationTargetPath,
     type TextureMap,
 } from '../../engine/types'
-import { getTypeSize, getVertexType, GLTFComponentType } from './helpers'
+import {
+    getTypeComponentsAmount,
+    getTypeSize,
+    getVertexType,
+    GLTFComponentType,
+} from './helpers'
 import { mat4, vec2, vec3, type Vec3, type Vec4 } from 'wgpu-matrix'
 
 type IndexMap = Map<number, string>
@@ -245,7 +257,18 @@ export class WheezyGLBLoader {
             texturesIndexMap
         )
 
+        // skin ids are allocated up front so nodes can reference them while
+        // the tree is walked; joint node ids resolve after the walk
+        const skinIndexMap: IndexMap = new Map()
+        const skinsMap: SkinMap = new Map()
+        modelData.json?.skins?.forEach((_: unknown, index: number) => {
+            skinIndexMap.set(index, generateId())
+        })
+
+        const nodeIdMap: IndexMap = new Map()
+
         const modelPreload: IPreloadEntity = {
+            nodeId: generateId(),
             trsMatrix: mat4.identity(),
             meshes: [],
             children: [],
@@ -259,11 +282,16 @@ export class WheezyGLBLoader {
                         modelData,
                         bufferIndexMap,
                         materialsIndexMap,
-                        bufferMap
+                        bufferMap,
+                        nodeIdMap,
+                        skinIndexMap
                     )
                 )
             })
         })
+
+        this.#loadSkins(modelData, skinIndexMap, nodeIdMap, skinsMap)
+        const animations = this.#loadAnimations(modelData, nodeIdMap)
 
         return {
             model: modelPreload,
@@ -272,6 +300,8 @@ export class WheezyGLBLoader {
             samplers: samplersMap,
             textures: texturesMap,
             materials: materialsMap,
+            skins: skinsMap,
+            animations,
         }
     }
 
@@ -284,21 +314,13 @@ export class WheezyGLBLoader {
             meshData.positions.bufferId
         ) as ArrayBuffer
 
-        const indexBuffer = bufferMap.get(
-            meshData.indices.bufferId
-        ) as ArrayBuffer
-
         const vertices = new Float32Array(
             positionsBuffer,
             meshData.positions?.byteOffset,
             meshData.positions?.byteLength / 4
         )
 
-        const indices = new Uint16Array(
-            indexBuffer,
-            meshData.indices?.byteOffset,
-            meshData.indices?.byteLength / 2
-        )
+        const indices = this.#readIndices(meshData, bufferMap)
 
         const normals = new Float32Array(vertices.length)
 
@@ -390,6 +412,55 @@ export class WheezyGLBLoader {
         } as GLTFAccessor
     }
 
+    /** sequential 0..n-1 indices for non-indexed glTF primitives */
+    static #createIndicesBuffer = (
+        meshData: IPreloadMesh,
+        bufferIndexMap: IndexMap,
+        bufferMap: BufferMap
+    ) => {
+        const count = meshData.positions.count
+        const use32 = count > 65535
+        const indices = use32 ? new Uint32Array(count) : new Uint16Array(count)
+        for (let i = 0; i < count; i++) {
+            indices[i] = i
+        }
+
+        const id = generateId()
+        bufferIndexMap.set(Math.random(), id)
+        bufferMap.set(id, indices.buffer as ArrayBuffer)
+
+        return {
+            bufferId: id,
+            byteStride: use32 ? 4 : 2,
+            byteLength: indices.byteLength,
+            byteOffset: 0,
+            count,
+            componentType: use32
+                ? GLTFComponentType.UNSIGNED_INT
+                : GLTFComponentType.UNSIGNED_SHORT,
+            elementType: use32 ? 'uint32' : 'uint16',
+            usage: GPUBufferUsage.INDEX,
+        } as GLTFAccessor
+    }
+
+    /** index view honoring the accessor's component type (uint16 or uint32) */
+    static #readIndices(meshData: IPreloadMesh, bufferMap: BufferMap) {
+        const indexBuffer = bufferMap.get(
+            meshData.indices.bufferId
+        ) as ArrayBuffer
+        return meshData.indices.componentType === GLTFComponentType.UNSIGNED_INT
+            ? new Uint32Array(
+                  indexBuffer,
+                  meshData.indices.byteOffset,
+                  meshData.indices.count
+              )
+            : new Uint16Array(
+                  indexBuffer,
+                  meshData.indices.byteOffset,
+                  meshData.indices.count
+              )
+    }
+
     static #createTangentsBuffer = (
         meshData: IPreloadMesh,
         bufferIndexMap: IndexMap,
@@ -401,10 +472,6 @@ export class WheezyGLBLoader {
 
         const textureCoordinatesBuffer = bufferMap.get(
             meshData.textureCoordinates.bufferId
-        ) as ArrayBuffer
-
-        const indexBuffer = bufferMap.get(
-            meshData.indices.bufferId
         ) as ArrayBuffer
 
         const vertices = new Float32Array(
@@ -419,13 +486,7 @@ export class WheezyGLBLoader {
             meshData.textureCoordinates?.byteLength / 4
         )
 
-        const indices =
-            //FIXME: this could be something other than Uint16
-            new Uint16Array(
-                indexBuffer,
-                meshData.indices?.byteOffset,
-                meshData.indices?.byteLength / 2
-            )
+        const indices = this.#readIndices(meshData, bufferMap)
 
         const tangents = new Float32Array(vertices.length)
 
@@ -513,7 +574,7 @@ export class WheezyGLBLoader {
 
     static #parseAccessor = (
         modelData: Record<string, any>,
-        accessorId: number,
+        accessorId: number | undefined,
         usage: GPUBufferUsageFlags,
         bufferIndexMap: IndexMap
     ): GLTFAccessor | undefined => {
@@ -556,17 +617,32 @@ export class WheezyGLBLoader {
         modelData: Record<string, any>,
         bufferIndexMap: IndexMap,
         materialsIndexMap: IndexMap,
-        bufferMap: BufferMap
+        bufferMap: BufferMap,
+        nodeIdMap: IndexMap,
+        skinIndexMap: IndexMap
     ) {
         const nodeJsonData = modelData?.json?.nodes[nodeIndex]
+        const nodeId = generateId()
+        // first visit wins: skins/animations resolve through this map after
+        // the whole node walk
+        if (!nodeIdMap.has(nodeIndex)) {
+            nodeIdMap.set(nodeIndex, nodeId)
+        }
+
         const dataStructEntry: IPreloadEntity = {
-            trsMatrix: nodeJsonData.matrix ?? mat4.identity(),
+            nodeId,
+            trsMatrix: WheezyGLBLoader.#composeNodeMatrix(nodeJsonData),
             meshes: [],
+            name: nodeJsonData.name,
             children: [],
         }
 
         if (nodeJsonData.mesh !== undefined) {
             const meshJsonData = modelData.json.meshes[nodeJsonData.mesh]
+            const skinId =
+                nodeJsonData.skin !== undefined
+                    ? skinIndexMap.get(nodeJsonData.skin)
+                    : undefined
 
             meshJsonData.primitives.forEach(
                 (primitive: {
@@ -574,10 +650,13 @@ export class WheezyGLBLoader {
                         NORMAL: number
                         POSITION: number
                         TEXCOORD_0: number
+                        JOINTS_0?: number
+                        WEIGHTS_0?: number
                     }
                     indices: number
                     mode: number
                     material?: number
+                    targets?: { POSITION?: number; NORMAL?: number }[]
                 }) => {
                     //FIXME: generate indices for non-indexed geometry
                     const meshData: Partial<IPreloadMesh> = {
@@ -610,6 +689,58 @@ export class WheezyGLBLoader {
                                 ? materialsIndexMap.get(primitive.material)
                                 : 'default',
                         mode: primitive.mode ?? 4,
+                        skinId,
+                    }
+
+                    if (!meshData.indices) {
+                        meshData.indices = this.#createIndicesBuffer(
+                            meshData as IPreloadMesh,
+                            bufferIndexMap,
+                            bufferMap
+                        )
+                    }
+
+                    if (skinId !== undefined) {
+                        meshData.joints = WheezyGLBLoader.#parseAccessor(
+                            modelData,
+                            primitive.attributes.JOINTS_0,
+                            GPUBufferUsage.VERTEX,
+                            bufferIndexMap
+                        )
+                        meshData.weights =
+                            WheezyGLBLoader.#parseSkinWeightsAccessor(
+                                modelData,
+                                primitive.attributes.WEIGHTS_0,
+                                bufferIndexMap
+                            )
+                    }
+
+                    if (primitive.targets?.length) {
+                        const morphTargets: IPreloadMorphTarget[] = []
+                        for (const target of primitive.targets) {
+                            const positions = WheezyGLBLoader.#parseAccessor(
+                                modelData,
+                                target.POSITION,
+                                GPUBufferUsage.VERTEX,
+                                bufferIndexMap
+                            )
+                            if (!positions) {
+                                continue
+                            }
+                            morphTargets.push({
+                                positions,
+                                normals: WheezyGLBLoader.#parseAccessor(
+                                    modelData,
+                                    target.NORMAL,
+                                    GPUBufferUsage.VERTEX,
+                                    bufferIndexMap
+                                ),
+                            })
+                        }
+                        if (morphTargets.length > 0) {
+                            meshData.morphTargets = morphTargets
+                            meshData.morphWeights = meshJsonData.weights
+                        }
                     }
 
                     if (!meshData.normals) {
@@ -646,11 +777,241 @@ export class WheezyGLBLoader {
                     modelData,
                     bufferIndexMap,
                     materialsIndexMap,
-                    bufferMap
+                    bufferMap,
+                    nodeIdMap,
+                    skinIndexMap
                 )
             )
         })
 
         return dataStructEntry
+    }
+
+    /** node.matrix when present, otherwise composed from translation/rotation/scale */
+    static #composeNodeMatrix(nodeJsonData: Record<string, any>) {
+        if (nodeJsonData.matrix) {
+            return nodeJsonData.matrix as Float32Array
+        }
+
+        const translation = nodeJsonData.translation as Vec3 | undefined
+        const rotation = nodeJsonData.rotation as number[] | undefined
+        const scale = nodeJsonData.scale as Vec3 | undefined
+
+        if (!translation && !rotation && !scale) {
+            return mat4.identity()
+        }
+
+        // glTF rotation is a quaternion in xyzw order, matching wgpu-matrix
+        const matrix = mat4.fromQuat(
+            rotation ?? [0, 0, 0, 1],
+            mat4.create()
+        ) as Float32Array
+        mat4.scale(matrix, scale ?? vec3.create(1, 1, 1), matrix)
+        if (translation) {
+            matrix[12] = translation[0]!
+            matrix[13] = translation[1]!
+            matrix[14] = translation[2]!
+        }
+        return matrix
+    }
+
+    /** WEIGHTS_0 may be stored normalized (unorm8x4 / unorm16x4 on the GPU) */
+    static #parseSkinWeightsAccessor(
+        modelData: Record<string, any>,
+        accessorId: number | undefined,
+        bufferIndexMap: IndexMap
+    ): GLTFAccessor | undefined {
+        if (accessorId === undefined || accessorId === null) {
+            return undefined
+        }
+
+        const accessor = WheezyGLBLoader.#parseAccessor(
+            modelData,
+            accessorId,
+            GPUBufferUsage.VERTEX,
+            bufferIndexMap
+        )
+        if (!accessor) {
+            return undefined
+        }
+
+        const rawAccessor = modelData.json.accessors[accessorId]
+        if (rawAccessor.normalized) {
+            accessor.elementType = getVertexType(
+                rawAccessor.componentType,
+                rawAccessor.type,
+                true
+            )
+        }
+        return accessor
+    }
+
+    /**
+     * Materializes a float accessor (animation times/values, inverse bind
+     * matrices) into a dense Float32Array — handles bufferView strides and
+     * unaligned offsets via DataView.
+     */
+    static #readAccessorFloats(
+        modelData: Record<string, any>,
+        accessorIndex: number
+    ): Float32Array {
+        const rawAccessor = modelData.json.accessors[accessorIndex]
+        const rawBufferView = modelData.json.bufferViews[rawAccessor.bufferView]
+        const buffer = modelData.binChunks[rawBufferView.buffer]
+
+        if (rawAccessor.componentType !== GLTFComponentType.FLOAT) {
+            throw new Error(
+                `wheezy: only float animation/skin accessors are supported (got componentType ${rawAccessor.componentType})`
+            )
+        }
+
+        const componentCount = getTypeComponentsAmount(rawAccessor.type)
+        const count = rawAccessor.count as number
+        const out = new Float32Array(count * componentCount)
+
+        const byteOffset =
+            (rawAccessor.byteOffset ?? 0) +
+            (rawBufferView.byteOffset ?? 0) +
+            (buffer?.byteOffset ?? 0)
+        const stride = Math.max(
+            rawBufferView.byteStride ?? 0,
+            componentCount * 4
+        )
+
+        const view = new DataView(buffer.arrayBuffer)
+        for (let i = 0; i < count; i++) {
+            for (let c = 0; c < componentCount; c++) {
+                out[i * componentCount + c] = view.getFloat32(
+                    byteOffset + i * stride + c * 4,
+                    true
+                )
+            }
+        }
+
+        return out
+    }
+
+    static #loadSkins(
+        modelData: Record<string, any>,
+        skinIndexMap: IndexMap,
+        nodeIdMap: IndexMap,
+        skinsMap: SkinMap
+    ) {
+        modelData.json?.skins?.forEach(
+            (
+                skinData: {
+                    name?: string
+                    inverseBindMatrices?: number
+                    joints: number[]
+                },
+                index: number
+            ) => {
+                const jointNodeIds: string[] = []
+                for (const jointIndex of skinData.joints) {
+                    const nodeId = nodeIdMap.get(jointIndex)
+                    if (nodeId === undefined) {
+                        console.warn(
+                            `wheezy: skin ${index} references node ${jointIndex} outside the loaded scenes — the joint stays bindless`
+                        )
+                    }
+                    jointNodeIds.push(nodeId as string)
+                }
+
+                const jointCount = jointNodeIds.length
+                const inverseBindMatrices = new Float32Array(jointCount * 16)
+                if (skinData.inverseBindMatrices !== undefined) {
+                    inverseBindMatrices.set(
+                        WheezyGLBLoader.#readAccessorFloats(
+                            modelData,
+                            skinData.inverseBindMatrices
+                        )
+                    )
+                } else {
+                    // no accessor: identity binds
+                    for (let j = 0; j < jointCount; j++) {
+                        const o = j * 16
+                        inverseBindMatrices[o] = 1
+                        inverseBindMatrices[o + 5] = 1
+                        inverseBindMatrices[o + 10] = 1
+                        inverseBindMatrices[o + 15] = 1
+                    }
+                }
+
+                const id = skinIndexMap.get(index) as string
+                const skin: IPreloadSkin = {
+                    name: skinData.name,
+                    jointNodeIds,
+                    inverseBindMatrices,
+                }
+                skinsMap.set(id, skin)
+            }
+        )
+    }
+
+    static #loadAnimations(
+        modelData: Record<string, any>,
+        nodeIdMap: IndexMap
+    ): IPreloadAnimation[] {
+        const animations: IPreloadAnimation[] = []
+
+        modelData.json?.animations?.forEach(
+            (
+                animationData: {
+                    name?: string
+                    channels: {
+                        sampler: number
+                        target: { node?: number; path: string }
+                    }[]
+                    samplers: {
+                        input: number
+                        output: number
+                        interpolation?: string
+                    }[]
+                },
+                animationIndex: number
+            ) => {
+                const tracks: IPreloadAnimationTrack[] = []
+
+                for (const channel of animationData.channels) {
+                    const sampler = animationData.samplers[channel.sampler]
+                    if (!sampler || channel.target.node === undefined) {
+                        continue
+                    }
+
+                    const targetNodeId = nodeIdMap.get(channel.target.node)
+                    if (targetNodeId === undefined) {
+                        console.warn(
+                            `wheezy: animation "${animationData.name}" targets node ${channel.target.node} outside the loaded scenes — channel skipped`
+                        )
+                        continue
+                    }
+
+                    tracks.push({
+                        targetNodeId,
+                        path: channel.target.path as TAnimationTargetPath,
+                        interpolation: (sampler.interpolation ??
+                            'LINEAR') as TAnimationInterpolation,
+                        input: WheezyGLBLoader.#readAccessorFloats(
+                            modelData,
+                            sampler.input
+                        ),
+                        output: WheezyGLBLoader.#readAccessorFloats(
+                            modelData,
+                            sampler.output
+                        ),
+                    })
+                }
+
+                if (tracks.length > 0) {
+                    animations.push({
+                        name:
+                            animationData.name ?? `Animation ${animationIndex}`,
+                        tracks,
+                    })
+                }
+            }
+        )
+
+        return animations
     }
 }

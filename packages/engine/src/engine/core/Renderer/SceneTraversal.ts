@@ -3,6 +3,7 @@ import { EntityTypes, type IMesh, type IScene } from '../../types'
 import { type SceneNodeContent } from '../../types/core/SceneTree'
 import { type BindGroupLayouts } from './BindGroupLayouts'
 import { type MeshGpuData } from './MeshGpuData'
+import { type SkinningUploader } from './SkinningUploader'
 import { type StagingBuffers } from './StagingBuffers'
 import {
     MAX_SCENE_NODES,
@@ -35,6 +36,7 @@ export class SceneTraversal {
 
     #device: GPUDevice
     #staging: StagingBuffers
+    #skinning: SkinningUploader
     #nodeMatricesBuffer: GPUBuffer
     #nodeCount = 0
     #scene!: IScene
@@ -60,10 +62,12 @@ export class SceneTraversal {
     constructor(
         device: GPUDevice,
         layouts: BindGroupLayouts,
-        staging: StagingBuffers
+        staging: StagingBuffers,
+        skinning: SkinningUploader
     ) {
         this.#device = device
         this.#staging = staging
+        this.#skinning = skinning
 
         this.#nodeMatricesBuffer = device.createBuffer({
             label: 'node matrices buffer',
@@ -113,6 +117,7 @@ export class SceneTraversal {
         this.#nodeCount = 0
         this.drawMeshes.length = 0
         this.shadowCasters.length = 0
+        this.#skinning.beginFrame(scene)
 
         for (const node of scene.objectManager.sceneTree.nodes.values()) {
             this.#walk(node, IDENTITY_MATRIX, 0, meshGpuData)
@@ -158,6 +163,9 @@ export class SceneTraversal {
                 nodeMatrix,
                 (nodeIndex * NODE_MATRIX_SIZE) / 4
             )
+            // joint nodes of registered skins need their slot for the
+            // per-frame joint-palette build (no-op unless skins exist)
+            this.#skinning.recordNodeIndex(node.gameObject.id, nodeIndex)
         } else if (!this.#overflowWarned) {
             this.#overflowWarned = true
             console.warn(
@@ -181,6 +189,9 @@ export class SceneTraversal {
                     continue
                 }
                 entry.nodeIndex = nodeIndex
+                if (mesh.skin || entry.morphBase >= 0) {
+                    this.#skinning.collect(mesh, entry)
+                }
                 this.drawMeshes.push(mesh)
                 if (mesh.castShadow) {
                     this.shadowCasters.push(mesh)

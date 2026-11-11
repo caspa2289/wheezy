@@ -4,9 +4,11 @@ import {
     MAX_DIRECTIONAL_LIGHTS,
     MAX_POINT_LIGHTS,
     MAX_SPOT_LIGHTS,
+    MORPH_WEIGHTS_BUFFER_SIZE,
     NODE_MATRICES_BUFFER_SIZE,
     POINT_LIGHT_BYTESTRIDE,
     SHADOW_DATA_BUFFER_SIZE,
+    SKIN_PALETTE_BUFFER_SIZE,
     SKYBOX_UNIFORM_BUFFER_SIZE,
     SPOT_LIGHT_BYTESTRIDE,
     VIEW_PARAMS_BUFFER_SIZE,
@@ -60,4 +62,10 @@ export class StagingBuffers {
 
     readonly nodeMatrices = new ArrayBuffer(NODE_MATRICES_BUFFER_SIZE)
     readonly nodeMatricesFloats = new Float32Array(this.nodeMatrices)
+
+    readonly skinPalette = new ArrayBuffer(SKIN_PALETTE_BUFFER_SIZE)
+    readonly skinPaletteFloats = new Float32Array(this.skinPalette)
+
+    readonly morphWeights = new ArrayBuffer(MORPH_WEIGHTS_BUFFER_SIZE)
+    readonly morphWeightsFloats = new Float32Array(this.morphWeights)
 }
