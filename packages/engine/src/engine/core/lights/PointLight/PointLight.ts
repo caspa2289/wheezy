@@ -1,4 +1,4 @@
-import { vec3, type Vec3 } from 'wgpu-matrix'
+import { type Mat4, vec3, type Vec3 } from 'wgpu-matrix'
 import {
     type ILightSourceV2,
     type ILightSourceV2Props,
@@ -18,6 +18,8 @@ export interface IPointLightProps extends Omit<
 
 export interface IPointLight extends ILightSourceV2 {
     position: Vec3
+    /** resolved world position — refreshed per frame by updateWorldPose */
+    worldPosition: Vec3
     attenuationConstant: number
     attenuationLinear: number
     attenuationExponential: number
@@ -25,6 +27,7 @@ export interface IPointLight extends ILightSourceV2 {
 
 export class PointLight extends LightSourceV2 implements IPointLight {
     position: Vec3
+    readonly worldPosition: Vec3
     attenuationConstant: number
     attenuationLinear: number
     attenuationExponential: number
@@ -35,6 +38,12 @@ export class PointLight extends LightSourceV2 implements IPointLight {
         this.attenuationConstant = props?.attenuationConstant ?? 1.0
         this.attenuationLinear = props?.attenuationLinear ?? 0.25
         this.attenuationExponential = props?.attenuationExponential ?? 0.25
+        this.worldPosition = vec3.copy(this.position)
+    }
+
+    override updateWorldPose(parentWorld: Mat4) {
+        super.updateWorldPose(parentWorld)
+        vec3.transformMat4(this.position, parentWorld, this.worldPosition)
     }
 
     fillLightData(dst: Float32Array, offset: number) {
@@ -44,9 +53,9 @@ export class PointLight extends LightSourceV2 implements IPointLight {
         dst[offset + 1] = this.color[1]!
         dst[offset + 2] = this.color[2]!
         dst[offset + 3] = this.intensity
-        dst[offset + 4] = this.position[0]!
-        dst[offset + 5] = this.position[1]!
-        dst[offset + 6] = this.position[2]!
+        dst[offset + 4] = this.worldPosition[0]!
+        dst[offset + 5] = this.worldPosition[1]!
+        dst[offset + 6] = this.worldPosition[2]!
         dst[offset + 7] = this.attenuationConstant
         dst[offset + 8] = this.attenuationLinear
         dst[offset + 9] = this.attenuationExponential
@@ -55,6 +64,6 @@ export class PointLight extends LightSourceV2 implements IPointLight {
     }
 
     override get gizmoPosition(): Vec3 {
-        return this.position
+        return this.worldPosition
     }
 }

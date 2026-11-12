@@ -3,7 +3,6 @@ export enum EntityTypes {
     mesh = 'mesh',
     material = 'material',
     transform = 'transform',
-    camera = 'camera',
     collider = 'collider',
     physicsObject = 'physicsObject',
     light = 'light',

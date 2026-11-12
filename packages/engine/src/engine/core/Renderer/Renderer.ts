@@ -1,4 +1,4 @@
-import { mat4, vec3 } from 'wgpu-matrix'
+import { type Mat4, mat4, vec3 } from 'wgpu-matrix'
 import {
     type IMesh,
     type IRenderer,
@@ -35,6 +35,10 @@ import {
 // accept a dst argument — no per-frame allocation)
 const scratchViewProjection = mat4.create()
 const scratchInverseViewProjection = mat4.create()
+// per-frame scratch for the camera's resolved world pose
+const scratchCameraWorld = mat4.create()
+const scratchCameraView = mat4.create()
+const scratchCameraPosition = vec3.create()
 
 /**
  * Renderer orchestration: owns the subsystem instances, wires the two
@@ -253,6 +257,10 @@ export class Renderer implements IRenderer {
         const afterAnimation = performance.now()
         Profiler.sample('animation', afterAnimation - afterSceneUpdate)
 
+        // resolve every light's world pose from its parent's scene-tree world
+        // matrix — before the gizmos and all light consumers read them
+        this.#lightUploader.resolvePoses(scene)
+
         // attach/detach/re-pin the debug light gizmos before the traversal so
         // a profiler-HUD toggle takes effect this frame (dev-only: the
         // Profiler is disabled in production builds)
@@ -263,6 +271,15 @@ export class Renderer implements IRenderer {
         const staging = this.#staging
         const floats = staging.viewParamsFloats
         const ints = staging.viewParamsInts
+
+        // resolve the camera's world pose (scene-tree ancestors × its local
+        // matrix) and write the derived view back onto the camera, so every
+        // consumer this frame reads the view that actually gets rendered
+        const cameraWorld = this.#cameraWorldMatrix(scene, scratchCameraWorld)
+        scene.camera.view = mat4.inverse(cameraWorld, scratchCameraView)
+        scratchCameraPosition[0] = cameraWorld[12]!
+        scratchCameraPosition[1] = cameraWorld[13]!
+        scratchCameraPosition[2] = cameraWorld[14]!
 
         // inverse view-projection for world-position reconstruction in the
         // deferred lighting pass (float offset 40 — see ViewParams in lighting.wgsl)
@@ -277,7 +294,10 @@ export class Renderer implements IRenderer {
 
         floats.set(scene.camera.projectionMatrix, 0)
         floats.set(scene.camera.view, 16)
-        floats.set(scene.camera.position, 32)
+        floats[32] = cameraWorld[12]!
+        floats[33] = cameraWorld[13]!
+        floats[34] = cameraWorld[14]!
+        floats[35] = cameraWorld[15]!
         // environment tint (rgb) and strength (a) for the IBL term
         floats[36] = this.ambientLightColor[0]!
         floats[37] = this.ambientLightColor[1]!
@@ -304,11 +324,51 @@ export class Renderer implements IRenderer {
         // `shadow_caster` pad slots are patched with the caster base indices
         const casterBases = this.#shadowCasters.allocate(
             scene,
-            scene.camera.position,
+            scratchCameraPosition,
             inverseViewProjection,
             this.#lightUploader.pointRanges,
             this.#lightUploader.spotRanges
         )
+
+        // TEMP DEBUG (remove): shadow allocation state for headless probing
+        ;(globalThis as any).__wheezyShadowDebug = {
+            tileCount: this.#shadowCasters.frameTileCount,
+            tiles: this.#shadowCasters.frameTiles
+                .slice(0, this.#shadowCasters.frameTileCount)
+                .map((t) => ({ ...t })),
+            bases: Array.from(casterBases.entries()).map(([l, b]) => [
+                l.lightType,
+                b,
+            ]),
+            casterMeshCount: this.#traversal.shadowCasters.length,
+            spots: scene.spotLights.map((l) => ({
+                p: Array.from(l.worldPosition),
+                d: Array.from(l.worldDirection),
+                range: 0,
+            })),
+            spotRanges: Array.from(
+                this.#lightUploader.spotRanges.subarray(
+                    0,
+                    scene.spotLights.length
+                )
+            ),
+            cameraPosition: Array.from(scratchCameraPosition),
+            shadowHeader: this.#staging.shadowDataInts[0],
+            caster0: {
+                vp: Array.from(this.#staging.shadowDataFloats.slice(4, 20)),
+                rect: Array.from(this.#staging.shadowDataFloats.slice(20, 24)),
+                enabled: this.#staging.shadowDataInts[24],
+            },
+            shadowPassDepth: (() => {
+                const d = (this.#framePlan.shadowPassDescriptor as any)
+                    .depthStencilAttachment
+                return {
+                    clearValue: d?.depthClearValue,
+                    loadOp: d?.depthLoadOp,
+                    storeOp: d?.depthStoreOp,
+                }
+            })(),
+        }
 
         // rewrites the persistent light buffers and the light counts in the
         // view-params staging (floats 63–65)
@@ -350,6 +410,15 @@ export class Renderer implements IRenderer {
         if (gpuTimingThisFrame) {
             this.#gpuTimer.readTimestamps(this.#framePlan.fxaaTimed)
         }
+    }
+
+    /**
+     * The camera's world matrix: its scene-tree ancestors' transforms
+     * composed with its own local matrix; the local matrix alone when the
+     * camera is not registered in the tree.
+     */
+    #cameraWorldMatrix(scene: IScene, dst: Mat4): Mat4 {
+        return scene.objectManager.resolveWorldMatrix(scene.camera, dst)
     }
 
     // --- pass encoders (created once, referenced from the frame plan's list) ---

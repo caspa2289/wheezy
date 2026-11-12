@@ -1,19 +1,19 @@
 import {
     AnimationDebugger,
-    EntityTypes,
     GameObject,
     type IGameObject,
-    type IMesh,
     type IScene,
+    PerspectiveCamera,
     Scene,
     SpotLight,
     type TSkyboxBitmaps,
+    Transform,
     WheezyGLBLoader,
     renderer,
 } from '@wheezy/engine'
-import { ArcBallCamera } from '@wheezy/engine/src/engine/core/cameras/ArcBallCamera'
 import { ArcBallController } from '@wheezy/engine/src/utils/ArcBallController'
-import { vec3 } from 'wgpu-matrix'
+import { FPSController } from '@wheezy/engine/src/utils/FPSController'
+import { vec3, vec4 } from 'wgpu-matrix'
 
 const WALL_SCALE = 6
 // raw POSITION max.z, which the node rotation turns into world +Y
@@ -50,25 +50,45 @@ const SKIBIDI_TOILET_SCALE = 2.4 / 2.58
 const SKIBIDI_TOILET_POSITION = vec3.create(3, CHARACTER_BASE_Y, 3.5)
 
 export class Demo1 extends Scene implements IScene {
-    #controller: ArcBallController
+    #controller: FPSController
 
     #testHook!: IGameObject
     #coloredSpots: SpotLight[] = []
     #orbitAngle = 0
+
+    #flashLight!: SpotLight
+
+    #player: IGameObject
+
+    #flashlightOffset: IGameObject
 
     // #helmet!: IGameObject
 
     constructor() {
         super()
 
-        this.camera = new ArcBallCamera({
+        // first-person rig: the camera rides at the player's origin with an
+        // identity local pose and inherits the player's orientation
+        this.camera = new PerspectiveCamera({
             canvasHeight: renderer.context.canvas.height,
             canvasWidth: renderer.context.canvas.width,
-            position: vec3.create(-8, 0, 0),
         })
 
-        this.#controller = new ArcBallController({
-            camera: this.camera as ArcBallCamera,
+        this.#player = new GameObject()
+        this.#flashlightOffset = new GameObject()
+        new Transform(this.#flashlightOffset)
+
+        new Transform(this.#player)
+        this.#player.transform.position = vec4.create(-8, 0, 0, 1)
+        this.#flashlightOffset.transform.translate(vec3.create(0, -2, -2))
+
+        this.#player.pointAt(HELMET_POSITION)
+        this.objectManager.addObject(this.#player, this.root)
+        this.objectManager.addObject(this.#flashlightOffset, this.#player)
+        this.objectManager.addObject(this.camera, this.#player)
+
+        this.#controller = new FPSController({
+            gameObject: this.#player,
             canvas: renderer.context.canvas as HTMLCanvasElement,
         })
     }
@@ -167,13 +187,15 @@ export class Demo1 extends Scene implements IScene {
     }
 
     async #setupSkyBox() {
+        const cubeMap = 'space'
+        const format = 'png'
         const imgSrcs = [
-            'static/cubemaps/bridge/posx.jpg',
-            'static/cubemaps/bridge/negx.jpg',
-            'static/cubemaps/bridge/posy.jpg',
-            'static/cubemaps/bridge/negy.jpg',
-            'static/cubemaps/bridge/posz.jpg',
-            'static/cubemaps/bridge/negz.jpg',
+            `static/cubemaps/${cubeMap}/posx.${format}`,
+            `static/cubemaps/${cubeMap}/negx.${format}`,
+            `static/cubemaps/${cubeMap}/posy.${format}`,
+            `static/cubemaps/${cubeMap}/negy.${format}`,
+            `static/cubemaps/${cubeMap}/posz.${format}`,
+            `static/cubemaps/${cubeMap}/negz.${format}`,
         ]
 
         const promises = imgSrcs.map(async (source) => {
@@ -209,7 +231,22 @@ export class Demo1 extends Scene implements IScene {
         })
         this.#coloredSpots = coloredSpots
 
-        this.spotLights.push(...coloredSpots)
+        // head-lamp rig: the light's position/direction live in the player's
+        // frame — the origin, pointing along the player's forward (−Z) — and
+        // the renderer resolves them against the player's world matrix each
+        // frame, so the cone turns with the FPSController
+        this.#flashLight = new SpotLight({
+            parent: this.#flashlightOffset,
+            direction: vec3.create(0, 0, -1),
+            color: vec3.create(0.9, 1, 0.9),
+            cutoff: 15,
+            intensity: 2,
+        })
+
+        this.spotLights.push(
+            // ...this.#coloredSpots,
+            this.#flashLight
+        )
     }
 
     public override onRender(dt: number): void {

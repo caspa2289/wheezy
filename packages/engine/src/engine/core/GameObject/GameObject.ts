@@ -1,3 +1,4 @@
+import { mat4, vec3, type Vec3 } from 'wgpu-matrix'
 import {
     type EntityID,
     EntityTypes,
@@ -64,5 +65,27 @@ export class GameObject
 
     public removeComponent(id: EntityID) {
         this.#components.delete(id)
+    }
+
+    /**
+     * Rotates the object so its forward axis (−Z, the direction a camera
+     * attached here looks) points at the target. Translation is preserved,
+     * roll resets to zero and the matrix's rotation is replaced wholesale
+     * (any scale in it is lost).
+     */
+    public pointAt(target: Vec3) {
+        const transform = this.transform
+        if (!transform) {
+            return
+        }
+
+        const position = vec3.copy(transform.position)
+        const back = vec3.normalize(vec3.sub(position, target))
+        // yaw/pitch decomposition of the back axis — the PerspectiveCamera
+        // convention; the recomposed matrix has its column 2 along `back`
+        const yaw = Math.atan2(back[0]!, back[2]!)
+        const pitch = -Math.asin(back[1]!)
+        mat4.copy(mat4.rotateX(mat4.rotationY(yaw), pitch), transform.matrix)
+        vec3.copy(position, transform.position)
     }
 }

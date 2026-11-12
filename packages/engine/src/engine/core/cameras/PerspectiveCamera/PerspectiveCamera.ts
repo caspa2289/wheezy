@@ -17,6 +17,7 @@ export class PerspectiveCamera extends Camera implements IPerspectiveCamera {
         const back = vec3.normalize(vec3.sub(positionVec, targetVec))
         this.#recalculateAngles(back)
         super.position = positionVec
+        this.update()
     }
 
     #recalculateAngles(direction: Vec3) {

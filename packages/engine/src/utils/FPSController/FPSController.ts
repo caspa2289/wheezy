@@ -1,11 +1,16 @@
-import { vec3 } from 'wgpu-matrix'
-import { type IPerspectiveCamera } from '../../engine/types/core/Camera'
+import { mat4, vec3 } from 'wgpu-matrix'
+import { type IGameObject } from '../../engine/types'
 import { Stuff } from '../Stuff'
 
 export interface FPSControllerProps {
     canvas: HTMLCanvasElement
-    camera: IPerspectiveCamera
+    gameObject: IGameObject
 }
+
+// per-frame scratch: the yaw/pitch rotation and one axis vector reused for
+// all three basis columns
+const scratchRotation = mat4.create()
+const scratchAxis = vec3.create()
 
 //FIXME: refactor when input controller is in place
 
@@ -22,16 +27,27 @@ export class FPSController {
 
     velocity = vec3.create()
 
+    yaw = 0
+    pitch = 0
+
     movementSpeed = 8
     frictionCoefficient = 0.99
     rotationSpeed = 0.05
 
     canvas: HTMLCanvasElement
-    camera: IPerspectiveCamera
+    gameObject: IGameObject
 
     constructor(props: FPSControllerProps) {
         this.canvas = props.canvas
-        this.camera = props.camera
+        this.gameObject = props.gameObject
+
+        // adopt the object's current orientation (e.g. from pointAt) so the
+        // first update() doesn't snap it back to yaw/pitch zero
+        const matrix = this.gameObject.transform?.matrix
+        if (matrix) {
+            this.yaw = Math.atan2(matrix[8]!, matrix[10]!)
+            this.pitch = -Math.asin(matrix[9]!)
+        }
 
         window.addEventListener('keydown', (evt: any) => {
             switch (evt.code) {
@@ -98,27 +114,41 @@ export class FPSController {
         (positive ? 1 : 0) - (negative ? 1 : 0)
 
     update(deltaTime: number) {
+        this.yaw = Stuff.mod(
+            this.yaw - this.rotationSpeed * this.analogX * deltaTime,
+            Math.PI * 2
+        )
+        this.pitch = Stuff.clamp(
+            this.pitch - this.rotationSpeed * this.analogY * deltaTime,
+            -Math.PI / 2,
+            Math.PI / 2
+        )
+        this.analogX = 0
+        this.analogY = 0
+
+        const transform = this.gameObject.transform
+        if (!transform) {
+            return
+        }
+
+        // yaw around Y, then pitch around X (roll stays zero) — the same
+        // composition PerspectiveCamera.update and GameObject.pointAt use
+        mat4.rotateX(
+            mat4.rotationY(this.yaw, scratchRotation),
+            this.pitch,
+            scratchRotation
+        )
+
         const targetVelocity = vec3.create()
         const deltaRight = this.#getSign(this.moveRight, this.moveLeft)
         const deltaBack = this.#getSign(this.moveBack, this.moveForward)
         const deltaUp = this.#getSign(this.moveUp, this.moveDown)
-        this.camera.yaw -= this.rotationSpeed * this.analogX * deltaTime
-        this.camera.pitch -= this.rotationSpeed * this.analogY * deltaTime
-        this.analogX = 0
-        this.analogY = 0
-        vec3.addScaled(
-            targetVelocity,
-            this.camera.right,
-            deltaRight,
-            targetVelocity
-        )
-        vec3.addScaled(
-            targetVelocity,
-            this.camera.back,
-            deltaBack,
-            targetVelocity
-        )
-        vec3.addScaled(targetVelocity, this.camera.up, deltaUp, targetVelocity)
+        mat4.getAxis(scratchRotation, 0, scratchAxis)
+        vec3.addScaled(targetVelocity, scratchAxis, deltaRight, targetVelocity)
+        mat4.getAxis(scratchRotation, 2, scratchAxis)
+        vec3.addScaled(targetVelocity, scratchAxis, deltaBack, targetVelocity)
+        mat4.getAxis(scratchRotation, 1, scratchAxis)
+        vec3.addScaled(targetVelocity, scratchAxis, deltaUp, targetVelocity)
         vec3.normalize(targetVelocity, targetVelocity)
         vec3.mulScalar(targetVelocity, this.movementSpeed, targetVelocity)
 
@@ -128,10 +158,13 @@ export class FPSController {
             Math.pow(1 - this.frictionCoefficient, deltaTime)
         )
 
-        this.camera.position = vec3.addScaled(
-            this.camera.position,
-            this.velocity,
-            deltaTime
-        )
+        // write the pose into the transform: the rotation in place (the
+        // matrix buffer is aliased by the camera column views), then the
+        // integrated position — vec3 ops on the 4-float position view leave
+        // its w untouched
+        const position = vec3.copy(transform.position)
+        mat4.copy(scratchRotation, transform.matrix)
+        vec3.addScaled(position, this.velocity, deltaTime, position)
+        vec3.copy(position, transform.position)
     }
 }

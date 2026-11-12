@@ -1,7 +1,8 @@
 import { type Mat4, mat4, vec3, type Vec3 } from 'wgpu-matrix'
-import { EntityTypes } from '../../../types'
-import { Entity } from '../../Entity'
 import { type ICamera } from '../../../types/core/Camera'
+import { type ITransform } from '../../../types'
+import { GameObject } from '../../GameObject'
+import { Transform } from '../../Transform'
 
 export interface ICameraProps {
     zFar?: number
@@ -12,14 +13,18 @@ export interface ICameraProps {
     canvasHeight: number
 }
 
-export class Camera extends Entity<EntityTypes.camera> implements ICamera {
-    readonly #view = mat4.create()
+export class Camera extends GameObject implements ICamera {
+    readonly #view = mat4.identity()
 
-    #matrix = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
-    #right = new Float32Array(this.#matrix.buffer, 4 * 0, 4)
-    #up = new Float32Array(this.#matrix.buffer, 4 * 4, 4)
-    #back = new Float32Array(this.#matrix.buffer, 4 * 8, 4)
-    #position = new Float32Array(this.#matrix.buffer, 4 * 12, 4)
+    #transform: ITransform
+
+    // column views aliased into #transform.matrix: right (0), up (1),
+    // back (2); the position column (3) is exposed by Transform itself.
+    // Every setter copies into the matrix buffer in place — reassigning
+    // transform.matrix would orphan these views
+    #right: Float32Array
+    #up: Float32Array
+    #back: Float32Array
 
     #zFar: number
     #zNear: number
@@ -27,7 +32,13 @@ export class Camera extends Entity<EntityTypes.camera> implements ICamera {
     #projectionMatrix
 
     constructor(props: ICameraProps) {
-        super(EntityTypes.camera)
+        super()
+
+        this.#transform = new Transform(this)
+        const matrixBuffer = this.#transform.matrix.buffer
+        this.#right = new Float32Array(matrixBuffer, 4 * 0, 4)
+        this.#up = new Float32Array(matrixBuffer, 4 * 4, 4)
+        this.#back = new Float32Array(matrixBuffer, 4 * 8, 4)
 
         this.#zFar = props?.zFar ?? 1000
         this.#zNear = props?.zNear ?? 0.1
@@ -38,6 +49,10 @@ export class Camera extends Entity<EntityTypes.camera> implements ICamera {
             this.#zNear,
             this.#zFar
         )
+    }
+
+    override get transform() {
+        return this.#transform
     }
 
     get aspectRatio() {
@@ -89,18 +104,20 @@ export class Camera extends Entity<EntityTypes.camera> implements ICamera {
     }
 
     get matrix() {
-        return this.#matrix
+        return this.#transform.matrix
     }
 
     set matrix(value: Mat4) {
-        this.#matrix = mat4.copy(value, this.#matrix)
+        mat4.copy(value, this.#transform.matrix)
     }
 
     get position() {
-        return this.#position
+        return this.#transform.position
     }
 
     set position(value: Vec3) {
-        vec3.copy(value, this.#position)
+        // Transform's own position setter copies 4 elements (Vec4) — routing
+        // a Vec3 through it would write NaN into w; write xyz in place
+        vec3.copy(value, this.#transform.position)
     }
 }

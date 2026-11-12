@@ -1,4 +1,4 @@
-import { vec3, type Vec3 } from 'wgpu-matrix'
+import { type Mat4, mat4, vec3, type Vec3 } from 'wgpu-matrix'
 import { type IScene } from '../../types'
 import { type ILightSourceV2 } from '../lights/LightSourceV2'
 import { type BindGroupLayouts } from './BindGroupLayouts'
@@ -70,6 +70,7 @@ export class LightUploader {
     #cullLightsBuffer: GPUBuffer
     #cullCount = 0
     #scratchDirection = vec3.create()
+    #scratchParentWorld = mat4.identity() as Mat4
     #capacityWarned = false
 
     constructor(
@@ -189,6 +190,36 @@ export class LightUploader {
             return (reach - attenuationConstant) / attenuationLinear
         }
         return SHADOW_LOCAL_FAR
+    }
+
+    /**
+     * The single per-frame world-pose resolution: every light's
+     * position/direction are properties in its parent GameObject's frame, so
+     * the parent's scene-tree world matrix is resolved and each light
+     * refreshes its worldPosition/worldDirection from it. Runs before every
+     * consumer (gizmos, GPU upload, shadow allocation, culling). Lights whose
+     * parent has no transform resolve to identity — their world values equal
+     * the raw properties.
+     */
+    resolvePoses(scene: IScene) {
+        const objectManager = scene.objectManager
+        const resolve = (light: ILightSourceV2) => {
+            light.updateWorldPose(
+                objectManager.resolveWorldMatrix(
+                    light.parent,
+                    this.#scratchParentWorld
+                )
+            )
+        }
+        for (const light of scene.directionalLights) {
+            resolve(light)
+        }
+        for (const light of scene.pointLights) {
+            resolve(light)
+        }
+        for (const light of scene.spotLights) {
+            resolve(light)
+        }
     }
 
     /** the single per-frame range derivation — ShadowCasters and the uploads read these arrays */
@@ -314,7 +345,7 @@ export class LightUploader {
         for (let i = 0; i < pointCount; i++) {
             const light = scene.pointLights[i]!
             this.#addCullLight(
-                light.position,
+                light.worldPosition,
                 this.pointRanges[i]!,
                 null,
                 -2, // point marker — no cone test in the shader
@@ -327,9 +358,9 @@ export class LightUploader {
         for (let i = 0; i < spotCount; i++) {
             const light = scene.spotLights[i]!
             this.#addCullLight(
-                light.position,
+                light.worldPosition,
                 this.spotRanges[i]!,
-                vec3.normalize(light.direction, this.#scratchDirection),
+                vec3.normalize(light.worldDirection, this.#scratchDirection),
                 light.cutoff,
                 1,
                 i

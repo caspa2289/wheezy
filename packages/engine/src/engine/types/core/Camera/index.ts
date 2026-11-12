@@ -1,7 +1,7 @@
 import { type Mat3, type Mat4, type Vec3, type Vec4 } from 'wgpu-matrix'
-import { EntityTypes, type IEntity } from '../Entity'
+import { type IGameObject } from '../GameObject'
 
-export interface ICamera extends IEntity<EntityTypes.camera> {
+export interface ICamera extends IGameObject {
     matrix: Mat3 // This is the inverse of the view matrix.
     view: Mat4
     position: Vec4
@@ -17,6 +17,7 @@ export interface ICamera extends IEntity<EntityTypes.camera> {
 export interface IPerspectiveCamera extends ICamera {
     pitch: number
     yaw: number
+    update: () => Mat4
 }
 
 export interface IArcBallCamera extends ICamera {

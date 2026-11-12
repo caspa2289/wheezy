@@ -1,4 +1,4 @@
-import { vec3, type Vec3 } from 'wgpu-matrix'
+import { type Mat4, vec3, type Vec3 } from 'wgpu-matrix'
 import {
     type ILightSourceV2,
     type ILightSourceV2Props,
@@ -22,6 +22,9 @@ export interface ISpotLightProps extends Omit<
 export interface ISpotLight extends ILightSourceV2 {
     position: Vec3
     direction: Vec3
+    /** resolved world pose — refreshed per frame by updateWorldPose */
+    worldPosition: Vec3
+    worldDirection: Vec3
     cutoff: number
     attenuationConstant: number
     attenuationLinear: number
@@ -32,6 +35,8 @@ export interface ISpotLight extends ILightSourceV2 {
 export class SpotLight extends LightSourceV2 implements ISpotLight {
     position: Vec3
     direction: Vec3
+    readonly worldPosition: Vec3
+    readonly worldDirection: Vec3
     #cutoff!: number
     attenuationConstant: number
     attenuationLinear: number
@@ -45,6 +50,19 @@ export class SpotLight extends LightSourceV2 implements ISpotLight {
         this.attenuationExponential = props?.attenuationExponential ?? 0.002
         this.direction = props?.direction ?? vec3.create(-1, 0, 0)
         this.cutoff = props?.cutoff ?? 15
+        this.worldPosition = vec3.copy(this.position)
+        this.worldDirection = vec3.copy(this.direction)
+    }
+
+    override updateWorldPose(parentWorld: Mat4) {
+        super.updateWorldPose(parentWorld)
+        vec3.transformMat4(this.position, parentWorld, this.worldPosition)
+        vec3.transformMat4Upper3x3(
+            this.direction,
+            parentWorld,
+            this.worldDirection
+        )
+        vec3.normalize(this.worldDirection, this.worldDirection)
     }
 
     get cutoff() {
@@ -62,11 +80,12 @@ export class SpotLight extends LightSourceV2 implements ISpotLight {
     }
 
     /**
-     * Aim the cone at a world-space point: direction = normalize(target −
-     * position). Normalizes explicitly — the plain `direction` property does
-     * not, and the shader's cone test consumes it raw. A degenerate target
-     * (at the light's position) keeps the current direction instead of
-     * producing NaN.
+     * Aim the cone at a point in the light's parent frame (identical to world
+     * space when the parent has no transform of its own): direction =
+     * normalize(target − position). Normalizes explicitly — the plain
+     * `direction` property does not, and the shader's cone test consumes it
+     * raw. A degenerate target (at the light's position) keeps the current
+     * direction instead of producing NaN.
      */
     pointAt(target: Vec3) {
         const toTarget = vec3.sub(target, this.position)
@@ -83,13 +102,13 @@ export class SpotLight extends LightSourceV2 implements ISpotLight {
         dst[offset + 1] = this.color[1]!
         dst[offset + 2] = this.color[2]!
         dst[offset + 3] = 0
-        dst[offset + 4] = this.position[0]!
-        dst[offset + 5] = this.position[1]!
-        dst[offset + 6] = this.position[2]!
+        dst[offset + 4] = this.worldPosition[0]!
+        dst[offset + 5] = this.worldPosition[1]!
+        dst[offset + 6] = this.worldPosition[2]!
         dst[offset + 7] = 0
-        dst[offset + 8] = this.direction[0]!
-        dst[offset + 9] = this.direction[1]!
-        dst[offset + 10] = this.direction[2]!
+        dst[offset + 8] = this.worldDirection[0]!
+        dst[offset + 9] = this.worldDirection[1]!
+        dst[offset + 10] = this.worldDirection[2]!
         dst[offset + 11] = this.cutoff
         dst[offset + 12] = this.intensity
         dst[offset + 13] = this.attenuationConstant
@@ -98,6 +117,6 @@ export class SpotLight extends LightSourceV2 implements ISpotLight {
     }
 
     override get gizmoPosition(): Vec3 {
-        return this.position
+        return this.worldPosition
     }
 }

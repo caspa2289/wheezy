@@ -1,8 +1,11 @@
+import { type Mat4, mat4 } from 'wgpu-matrix'
 import {
     type EntityID,
     type IGameObject,
     type IObjectManager,
     type ISceneTree,
+    type SceneNode,
+    type SceneNodeContent,
     type SceneTreePosition,
 } from '../../types'
 import { SceneTree } from '../SceneTree'
@@ -21,6 +24,43 @@ export class ObjectManager implements IObjectManager {
         return gameObject
             ? (this.#objectPositions.get(gameObject.id) ?? null)
             : null
+    }
+
+    public getObjectPath(gameObject: IGameObject): SceneTreePosition | null {
+        return this.#objectPositions.get(gameObject.id) ?? null
+    }
+
+    /**
+     * The object's world matrix: its scene-tree ancestors' transforms composed
+     * with its own, written into `dst`. Objects not registered in the tree (or
+     * with a stale path record) resolve to their own transform matrix — or
+     * identity when they have no transform.
+     */
+    public resolveWorldMatrix(gameObject: IGameObject, dst: Mat4): Mat4 {
+        const path = this.#objectPositions.get(gameObject.id)
+        if (!path) {
+            return this.#ownMatrix(gameObject, dst)
+        }
+
+        mat4.identity(dst)
+        let siblings: SceneNode | null = this.#sceneTree.nodes
+        for (const id of path) {
+            const node: SceneNodeContent | undefined = siblings?.get(id)
+            if (!node) {
+                return this.#ownMatrix(gameObject, dst)
+            }
+            const transform = node.gameObject.transform
+            if (transform) {
+                mat4.mul(dst, transform.matrix, dst)
+            }
+            siblings = node.children
+        }
+        return dst
+    }
+
+    #ownMatrix(gameObject: IGameObject, dst: Mat4): Mat4 {
+        const transform = gameObject.transform
+        return transform ? mat4.copy(transform.matrix, dst) : mat4.identity(dst)
     }
 
     public addObject(child: IGameObject, target?: IGameObject) {

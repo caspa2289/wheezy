@@ -186,7 +186,7 @@ function createGizmoCone() {
  * directional lights that is the world origin, matching their `pointAt`
  * anchor), plus, for lights with a direction (spot, directional), an
  * emissive **cone** showing where the light points: apex at the anchor,
- * opened along `light.direction` with the spot's real cutoff angle
+ * opened along `light.worldDirection` with the spot's real cutoff angle
  * (directional uses a fixed 30° half angle). `Renderer.render` drives `sync`
  * every frame before the scene-tree traversal; visibility comes from the
  * profiler HUD's checkbox (`Profiler.enabled && Profiler.gizmosEnabled`), so
@@ -218,7 +218,7 @@ export class LightGizmo {
                 scene,
                 light,
                 enabled,
-                light.direction,
+                light.worldDirection,
                 light.cutoff
             )
         }
@@ -227,7 +227,7 @@ export class LightGizmo {
                 scene,
                 light,
                 enabled,
-                light.direction,
+                light.worldDirection,
                 DIRECTIONAL_GIZMO_COS_CUTOFF
             )
         }

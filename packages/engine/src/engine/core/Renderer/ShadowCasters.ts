@@ -212,7 +212,7 @@ export class ShadowCasters {
         )
 
         for (const light of scene.directionalLights) {
-            if (vec3.length(light.direction) <= 1e-6) {
+            if (vec3.length(light.worldDirection) <= 1e-6) {
                 continue
             }
             const candidate = this.#nextCandidate(
@@ -222,7 +222,7 @@ export class ShadowCasters {
                 1
             )
             this.#directionalShadowVP(
-                light.direction,
+                light.worldDirection,
                 sphere,
                 SHADOW_TILE_DIRECTIONAL,
                 candidate.vps[0]!
@@ -235,7 +235,7 @@ export class ShadowCasters {
             const light = scene.spotLights[i]!
             const candidate = this.#nextCandidate(
                 light,
-                vec3.distance(light.position, cameraPosition),
+                vec3.distance(light.worldPosition, cameraPosition),
                 SHADOW_TILE_SPOT,
                 1
             )
@@ -254,7 +254,7 @@ export class ShadowCasters {
             const far = Math.min(Math.max(range, 1), SHADOW_LOCAL_FAR)
             const candidate = this.#nextCandidate(
                 light,
-                vec3.distance(light.position, cameraPosition),
+                vec3.distance(light.worldPosition, cameraPosition),
                 SHADOW_TILE_POINT_FACE,
                 POINT_FACE_COUNT
             )
@@ -262,13 +262,13 @@ export class ShadowCasters {
             for (let face = 0; face < POINT_FACE_COUNT; face++) {
                 const visible = this.#pointFaceVisible(
                     face,
-                    light.position,
+                    light.worldPosition,
                     sphere
                 )
                 candidate.faceVisible[face] = visible
                 if (visible) {
                     this.#pointFaceShadowVP(
-                        light.position,
+                        light.worldPosition,
                         face,
                         far,
                         candidate.vps[face]!
@@ -549,18 +549,18 @@ export class ShadowCasters {
 
     #spotShadowVP(light: ISpotLight, range: number, dst: Mat4) {
         const direction = vec3.normalize(
-            light.direction,
+            light.worldDirection,
             this.#scratchDirection
         )
         const up = Math.abs(direction[1]!) > 0.99 ? UP_Z : UP_Y
         const target = vec3.addScaled(
-            light.position,
+            light.worldPosition,
             direction,
             1,
             this.#scratchTarget
         )
         const lightView = mat4.lookAt(
-            light.position,
+            light.worldPosition,
             target,
             up,
             this.#scratchLightView
